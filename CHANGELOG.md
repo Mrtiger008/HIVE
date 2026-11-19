@@ -1,5 +1,22 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 12 Complete
+
+**Phase 12: Markdown Import**
+
+`src/importer.js`:
+- `parseMd(content, filePath)` — extracts title (frontmatter → H1 → filename), body, type, trust, importance, tags from any markdown file; optional YAML frontmatter (`---` block)
+- `importFile(filePath, { auto, overrides })` — dry-run or write; deduped via `source_ref = md:<abs-path>`; skips empty files and already-imported files
+- `importDir(dirPath, { auto, limit, overrides })` — batch-imports all `.md`/`.markdown` files in a directory (non-recursive); returns `{ proposals, stored, skipped }`
+
+CLI:
+- `hive import <file.md> [--auto] [--type TYPE] [--trust LEVEL] [--importance N]`
+- `hive import <directory> [--auto] [--limit N]` — bulk import a folder of notes
+
+Tests: 10/10 passing (`tests/test-phase12.js`). All suites: **120/120 total**.
+
+---
+
 ## 2026-11-20 — Phase 11 Complete
 
 **Phase 11: Graph Visualization**

@@ -16,6 +16,7 @@ Phase 8 — Entity Extraction / Auto-tagging — COMPLETE (2026-11-20)
 Phase 9 — Web Dashboard — COMPLETE (2026-11-20)
 Phase 10 — Write API + Auto-embed — COMPLETE (2026-11-20)
 Phase 11 — Graph Visualization — COMPLETE (2026-11-20)
+Phase 12 — Markdown Import — COMPLETE (2026-11-20)
 
 ## Architecture (decided)
 

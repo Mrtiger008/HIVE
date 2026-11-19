@@ -512,6 +512,45 @@ const COMMANDS = {
     }).catch(err => { console.error(`Error: ${err.message}`); process.exit(1); });
   },
 
+  // ── markdown import ───────────────────────────────────────────────────────
+
+  'import'(args) {
+    const { positional, flags } = parseArgs(args);
+    if (!positional) die('Usage: hive import <file.md|directory> [--auto] [--type TYPE] [--trust LEVEL] [--importance N] [--limit N]');
+    const importer = require('./importer');
+    const auto     = flags.auto === true || flags.auto === 'true';
+    const overrides = {};
+    if (flags.type)       overrides.memory_type = flags.type;
+    if (flags.trust)      overrides.trust_level  = flags.trust;
+    if (flags.importance) overrides.importance   = +flags.importance;
+
+    const stat = require('fs').statSync(positional);
+    if (stat.isDirectory()) {
+      const { proposals, stored, skipped } = importer.importDir(positional, {
+        auto, limit: flags.limit ? +flags.limit : 200, overrides,
+      });
+      if (auto) {
+        console.log(`Imported ${stored.length} memories from ${positional} (${skipped.length} skipped).`);
+        for (const m of stored) console.log(`  [${m.id.slice(0,8)}] ${m.title}`);
+      } else {
+        console.log(`Found ${proposals.length} markdown files (dry-run — add --auto to import):\n`);
+        proposals.slice(0, 10).forEach((p, i) => console.log(`${i+1}. ${p.title}\n   ${p._file}\n`));
+        if (proposals.length > 10) console.log(`  … and ${proposals.length - 10} more`);
+        if (skipped.length) console.log(`\nSkipped: ${skipped.length} (already imported)`);
+      }
+    } else {
+      const r = importer.importFile(positional, { auto, overrides });
+      if (r.skipped) { console.log(`Skipped: ${r.reason}`); return; }
+      if (r.stored)  { console.log('Imported:\n'); console.log(fmt(r.stored)); return; }
+      const p = r.proposal;
+      console.log(`Dry-run (add --auto to import):\n`);
+      console.log(`Title:   ${p.title}`);
+      console.log(`Type:    ${p.memory_type}  Trust: ${p.trust_level}  Importance: ${p.importance}`);
+      if (p.tags.length) console.log(`Tags:    ${p.tags.join(', ')}`);
+      console.log(`\n${p.content.slice(0, 300)}${p.content.length > 300 ? '…' : ''}`);
+    }
+  },
+
   // ── web dashboard ─────────────────────────────────────────────────────────
 
   'serve'(args) {
@@ -673,6 +712,10 @@ Project commands:
   hive project list   [--status active|paused|completed|archived] [--domain D]
   hive project get    <id>
   hive project update <id>  [--name] [--status] [--objective] [--description] [--domain]
+
+Markdown import:
+  hive import <file.md>       [--auto] [--type TYPE] [--trust LEVEL] [--importance N]
+  hive import <directory>     [--auto] [--limit N]   Import all .md files in a folder
 
 Web dashboard:
   hive serve     [--port N]   Start local dashboard (default port 7749)

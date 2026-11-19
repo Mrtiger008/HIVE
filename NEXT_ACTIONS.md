@@ -19,7 +19,14 @@
 
 ## Phase 11 — Graph Visualization — DONE ✅ (2026-11-20)
 
-## Phase 12 — Candidates
+## Phase 12 — Markdown Import — DONE ✅ (2026-11-20)
+
+## Phase 13 — Candidates
+
+- **REST API + integrations**: JSON API for external tools (Obsidian plugin, Alfred, etc.)
+- **Dashboard search improvements**: semantic search toggle in the Search tab
+- **Memory editing**: click a card in the dashboard to edit title/content in-place
+- **Scheduled review**: weekly digest email/Slack of stale memories due for review
 
 - **REST API + integrations**: Obsidian plugin, Alfred workflow, Raycast extension
 - **Graph visualization**: D3 force-directed entity relationship graph in the dashboard
