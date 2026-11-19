@@ -216,6 +216,81 @@ const COMMANDS = {
     console.log(`Backup saved: ${dest}`);
   },
 
+  'context'(args) {
+    const { positional, flags } = parseArgs(args);
+    if (!positional) {
+      die('Usage: hive context "<task description>" [--project ID] [--budget 2000] [--cross-project] [--json]');
+    }
+    const { buildContext } = require('./context');
+    const result = buildContext(positional, {
+      projectId:    flags.project || null,
+      budget:       flags.budget ? +flags.budget : 2000,
+      crossProject: flags['cross-project'] === true || flags['cross-project'] === 'true',
+    });
+
+    if (flags.json) { console.log(JSON.stringify(result, null, 2)); return; }
+
+    const HR = '─'.repeat(60);
+    console.log('\nTask analysis');
+    console.log(HR);
+    console.log(`Input:   "${result.task}"`);
+    if (result.domain) {
+      console.log(`Domain:  ${result.domain.name}  (confidence: ${result.domain.confidence})`);
+    } else {
+      console.log('Domain:  not detected');
+    }
+    if (result.project) {
+      console.log(`Project: ${result.project.name}  [${result.project.id.slice(0,8)}]  (match: ${Math.round(result.project.confidence * 100)}%)`);
+    } else {
+      console.log('Project: none detected');
+    }
+
+    if (result.warnings.length) {
+      console.log('\nWarnings');
+      console.log(HR);
+      for (const w of result.warnings) {
+        console.log(`⚠  ${w.message}`);
+        if (w.alternatives) {
+          for (const a of w.alternatives) {
+            console.log(`   • ${a.name} [${a.id.slice(0,8)}]  (match: ${Math.round(a.score * 100)}%)`);
+          }
+        }
+      }
+    }
+
+    console.log(`\nContext pack  [~${result.tokenEstimate} / ${result.budget} tokens]`);
+    console.log(HR);
+
+    if (result.project) {
+      console.log('[PROJECT]');
+      console.log(`Name:   ${result.project.name}`);
+      if (result.project.objective) console.log(`Goal:   ${result.project.objective}`);
+      console.log(`Status: ${result.project.status}`);
+    }
+
+    if (result.memories.length) {
+      console.log(`\n[MEMORIES — ${result.memories.length} retrieved]`);
+      result.memories.forEach((m, i) => {
+        const preview = m.content.replace(/\n/g, ' ').substring(0, 120);
+        const src = m._source ? ` {${m._source}}` : '';
+        console.log(`\n${i + 1}. [${m.memory_type}] [${m.trust_level}] i=${m.importance}${src}  ${m.title}`);
+        console.log(`   ${preview}${m.content.length > 120 ? '…' : ''}`);
+        if (m.source) console.log(`   Source: ${m.source}`);
+      });
+    } else {
+      console.log('\n[MEMORIES — none found]');
+      if (result.project) {
+        console.log(`  Add memories: hive memory add --project ${result.project.id} --title "..." --content "..."`);
+      }
+    }
+
+    if (result.skills.length) {
+      console.log(`\n[SKILLS — ${result.skills.length} found]`);
+      for (const s of result.skills) console.log(`  • ${s.title}`);
+    }
+    console.log('');
+  },
+
   'help'() {
     console.log(`
 HIVE — Personal AI Knowledge & Memory System
@@ -231,6 +306,9 @@ Memory commands:
 Search:
   hive search "<query>"  [--domain D] [--project ID] [--type T] [--limit N]
 
+Context router:
+  hive context "<task>"  [--project ID] [--budget 2000] [--cross-project] [--json]
+
 Project commands:
   hive project create --name "…" [--objective "…"] [--domain "…"] [--description "…"]
   hive project list   [--status active|paused|completed|archived] [--domain D]
@@ -241,6 +319,14 @@ Utility:
   hive export    Export all active memories to Markdown files
   hive backup    Create a timestamped SQLite backup
   hive help      Show this help
+
+Memory types:  core | domain | project | episodic | semantic | skill
+Trust levels:  USER_CONFIRMED | SOURCE_VERIFIED | OBSERVED | INFERRED | AI_HYPOTHESIS | CONFLICTED | OUTDATED | UNKNOWN
+
+Context router notes:
+  --budget N         Max tokens in context pack (default 2000)
+  --cross-project    Include memories from all projects (default: project-isolated)
+  --json             Output raw JSON for programmatic use
 
 Memory types:  core | domain | project | episodic | semantic | skill
 Trust levels:  USER_CONFIRMED | SOURCE_VERIFIED | OBSERVED | INFERRED | AI_HYPOTHESIS | CONFLICTED | OUTDATED | UNKNOWN
