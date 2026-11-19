@@ -854,6 +854,14 @@ const COMMANDS = {
     console.log('──────────────────────────────────────────\n');
   },
 
+  'obsidian'(args) {
+    const { positional } = parseArgs(args);
+    const dir = positional || './obsidian-vault';
+    const obs = require('./obsidian');
+    const n = obs.writeVault(dir);
+    console.log(`Exported ${n} memories to ${dir}/`);
+  },
+
   'decay'(args) {
     const { flags } = parseArgs(args);
     const dcy = require('./decay');

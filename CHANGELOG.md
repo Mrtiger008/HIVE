@@ -1,5 +1,28 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 36 Complete
+
+**Phase 36: Obsidian Export**
+
+`src/obsidian.js` (new):
+- `slugify(title)` — converts titles to safe kebab-case filenames
+- `generate()` — returns `[{ filename, content, id, title }]` for all active memories
+  - YAML frontmatter: id, title, memory_type, trust_level, confidence, importance, tags, domain, project_id, created, updated
+  - `# Title` heading + full content body
+  - `## Links` section with `[[wikilinks]]` for each memory-to-memory link (Phase 31)
+  - `## Tags` section with `#hashtag` format
+- `writeVault(dir)` — writes all files to a directory (creates it if needed), returns file count
+
+`src/server.js`:
+- `GET /api/export/obsidian` — returns full vault as JSON array for preview/download
+- Dashboard header: "⬇ Obsidian" button — downloads vault as bundled `.txt`
+
+`src/hive.js`:
+- `hive obsidian [<dir>]` — writes vault to `./obsidian-vault/` (or specified dir)
+
+`tests/test-phase36.js` — 10/10 passing
+Full regression: 270/270 (Phases 10–36, zero regressions)
+
 ## 2026-11-20 — Phase 35 Complete
 
 **Phase 35: Memory Decay**

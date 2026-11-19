@@ -65,9 +65,11 @@
 
 ## Phase 35 — Memory Decay — DONE ✅ (2026-11-20)
 
-## Phase 36 — Candidates
+## Phase 36 — Obsidian Export — DONE ✅ (2026-11-20)
 
-- **Full-text export to Obsidian**: sync memories as markdown vault notes with backlinks
+## Phase 37 — Candidates
+
 - **Keyboard shortcuts**: keyboard-driven navigation (j/k scroll, / focus search, n new)
 - **Conflict resolution**: flag contradicting memories and suggest merge/deprecate actions
-- **Memory relations graph**: visualize memory-to-memory links as a force-directed graph (separate from entity graph)
+- **Memory relations graph**: visualize memory-to-memory links as a force-directed graph
+- **Multi-file import**: drag-and-drop / batch import from a directory of markdown files

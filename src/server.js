@@ -19,6 +19,7 @@ const links            = require('./links');
 const bookmarks        = require('./bookmarks');
 const digest           = require('./digest');
 const decay            = require('./decay');
+const obsidian         = require('./obsidian');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -454,6 +455,7 @@ const ROUTES = {
     const minIdleDays = u.searchParams.get('min_idle_days') ? +u.searchParams.get('min_idle_days') : 14;
     json(res, { changes: decay.preview({ minIdleDays }) });
   },
+  'GET /api/export/obsidian': (req, res) => json(res, obsidian.generate()),
   'POST /api/decay/run':     async (req, res) => {
     const body = await readBody(req).catch(() => ({}));
     const minIdleDays = body.min_idle_days || 14;
@@ -616,7 +618,7 @@ input{width:360px}
 .cbar{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-left:4px}
 </style></head>
 <body>
-<header><h1>&#x1F9E0; HIVE</h1><span id="stats">loading…</span><span style="margin-left:auto;display:flex;gap:8px"><a href="/api/export?format=json" download="hive-export.json" class="btn" style="text-decoration:none;font-size:12px">⬇ JSON</a><a href="/api/export?format=csv" download="hive-export.csv" class="btn" style="text-decoration:none;font-size:12px">⬇ CSV</a></span></header>
+<header><h1>&#x1F9E0; HIVE</h1><span id="stats">loading…</span><span style="margin-left:auto;display:flex;gap:8px"><a href="/api/export?format=json" download="hive-export.json" class="btn" style="text-decoration:none;font-size:12px">⬇ JSON</a><a href="/api/export?format=csv" download="hive-export.csv" class="btn" style="text-decoration:none;font-size:12px">⬇ CSV</a><button class="btn" style="font-size:12px" onclick="obsidianExport()">⬇ Obsidian</button></span></header>
 <nav>
   <button class="on" onclick="show('search',this)">Search</button>
   <button onclick="show('memories',this)">Memories</button>
@@ -1334,6 +1336,17 @@ async function loadDecayPreview() {
     <span style="color:#8b949e;font-size:11px">\${c.idle_days}d idle</span>
     <span style="color:#ffa657">\${(c.confidence*100|0)}% → \${(c.new_confidence*100|0)}%</span>
   </div>\`).join('') + \`<p style="margin-top:12px;font-size:12px;color:#8b949e">\${d.changes.length} memories would decay. Click "Apply decay" to commit.</p>\`;
+}
+async function obsidianExport() {
+  const files = await api('/api/export/obsidian');
+  if (!files.length) { alert('No active memories to export.'); return; }
+  // Bundle as a single text blob with file separators for quick copy, or download each
+  const text = files.map(f => \`===== \${f.filename} =====\n\${f.content}\`).join('\n\n');
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'hive-obsidian.txt';
+  a.click();
 }
 async function runDecay() {
   if (!confirm('Apply confidence decay to all eligible memories?')) return;
