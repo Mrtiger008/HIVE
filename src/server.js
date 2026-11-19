@@ -12,6 +12,7 @@ const projects         = require('./projects');
 const apikeys          = require('./apikeys');
 const webhooks         = require('./webhooks');
 const versions         = require('./versions');
+const tags             = require('./tags');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -290,6 +291,14 @@ function handleSimilar(req, res, q) {
     .map(m => ({ id: m.id, title: m.title, memory_type: m.memory_type, score: +m._score.toFixed(3) })));
 }
 
+function handleTagStats(req, res, q) {
+  const limit = +(q.limit) || 50;
+  const top = tags.topTags(limit);
+  const coTag = q.co;
+  const co = coTag ? tags.coOccurrence(coTag, 10) : [];
+  json(res, { top, co, coTag: coTag || null });
+}
+
 function handleListVersions(req, res, id) {
   const m = memory.get(id);
   if (!m) { json(res, { error: 'not found' }, 404); return; }
@@ -375,6 +384,7 @@ const ROUTES = {
   'GET /api/brief':          handleBrief,
   'GET /api/apikeys':        handleListKeys,
   'POST /api/apikeys':       handleCreateKey,
+  'GET /api/tags/stats':     (req, res) => { const u = new URL(req.url,'http://l'); handleTagStats(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/webhooks':       handleListWebhooks,
   'POST /api/webhooks':      handleAddWebhook,
   'GET /':                   handleIndex,
@@ -525,6 +535,7 @@ input{width:360px}
   <button onclick="show('activity',this)">Activity</button>
   <button onclick="show('apikeys',this)">API Keys</button>
   <button onclick="show('webhooks',this)">Webhooks</button>
+  <button onclick="show('tagcloud',this)">Tags</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -608,6 +619,19 @@ input{width:360px}
   <div id="whl"><p class="empty">Loading webhooks…</p></div>
 </div>
 
+<div id="tagcloud" class="tab">
+  <div class="row" style="margin-bottom:12px;gap:8px">
+    <button class="btn" onclick="loadTagCloud()">↺ Refresh</button>
+    <input id="tc-co" placeholder="Co-occurrence for tag…" style="width:200px" oninput="loadCoOccurrence()">
+  </div>
+  <div id="tc-cloud" style="line-height:2.4;padding:8px 0"></div>
+  <div id="tc-top" style="margin-top:16px"></div>
+  <div id="tc-co-out" style="margin-top:16px;display:none">
+    <h4 style="margin:0 0 8px;font-size:13px;color:#8b949e">Co-occurring tags</h4>
+    <div id="tc-co-list"></div>
+  </div>
+</div>
+
 <div id="hist-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
   <div class="mbox" style="max-width:700px;max-height:85vh;overflow-y:auto">
     <h3>Version History</h3>
@@ -664,6 +688,7 @@ function show(id, btn) {
   if (id==='activity') loadActivity();
   if (id==='apikeys') loadKeys();
   if (id==='webhooks') loadWebhooks();
+  if (id==='tagcloud') loadTagCloud();
 }
 
 function confBar(c) {
@@ -1056,6 +1081,37 @@ async function showHistory(memId) {
     <div style="flex:1"><div style="font-size:13px">\${esc(v.title)}</div><div style="font-size:11px;color:#8b949e">\${fmt(v.snapshot_at)}</div></div>
     <button class="btn" style="font-size:11px;padding:3px 8px" onclick="showDiff(\${v.id})">View diff</button>
   </div>\`).join('');
+}
+let _tcTimer = null;
+async function loadTagCloud() {
+  const d = await api('/api/tags/stats?limit=80');
+  const cloud = g('tc-cloud');
+  const top = g('tc-top');
+  if (!d.top.length) { cloud.innerHTML='<p class="empty">No tags yet — add tags when creating memories.</p>'; top.innerHTML=''; return; }
+  const max = d.top[0].count;
+  const minPx = 12, maxPx = 32;
+  const colors = ['#79c0ff','#3fb950','#d2a8ff','#ffa657','#f85149','#58a6ff'];
+  cloud.innerHTML = d.top.map((t,i) => {
+    const size = minPx + Math.round((t.count / max) * (maxPx - minPx));
+    const col = colors[i % colors.length];
+    return \`<span style="font-size:\${size}px;color:\${col};margin:0 8px;cursor:pointer;display:inline-block" onclick="filterByTag('\${esc(t.tag)}')" title="\${t.count} memories">#\${esc(t.tag)}</span>\`;
+  }).join('');
+  top.innerHTML = \`<table style="font-size:12px;border-collapse:collapse;width:100%;max-width:400px">\${d.top.slice(0,15).map((t,i)=>\`<tr><td style="padding:3px 8px;color:#8b949e">\${i+1}</td><td style="padding:3px 8px"><span style="cursor:pointer;color:#79c0ff" onclick="filterByTag('\${esc(t.tag)}')">#\${esc(t.tag)}</span></td><td style="padding:3px 8px;color:#8b949e">\${t.count}</td></tr>\`).join('')}</table>\`;
+}
+function filterByTag(tag) {
+  const tf = g('mtag'); if (tf) { tf.value = tag; }
+  document.querySelectorAll('nav button').forEach(b => { if (b.textContent==='Memories') b.click(); });
+}
+async function loadCoOccurrence() {
+  clearTimeout(_tcTimer);
+  _tcTimer = setTimeout(async () => {
+    const tag = g('tc-co').value.trim().toLowerCase();
+    if (!tag) { g('tc-co-out').style.display='none'; return; }
+    const d = await api('/api/tags/stats?co='+encodeURIComponent(tag));
+    if (!d.co.length) { g('tc-co-out').style.display='none'; return; }
+    g('tc-co-list').innerHTML = d.co.map(t=>\`<span class="b" style="margin:3px;display:inline-block">#\${esc(t.tag)} <span style="color:#8b949e">\${t.count}</span></span>\`).join('');
+    g('tc-co-out').style.display='block';
+  }, 300);
 }
 async function showDiff(versionId) {
   const d = await api('/api/versions/'+versionId+'/diff');

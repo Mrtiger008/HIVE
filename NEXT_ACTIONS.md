@@ -49,9 +49,11 @@
 
 ## Phase 27 — Memory Versioning — DONE ✅ (2026-11-20)
 
-## Phase 28 — Candidates
+## Phase 28 — Tag Analytics — DONE ✅ (2026-11-20)
 
-- **Scheduled digests**: daily/weekly summary of stale + new memories (file or stdout)
+## Phase 29 — Candidates
+
 - **Memory templates**: pre-fill add modal with type-specific field defaults
+- **Scheduled digests**: daily/weekly summary of stale + new memories (file or stdout)
 - **Full-text export to Obsidian**: sync memories as markdown vault notes with backlinks
-- **Tag analytics**: tag cloud, co-occurrence matrix, most-used tags dashboard widget
+- **Knowledge stats dashboard**: total memories, trust breakdown, type breakdown, growth chart

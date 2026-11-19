@@ -1,5 +1,23 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 28 Complete
+
+**Phase 28: Tag Analytics**
+
+`src/tags.js` (new):
+- `topTags(limit=50)` — parses tags JSON from all active memories, returns `[{tag, count}]` sorted by frequency
+- `coOccurrence(tag, limit=10)` — for memories containing a given tag, counts how often each other tag appears alongside it
+
+`src/server.js`:
+- `GET /api/tags/stats?limit=N&co=<tag>` — returns `{top:[{tag,count}], co:[{tag,count}], coTag}`
+- Dashboard: Tags tab with interactive tag cloud (font-size scales with frequency, click filters Memories tab), top-15 ranked list, and debounced co-occurrence panel
+
+`src/hive.js`:
+- `hive tags [--top N] [--co <tag>]` — ranked tag list with optional co-occurrence section
+
+`tests/test-phase28.js`: 10/10 passing
+Full regression: 190/190 (Phases 10–28)
+
 ## 2026-11-20 — Phase 27 Complete
 
 **Phase 27: Memory Versioning**

@@ -724,6 +724,23 @@ const COMMANDS = {
     }
   },
 
+  'tags'(args) {
+    const { flags } = parseArgs(args);
+    const t = require('./tags');
+    const limit = +(flags.top || flags.limit || 20);
+    const top = t.topTags(limit);
+    if (!top.length) { console.log('No tags found.'); return; }
+    console.log(`\nTop ${top.length} tags:\n`);
+    top.forEach((e, i) => console.log(`  ${String(i+1).padStart(2)}. #${e.tag.padEnd(24)} ${e.count}`));
+    if (flags.co) {
+      const co = t.coOccurrence(flags.co, 10);
+      if (!co.length) { console.log(`\nNo co-occurring tags for #${flags.co}`); return; }
+      console.log(`\nCo-occurring with #${flags.co}:`);
+      co.forEach(e => console.log(`  #${e.tag.padEnd(24)} ${e.count}`));
+    }
+    console.log('');
+  },
+
   'versions'(args) {
     const { positional, flags } = parseArgs(args);
     const v = require('./versions');
@@ -844,6 +861,11 @@ API key management:
   hive apikey list              List all API keys
   hive apikey create <name>     Generate a new Bearer token (shown once)
   hive apikey revoke <name>     Delete a key
+
+Tag analytics:
+  hive tags                     Show top 20 tags by frequency
+  hive tags --top N             Show top N tags
+  hive tags --co <tag>          Also show co-occurring tags for <tag>
 
 Version history:
   hive versions <memory_id>              List all prior versions of a memory
