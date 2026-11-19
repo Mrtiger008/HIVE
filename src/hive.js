@@ -7,6 +7,7 @@ const entities = require('./entities');
 const graph    = require('./graph');
 const { search }    = require('./search');
 const { exportAll, backup } = require('./export');
+const ingest   = require('./ingest');
 
 const [,, cmd, ...rawArgs] = process.argv;
 
@@ -318,6 +319,53 @@ const COMMANDS = {
     }
   },
 
+  // ── session / ingest ──────────────────────────────────────────────────────
+
+  'session import'(args) {
+    const { positional, flags } = parseArgs(args);
+    if (!positional) die('Usage: hive session import <path/to/session.jsonl> [--auto] [--project <id>] [--limit N]');
+    const auto = flags.auto === true || flags.auto === 'true';
+    const { proposals, stored } = ingest.fromSession(positional, {
+      projectId: flags.project || null,
+      auto,
+      maxProposals: flags.limit ? +flags.limit : 15,
+    });
+
+    if (auto) {
+      console.log(`Stored ${stored.length} memories (${proposals.length - stored.length} already existed).`);
+      for (const m of stored) console.log(`  [${m.id.slice(0,8)}] [${m.memory_type}] ${m.title}`);
+    } else {
+      console.log(`Found ${proposals.length} proposals (dry-run — add --auto to store):\n`);
+      proposals.forEach((p, i) => {
+        console.log(`${i + 1}. [${p.memory_type}] [${p.trust_level}] ${p.title}`);
+        console.log(`   ${p.content.replace(/\n/g, ' ').slice(0, 120)}${p.content.length > 120 ? '…' : ''}\n`);
+      });
+    }
+  },
+
+  'ingest'(args) {
+    const { flags } = parseArgs(args);
+    const auto = flags.auto === true || flags.auto === 'true';
+    const { proposals, stored } = ingest.fromClaudeMem({
+      project:   flags.project || '',
+      limit:     flags.limit ? +flags.limit : 50,
+      auto,
+      projectId: flags['project-id'] || null,
+    });
+
+    if (auto) {
+      console.log(`Ingested ${stored.length} memories from claude-mem (${proposals.length - stored.length} already existed).`);
+      for (const m of stored) console.log(`  [${m.id.slice(0,8)}] [${m.memory_type}] ${m.title}`);
+    } else {
+      console.log(`Found ${proposals.length} claude-mem observations (dry-run — add --auto to store):\n`);
+      proposals.slice(0, 20).forEach((p, i) => {
+        console.log(`${i + 1}. [${p._cm_id}] [${p.memory_type}] ${p.title}`);
+        console.log(`   ${p.content.replace(/\n/g, ' ').slice(0, 100)}${p.content.length > 100 ? '…' : ''}\n`);
+      });
+      if (proposals.length > 20) console.log(`  … and ${proposals.length - 20} more`);
+    }
+  },
+
   // ── utility ───────────────────────────────────────────────────────────────
 
   'export'() {
@@ -410,6 +458,10 @@ const COMMANDS = {
   'help'() {
     console.log(`
 HIVE — Personal AI Knowledge & Memory System
+
+Session & ingest commands:
+  hive session import <path.jsonl>  [--auto] [--project <id>] [--limit N]
+  hive ingest                       [--project <name>] [--limit N] [--auto] [--project-id <id>]
 
 Entity commands:
   hive entity add    --name "..." [--type person|tool|org|concept|project|file|domain|other] [--description "..."] [--aliases "a,b"]

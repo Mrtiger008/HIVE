@@ -4,25 +4,25 @@
 ## Phase 2 — DONE ✅ (2026-11-19)
 ## Phase 3 — DONE ✅ (2026-11-19)
 
-## Phase 4 — Session Capture (next)
+## Phase 4 — DONE ✅ (2026-11-19)
 
-Goal: Automatically capture useful knowledge from Claude Code sessions into HIVE.
+## Phase 5 — Learning System (next)
+
+Goal: Make HIVE learn from patterns — reinforce important memories, decay stale ones, detect recurring topics, offer proactive suggestions.
 
 Key tasks:
-1. Research Claude Code hook capabilities (PostToolUse, Stop events)
-2. Hook script: `hooks/session-capture.js` — write session events to `logs/sessions/`
-3. Session metadata indexer: parse session logs, extract decisions/corrections/state changes
-4. Memory extraction: auto-propose memories from session content (user confirms before storing)
-5. `hive session import <log-path>` — manual import command
-6. claude-mem ingestion: `hive ingest` reads claude-mem observations, converts to HIVE memories
-7. Project state auto-update at session end
-8. Tests: session capture, memory extraction, dedup against existing memories
+1. `src/decay.js` — recency decay score: `importance × (1 / (1 + days_since_access / 30))`. Scheduled sweep marks OUTDATED memories not accessed in 90d.
+2. `src/reinforce.js` — bump importance (+1, max 10) each time a memory is retrieved via search. Keeps high-utility memories surfaced.
+3. `src/patterns.js` — sliding-window keyword frequency over last 30d of memories. Returns top recurring topics.
+4. `hive suggest [--project <id>]` — surfaces 5 memories due for reinforcement or review (high decay, low importance, long ago accessed).
+5. `hive patterns` — lists top recurring topics/entities across recent memories.
+6. Tests: 10 cases covering decay math, reinforcement capping, pattern extraction, suggest ranking.
 
 ## Upcoming decisions
 
-- Semantic/vector search: transformers.js (~80MB pure JS) vs Python-based bridge — still deferred
-- Entity extraction: auto-extract entities from memory content (Phase 5 candidate)
+- Semantic/vector search: transformers.js (~80MB pure JS) vs Python-based bridge — still deferred to Phase 6
+- Auto-entity extraction from memory content: candidate for Phase 5 or 6
 
 ## Blocked on
 
-Nothing. Phase 4 can start immediately.
+Nothing. Phase 5 can start immediately.

@@ -1,5 +1,29 @@
 # CHANGELOG.md
 
+## 2026-11-19 — Phase 4 Complete
+
+**Phase 4: Session Capture & Ingestion**
+
+`src/ingest.js` — two ingestion paths:
+- `parseSession(jsonlPath)`: reads Claude Code JSONL transcripts; strips `<system-reminder>` from user content; skips `thinking` blocks; filters assistant text under 10 chars
+- `extractProposals(turns)`: filler-message filter (continue/go ahead/ok/etc.); SIGNAL_PATTERNS regex (decided, root cause, fixed, architecture, must be, etc.); NOISE_PREFIXES filter (Let me, I'll, Running, etc.); returns ranked proposals
+- `fromSession(jsonlPath, { auto, projectId, maxProposals })`: dedup via `source_ref = session:<id>:<djb2hash>`; dry-run by default
+- `fromClaudeMem({ project, limit, auto, projectId })`: reads `~/.claude-mem/claude-mem.db` readonly; maps observation types to HIVE memory types; dedup via `source_ref = claude-mem:<id>`
+
+`hooks/session-capture.js` — Claude Code Stop hook:
+- Derives JSONL path from `CLAUDE_SESSION_ID` + `CLAUDE_PROJECT_DIR` env vars
+- Falls back to scanning `~/.claude/projects/` if no PROJECT_DIR
+- Calls `fromSession(..., { auto: true, maxProposals: 10 })`
+
+`hive session import <path>  [--auto] [--project <id>] [--limit N]`
+`hive ingest  [--project <name>] [--limit N] [--auto] [--project-id <id>]`
+
+Tests: 10/10 passing (`tests/test-ingest.js`). All suites: 40/40 total.
+
+**Next**: Phase 5 — Learning System (decay, reinforcement, pattern detection, smart suggestions)
+
+---
+
 ## 2026-11-19 — Phase 3 Complete
 
 **Phase 3: Knowledge Graph**
