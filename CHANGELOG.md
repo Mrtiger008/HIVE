@@ -1,5 +1,25 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 10 Complete
+
+**Phase 10: Write API + Auto-embed**
+
+`src/server.js`:
+- `POST /api/memories` — create a memory from the browser (returns 201 + full memory object)
+- `DELETE /api/memories/:id` — archive a memory (soft delete, sets status=archived)
+- Input validation: 400 if title or content missing
+- Dynamic route dispatch for `DELETE /api/memories/:id`
+- Dashboard: "+ Add Memory" button in Memories tab → modal form (title, content, type, trust, importance)
+- Dashboard: "× archive" button on each memory card — removes card on success, refreshes stats
+- Inline validation in modal (no browser `alert()`)
+
+`src/memory.js`:
+- Auto-embed on `memory.add()` — fire-and-forget `semantic.embedMemory(m)`, soft dependency (never blocks the add, fails silently without the model)
+
+Tests: 10/10 passing (`tests/test-phase10.js`). All suites: **100/100 total**.
+
+---
+
 ## 2026-11-20 — Phase 9 Complete
 
 **Phase 9: Web Dashboard**

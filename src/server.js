@@ -17,6 +17,15 @@ function json(res, data, status = 200) {
   res.end(JSON.stringify(data));
 }
 
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let raw = '';
+    req.on('data', c => { raw += c; });
+    req.on('end', () => { try { resolve(JSON.parse(raw || '{}')); } catch { resolve({}); } });
+    req.on('error', reject);
+  });
+}
+
 // ── Route handlers ────────────────────────────────────────────────────────────
 
 function handleStats(req, res) {
@@ -72,20 +81,42 @@ async function handleBrief(req, res) {
   json(res, { text: result.text });
 }
 
+async function handleAddMemory(req, res) {
+  const body = await readBody(req);
+  if (!body.title || !body.content) { json(res, { error: 'title and content required' }, 400); return; }
+  const m = memory.add({
+    title:       body.title,
+    content:     body.content,
+    memory_type: body.memory_type || 'semantic',
+    trust_level: body.trust_level || 'OBSERVED',
+    importance:  body.importance  ? +body.importance : 5,
+    tags:        body.tags        || [],
+  });
+  json(res, m, 201);
+}
+
+async function handleDeleteMemory(req, res, id) {
+  const m = memory.get(id);
+  if (!m) { json(res, { error: 'not found' }, 404); return; }
+  memory.update(id, { status: 'archived' });
+  json(res, { ok: true });
+}
+
 function handleIndex(req, res) {
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(HTML);
 }
 
 const ROUTES = {
-  'GET /api/stats':    handleStats,
-  'GET /api/search':   handleSearch,
-  'GET /api/memories': handleMemories,
-  'GET /api/patterns': handlePatterns,
-  'GET /api/entities': handleEntities,
-  'GET /api/projects': handleProjects,
-  'GET /api/brief':    handleBrief,
-  'GET /':             handleIndex,
+  'GET /api/stats':     handleStats,
+  'GET /api/search':    handleSearch,
+  'GET /api/memories':  handleMemories,
+  'POST /api/memories': handleAddMemory,
+  'GET /api/patterns':  handlePatterns,
+  'GET /api/entities':  handleEntities,
+  'GET /api/projects':  handleProjects,
+  'GET /api/brief':     handleBrief,
+  'GET /':              handleIndex,
 };
 
 // ── Server factory ────────────────────────────────────────────────────────────
@@ -95,7 +126,11 @@ function createServer() {
     const u = new URL(req.url, 'http://localhost');
     const pathname = u.pathname;
     const query = Object.fromEntries(u.searchParams);
-    const handler = ROUTES[`${req.method} ${pathname}`];
+    let handler = ROUTES[`${req.method} ${pathname}`];
+    if (!handler && req.method === 'DELETE' && pathname.startsWith('/api/memories/')) {
+      const id = pathname.slice('/api/memories/'.length);
+      handler = (req, res) => handleDeleteMemory(req, res, id);
+    }
     if (!handler) { res.writeHead(404); res.end('Not Found'); return; }
     Promise.resolve(handler(req, res, query)).catch(err => {
       if (!res.headersSent) { res.writeHead(500); res.end(err.message); }
@@ -150,6 +185,18 @@ input{width:360px}
 #brief-out ul{padding-left:20px;margin:4px 0}
 #brief-out li{margin-bottom:4px}
 #brief-out p{margin-bottom:8px}
+.modal{position:fixed;inset:0;background:#0009;display:none;align-items:center;justify-content:center;z-index:100}
+.modal.on{display:flex}
+.mbox{background:#161b22;border:1px solid #30363d;border-radius:12px;padding:24px;width:480px;max-width:90vw}
+.mbox h3{font-size:15px;color:#e6edf3;margin-bottom:16px}
+.mbox label{display:block;font-size:12px;color:#8b949e;margin-bottom:4px}
+.mbox .f{margin-bottom:12px}
+.mbox textarea{background:#0d1117;border:1px solid #30363d;color:#c9d1d9;padding:8px 12px;border-radius:6px;font-size:13px;width:100%;resize:vertical}
+.mbox input[type=number]{width:72px}
+.mbtns{display:flex;gap:8px;justify-content:flex-end;margin-top:16px}
+.merr{color:#f85149;font-size:12px;margin:4px 0 0}
+.arch{background:none;border:none;color:#484f58;cursor:pointer;font-size:11px;float:right;padding:0}
+.arch:hover{color:#f85149}
 </style></head>
 <body>
 <header><h1>&#x1F9E0; HIVE</h1><span id="stats">loading…</span></header>
@@ -174,6 +221,7 @@ input{width:360px}
     <select id="mtype" onchange="loadMem()"><option value="">All types</option><option>core</option><option>domain</option><option>project</option><option>episodic</option><option>semantic</option><option>skill</option></select>
     <select id="mtrust" onchange="loadMem()"><option value="">All trust</option><option>USER_CONFIRMED</option><option>SOURCE_VERIFIED</option><option>OBSERVED</option><option>INFERRED</option></select>
     <select id="mproj" onchange="loadMem()"><option value="">All projects</option></select>
+    <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
   </div>
   <div id="ml"></div>
 </div>
@@ -185,6 +233,22 @@ input{width:360px}
 
 <div id="patterns" class="tab"><div id="pc"></div></div>
 <div id="entities" class="tab"><div id="el"></div></div>
+
+<div id="add-modal" class="modal">
+  <div class="mbox">
+    <h3>Add Memory</h3>
+    <div class="f"><label>Title *</label><input id="nm-t" style="width:100%" placeholder="Memory title"></div>
+    <div class="f"><label>Content *</label><textarea id="nm-c" rows="5" placeholder="Memory content…"></textarea></div>
+    <div class="f"><label>Type</label><select id="nm-ty"><option>semantic</option><option>core</option><option>domain</option><option>project</option><option>episodic</option><option>skill</option></select></div>
+    <div class="f"><label>Trust</label><select id="nm-tr"><option>OBSERVED</option><option>USER_CONFIRMED</option><option>SOURCE_VERIFIED</option><option>INFERRED</option></select></div>
+    <div class="f"><label>Importance (1–10)</label><input id="nm-i" type="number" min="1" max="10" value="5"></div>
+    <p id="nm-err" class="merr"></p>
+    <div class="mbtns">
+      <button class="btn" onclick="closeAdd()">Cancel</button>
+      <button class="btn" onclick="submitAdd()">Save</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const g = id => document.getElementById(id);
@@ -202,8 +266,8 @@ function show(id, btn) {
 
 function card(m) {
   const preview = (m.content||'').replace(/\\n/g,' ').slice(0,280);
-  return \`<div class="card">
-    <div class="ct">\${esc(m.title)}</div>
+  return \`<div class="card" data-id="\${m.id}">
+    <div class="ct">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button></div>
     <div class="cm"><span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span></div>
     <div class="cc">\${esc(preview)}\${m.content.length>280?'…':''}</div>
   </div>\`;
@@ -246,7 +310,25 @@ async function loadEnt() {
   g('el').innerHTML = d.map(e=>\`<div class="card"><div class="ct">\${esc(e.name)}</div><div class="cm"><span class="b bt">\${e.entity_type}</span>\${e.aliases.length?' · '+e.aliases.join(', '):''}</div>\${e.description?\`<div class="cc">\${esc(e.description)}</div>\`:''}</div>\`).join('');
 }
 
-api('/api/stats').then(d => g('stats').textContent = \`\${d.memories} memories · \${d.entities} entities · \${d.projects} projects\`);
+function refreshStats() { api('/api/stats').then(d => g('stats').textContent = \`\${d.memories} memories · \${d.entities} entities · \${d.projects} projects\`); }
+function showAdd() { g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
+function closeAdd() { g('add-modal').classList.remove('on'); }
+async function submitAdd() {
+  const title = g('nm-t').value.trim(), content = g('nm-c').value.trim();
+  if (!title || !content) { g('nm-err').textContent = 'Title and content are required.'; return; }
+  g('nm-err').textContent = '';
+  const r = await fetch('/api/memories', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ title, content, memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value }) });
+  if (!r.ok) { const e = await r.json(); g('nm-err').textContent = e.error || 'Save failed.'; return; }
+  g('nm-t').value = ''; g('nm-c').value = '';
+  closeAdd(); loadMem(); refreshStats();
+}
+async function archiveMem(id, btn) {
+  btn.textContent = '…';
+  const r = await fetch(\`/api/memories/\${id}\`, { method:'DELETE' });
+  if (r.ok) { btn.closest('.card').remove(); refreshStats(); }
+  else btn.textContent = '× archive';
+}
+refreshStats();
 api('/api/projects').then(ps => { const sel=g('mproj'); ps.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);}); });
 </script>
 </body></html>`;

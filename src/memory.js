@@ -76,6 +76,8 @@ function add(opts) {
   syncToMarkdown(m);
   // Auto-extract entity mentions — soft dependency, never blocks the add
   try { require('./extract').extractAndLink(id, { title, content }); } catch {}
+  // Auto-embed for semantic search — fire-and-forget, never blocks the add
+  try { require('./semantic').embedMemory(m).catch(() => {}); } catch {}
   return m;
 }
 
