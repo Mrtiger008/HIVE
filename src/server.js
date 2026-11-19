@@ -41,7 +41,17 @@ function handleSearch(req, res, q) {
   const query = q.q || '';
   const limit = +(q.limit) || 20;
   const projectId = q.project || null;
+  const mode = q.mode || 'keyword';
   if (!query.trim()) { json(res, []); return; }
+  if (mode === 'semantic' || mode === 'hybrid') {
+    try {
+      const sem = require('./semantic');
+      sem.search(query, { limit, projectId, hybrid: mode === 'hybrid' })
+        .then(results => json(res, results))
+        .catch(() => json(res, search(query, { limit, project_id: projectId })));
+      return;
+    } catch { /* fall through to keyword */ }
+  }
   json(res, search(query, { limit, project_id: projectId }));
 }
 
@@ -252,6 +262,7 @@ input{width:360px}
 <div id="search" class="tab on">
   <div class="row">
     <input id="q" placeholder="Search memories…" onkeydown="if(event.key==='Enter')doSearch()">
+    <select id="smode" title="Search mode"><option value="keyword">Keyword</option><option value="hybrid">Hybrid</option><option value="semantic">Semantic</option></select>
     <button class="btn" onclick="doSearch()">Search</button>
   </div>
   <div id="sr"></div>
@@ -323,7 +334,8 @@ function card(m) {
 async function doSearch() {
   const q = g('q').value.trim();
   if (!q) return;
-  const d = await api('/api/search?q='+encodeURIComponent(q)+'&limit=20');
+  const mode = g('smode').value;
+  const d = await api('/api/search?q='+encodeURIComponent(q)+'&limit=20&mode='+mode);
   g('sr').innerHTML = d.length ? d.map(card).join('') : '<p class="empty">No results.</p>';
 }
 

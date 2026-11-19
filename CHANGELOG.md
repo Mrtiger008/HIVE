@@ -1,5 +1,21 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 14 Complete
+
+**Phase 14: Semantic Search Toggle**
+
+`src/server.js`:
+- `GET /api/search?mode=keyword|semantic|hybrid` — `mode` param selects search engine
+  - `keyword` (default): existing FTS5 BM25 search, always available
+  - `semantic`: cosine similarity via `semantic.js` (requires embeddings; falls back to keyword if not loaded)
+  - `hybrid`: 60% cosine + 40% normalised importance via `semantic.js` (same fallback)
+- Dashboard Search tab: added `<select id="smode">` (Keyword / Hybrid / Semantic) next to the search button
+- `doSearch()` reads `smode` and appends `&mode=...` to the API call
+
+Tests: 10/10 passing (`tests/test-phase14.js`). All suites: **130/130 total**.
+
+---
+
 ## 2026-11-20 — Phase 13 Complete
 
 **Phase 13: Memory Editing**
