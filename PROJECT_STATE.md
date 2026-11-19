@@ -5,7 +5,9 @@ Last updated: 2026-11-19
 ## Current Phase
 
 Phase 0 — COMPLETE  
-Phase 1 — Core Foundation — NOT STARTED
+Phase 1 — Core Foundation — COMPLETE (2026-11-19)  
+Phase 2 — Retrieval Engine — COMPLETE (2026-11-19)  
+Phase 3 — Knowledge Graph — NOT STARTED
 
 ## Architecture (decided)
 
@@ -42,10 +44,23 @@ They coexist, don't duplicate.
 
 ## What Exists
 
-- Full directory structure created
-- Phase 0 documentation complete (docs/)
-- Git repo initialized
-- No code yet (Phase 1 starts next)
+- Full directory structure
+- Phase 0 docs: RESEARCH.md, ARCHITECTURE.md, TECH_STACK.md, SECURITY.md
+- Phase 1 engine: src/db.js, src/memory.js, src/projects.js, src/search.js, src/security.js, src/audit.js, src/export.js, src/hive.js
+- Tests: tests/test.js — 10/10 passing
+- Working CLI: `node src/hive.js help`
+- Git: 2 commits (c38aff3 Phase 0, 2a2aac1 Phase 1)
+
+## CLI Quick Reference
+
+```
+node src/hive.js memory add  --title "..." --content "..." --type semantic --trust OBSERVED --importance 5
+node src/hive.js search "natural language query"
+node src/hive.js project create --name "..." --domain "..."
+node src/hive.js backup
+node src/hive.js export
+node src/hive.js help
+```
 
 ## Known Issues / Technical Debt
 

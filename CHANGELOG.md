@@ -1,5 +1,55 @@
 # CHANGELOG.md
 
+## 2026-11-19 — Phase 2 Complete
+
+**Phase 2: Retrieval Engine / Context Router**
+
+`src/context.js` — `buildContext(task, { projectId, budget, crossProject })`:
+- Domain detection from task keywords (4 domains: data-analytics, software-engineering, professional-work, personal)
+- Project identification via stop-word-filtered substring scoring against name/objective
+- 4 retrieval layers ranked by source weight × confidence × importance × recency
+- Recency decay: `1/(1 + days/30)` — half-life 30 days
+- Token budget enforcement (default 2000 tokens, project header reserved)
+- Ambiguity detection: second candidate within 50% of top score → `ambiguous_project` warning
+- Output: `{ task, domain, project, memories, skills, warnings, tokenEstimate, budget }`
+
+`hive context "<task>"` CLI command — pretty-print + `--json` flag for programmatic use.
+
+Bugs fixed during Phase 2:
+- `_scoreProject` removed domain field from haystack → prevents 'work' matching 'professional-work'
+- Added STOP_WORDS filter → 'the' in query no longer pollutes project scoring
+- Ambiguity threshold lowered 70% → 50% → adjacent-score projects correctly surface warning
+
+Tests: 10/10 passing (`tests/test-context.js`). All Phase 1 tests still 10/10. Git: f1590e0
+
+**Next**: Phase 3 — Knowledge Graph (entities, relationships, provenance)
+
+---
+
+
+## 2026-11-19 — Phase 1 Complete
+
+**Phase 1: Core Foundation**
+
+SQLite schema (hive.db): memories, projects, entities, relationships, sources, audit_log + FTS5 virtual table with porter/unicode61 tokenizer and sync triggers.
+
+Node.js CLI (`node src/hive.js`):
+- `memory add/get/update/delete/list`
+- `search "<query>"` — FTS5 BM25 with OR-join for natural-language queries + LIKE fallback
+- `project create/list/get/update`
+- `export` — all active memories → Markdown files
+- `backup` — WAL checkpoint + timestamped SQLite copy
+
+Security: 8-pattern credential scanner blocks secrets before ingestion. Audit log to SQLite + file.
+
+Markdown sync: memories with importance ≥ 7 auto-synced to `memory/<type>/` on write.
+
+Tests: 10/10 passing. Git: 2a2aac1
+
+**Next**: Phase 2 — Context Router (`hive context "<task>"`)
+
+---
+
 ## 2026-11-19 — Phase 0 Complete
 
 **Phase 0: Research & Environment Audit**

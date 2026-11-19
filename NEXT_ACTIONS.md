@@ -1,30 +1,26 @@
 # NEXT_ACTIONS.md
 
-## Immediate next session — Phase 1 start
+## Phase 1 — DONE ✅
+## Phase 2 — DONE ✅ (2026-11-19)
 
-### Decision needed from user before starting:
-1. **Approve Phase 1 start** — building the SQLite schema and Node.js CLI
-2. **package.json dependencies** — only `better-sqlite3` needed for Phase 1 (all else built-in).
-   Confirm approval to `npm install better-sqlite3`.
+## Phase 3 — Knowledge Graph (next)
 
-### Once approved, in this order:
+Goal: Entities, relationships, and provenance graph over memories.
 
-1. `npm init` in HIVE root, install `better-sqlite3`
-2. `src/db.js` — SQLite init, schema creation, migrations
-3. SQLite schema: `memories`, `projects`, `entities`, `sources`, `relationships` tables + FTS5
-4. `src/memory.js` — memory CRUD with trust levels
-5. `src/projects.js` — project CRUD
-6. `src/hive.js` — CLI entry point, command dispatch
-7. First working commands: `hive memory add`, `hive search`, `hive project create`
-8. `tests/` — baseline test suite (10 tests from spec)
-9. `hive backup` / `hive export`
-10. First git commit of working code
+Key tasks:
+1. `src/entities.js` — CRUD for the `entities` table (name, type, attributes)
+2. `src/relationships.js` — CRUD for `relationships` table (subject, predicate, object)
+3. Entity extraction from memory content (simple rule-based, no LLM required for MVP)
+4. Graph traversal: given an entity, fetch related memories and connected entities
+5. `hive entity list/get`, `hive relationship list` CLI commands
+6. Tests: entity creation, relationship traversal, entity extraction
+
+## Upcoming decisions
+
+- Semantic/vector search: transformers.js (~80MB pure JS) or Python-based — still deferred
+- Whether to backfill claude-mem observations into HIVE (Phase 4 integration)
+- Entity extraction: rule-based regex patterns vs NLP library vs LLM-assisted
 
 ## Blocked on
 
-Nothing currently blocked. Architecture decided. Waiting for session-start approval.
-
-## Upcoming decisions (not blocking Phase 1)
-
-- Semantic search approach for Phase 2: transformers.js (pure JS, ~80MB model) vs Python bridge
-- Whether to ingest existing claude-mem observations into HIVE as a backfill
+Nothing. Phase 3 can start immediately.
