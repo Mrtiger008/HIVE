@@ -1,5 +1,22 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 18 Complete
+
+**Phase 18: Search History**
+
+`src/db.js`:
+- Schema v5 migration: `search_history` table (id, query, searched_at) + index on query
+
+`src/server.js`:
+- `recordQuery(query)` — called on every non-empty search, inserts into `search_history`
+- `GET /api/search/history?limit=N` — returns recent unique queries grouped by query, ordered by `last_used DESC`, with `times` count
+- Dashboard Search tab: `<input list="q-history">` + `<datalist id="q-history">` for native browser autocomplete
+- `loadHistory()` — populates datalist on page load and after each search
+
+Tests: 10/10 passing (`tests/test-phase18.js`). All suites: **170/170 total**.
+
+---
+
 ## 2026-11-20 — Phase 17 Complete
 
 **Phase 17: Export Formats**

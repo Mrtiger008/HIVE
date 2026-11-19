@@ -171,6 +171,18 @@ function _initSchema(db) {
     `);
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (4, ?)').run(Date.now());
   }
+  // v5: search_history — recent query log for autocomplete
+  if (sv < 5) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS search_history (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        query       TEXT NOT NULL,
+        searched_at INTEGER NOT NULL
+      );
+      CREATE INDEX IF NOT EXISTS idx_sh_query ON search_history(query);
+    `);
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (5, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {

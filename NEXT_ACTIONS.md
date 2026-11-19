@@ -29,7 +29,9 @@
 
 ## Phase 17 — Export Formats — DONE ✅ (2026-11-20)
 
-## Phase 18 — Candidates
+## Phase 18 — Search History — DONE ✅ (2026-11-20)
+
+## Phase 19 — Candidates
 
 - **REST API + integrations**: JSON API for external tools (Obsidian plugin, Alfred, etc.)
 - **Dashboard search improvements**: semantic search toggle in the Search tab

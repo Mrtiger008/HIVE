@@ -37,12 +37,27 @@ function handleStats(req, res) {
   });
 }
 
+function recordQuery(query) {
+  try {
+    getDb().prepare('INSERT INTO search_history (query, searched_at) VALUES (?, ?)').run(query.trim(), Date.now());
+  } catch {}
+}
+
+function handleSearchHistory(req, res, q) {
+  const limit = +(q.limit) || 20;
+  const rows = getDb().prepare(
+    'SELECT query, MAX(searched_at) as last_used, COUNT(*) as times FROM search_history GROUP BY query ORDER BY last_used DESC LIMIT ?'
+  ).all(limit);
+  json(res, rows);
+}
+
 function handleSearch(req, res, q) {
   const query = q.q || '';
   const limit = +(q.limit) || 20;
   const projectId = q.project || null;
   const mode = q.mode || 'keyword';
   if (!query.trim()) { json(res, []); return; }
+  recordQuery(query);
   if (mode === 'semantic' || mode === 'hybrid') {
     try {
       const sem = require('./semantic');
@@ -193,7 +208,8 @@ function handleIndex(req, res) {
 
 const ROUTES = {
   'GET /api/stats':     handleStats,
-  'GET /api/search':    handleSearch,
+  'GET /api/search':         handleSearch,
+  'GET /api/search/history': handleSearchHistory,
   'GET /api/memories':  handleMemories,
   'POST /api/memories': handleAddMemory,
   'GET /api/patterns':  handlePatterns,
@@ -319,7 +335,8 @@ input{width:360px}
 
 <div id="search" class="tab on">
   <div class="row">
-    <input id="q" placeholder="Search memories…" onkeydown="if(event.key==='Enter')doSearch()">
+    <input id="q" placeholder="Search memories…" onkeydown="if(event.key==='Enter')doSearch()" list="q-history" autocomplete="off">
+    <datalist id="q-history"></datalist>
     <select id="smode" title="Search mode"><option value="keyword">Keyword</option><option value="hybrid">Hybrid</option><option value="semantic">Semantic</option></select>
     <button class="btn" onclick="doSearch()">Search</button>
   </div>
@@ -400,6 +417,7 @@ async function doSearch() {
   const mode = g('smode').value;
   const d = await api('/api/search?q='+encodeURIComponent(q)+'&limit=20&mode='+mode);
   g('sr').innerHTML = d.length ? d.map(card).join('') : '<p class="empty">No results.</p>';
+  loadHistory();
 }
 
 async function loadMem() {
@@ -536,5 +554,7 @@ async function archiveMem(id, btn) {
 }
 refreshStats();
 api('/api/projects').then(ps => { const sel=g('mproj'); ps.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);}); });
+function loadHistory() { api('/api/search/history?limit=30').then(hs => { const dl=g('q-history'); dl.innerHTML=''; hs.forEach(h=>{const o=document.createElement('option');o.value=h.query;dl.appendChild(o);}); }); }
+loadHistory();
 </script>
 </body></html>`;
