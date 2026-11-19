@@ -3,6 +3,8 @@
 
 const memory   = require('./memory');
 const projects = require('./projects');
+const entities = require('./entities');
+const graph    = require('./graph');
 const { search }    = require('./search');
 const { exportAll, backup } = require('./export');
 
@@ -40,6 +42,17 @@ function fmt(m) {
     `Updated:    ${new Date(m.updated_at).toLocaleString()}`,
     '',
     m.content,
+  ].filter(l => l !== null).join('\n');
+}
+
+function fmtEntity(e) {
+  return [
+    `ID:          ${e.id}`,
+    `Name:        ${e.name}`,
+    `Type:        ${e.entity_type}`,
+    e.description        ? `Description: ${e.description}` : null,
+    e.aliases?.length    ? `Aliases:     ${e.aliases.join(', ')}` : null,
+    `Created:     ${new Date(e.created_at).toLocaleString()}`,
   ].filter(l => l !== null).join('\n');
 }
 
@@ -202,6 +215,109 @@ const COMMANDS = {
     console.log(fmtProject(p));
   },
 
+  // ── entity ───────────────────────────────────────────────────────────────
+
+  'entity add'(args) {
+    const { flags } = parseArgs(args);
+    if (!flags.name) die('Usage: hive entity add --name "..." [--type person|tool|org|concept|project|file|domain|other] [--description "..."] [--aliases "a,b"]');
+    const e = entities.create({
+      name: flags.name,
+      entity_type: flags.type || 'other',
+      description: flags.description,
+      aliases: flags.aliases ? flags.aliases.split(',').map(a => a.trim()).filter(Boolean) : [],
+    });
+    console.log('Entity created:\n');
+    console.log(fmtEntity(e));
+  },
+
+  'entity get'(args) {
+    const { positional } = parseArgs(args);
+    if (!positional) die('Usage: hive entity get <id>');
+    const e = entities.get(positional);
+    if (!e) die(`Entity not found: ${positional}`);
+    console.log(fmtEntity(e));
+    const nbrs = graph.neighbors(e.id, { limit: 5 });
+    if (nbrs.length) {
+      console.log('\nRelationships:');
+      for (const n of nbrs)
+        console.log(`  ${n.direction === 'out' ? '→' : '←'} [${n.rel_type}] ${n.name} (${n.entity_type})`);
+    }
+  },
+
+  'entity list'(args) {
+    const { flags } = parseArgs(args);
+    const list = entities.list({ entity_type: flags.type, limit: flags.limit ? +flags.limit : 50 });
+    if (!list.length) { console.log('No entities found.'); return; }
+    for (const e of list)
+      console.log(`[${e.id.slice(0,8)}] [${e.entity_type.padEnd(8)}] ${e.name}${e.aliases.length ? `  (${e.aliases.join(', ')})` : ''}`);
+    console.log(`\n${list.length} result(s)`);
+  },
+
+  'entity find'(args) {
+    const { positional } = parseArgs(args);
+    if (!positional) die('Usage: hive entity find "<name>"');
+    const results = entities.findByName(positional);
+    if (!results.length) { console.log('No entities found.'); return; }
+    for (const e of results)
+      console.log(`[${e.id.slice(0,8)}] [${e.entity_type.padEnd(8)}] ${e.name}${e.aliases.length ? `  aliases: ${e.aliases.join(', ')}` : ''}`);
+  },
+
+  'entity link'(args) {
+    const { flags } = parseArgs(args);
+    if (!flags.from || !flags.rel || !flags.to)
+      die('Usage: hive entity link --from <id> --rel <REL_TYPE> --to <id> [--confidence 0.9] [--notes "..."]');
+    const rel = graph.link({
+      from_id: flags.from, rel_type: flags.rel, to_id: flags.to,
+      confidence: flags.confidence ? +flags.confidence : 0.5,
+      notes: flags.notes,
+    });
+    console.log(`Relationship created: ${rel.id}`);
+    const from = entities.get(rel.from_id);
+    const to   = entities.get(rel.to_id);
+    console.log(`  ${from.name}  --[${rel.rel_type}]-->  ${to.name}`);
+  },
+
+  'entity merge'(args) {
+    const { flags } = parseArgs(args);
+    if (!flags.keep || !flags.drop) die('Usage: hive entity merge --keep <id> --drop <id>');
+    const kept = entities.merge(flags.keep, flags.drop);
+    console.log(`Merged. Kept entity:\n`);
+    console.log(fmtEntity(kept));
+  },
+
+  // ── graph ─────────────────────────────────────────────────────────────────
+
+  'graph neighbors'(args) {
+    const { positional, flags } = parseArgs(args);
+    if (!positional) die('Usage: hive graph neighbors <entity_id> [--direction out|in|both] [--rel REL_TYPE] [--limit N]');
+    const e = entities.get(positional);
+    if (!e) die(`Entity not found: ${positional}`);
+    const nbrs = graph.neighbors(positional, {
+      direction: flags.direction || 'both',
+      relType: flags.rel,
+      limit: flags.limit ? +flags.limit : 20,
+    });
+    if (!nbrs.length) { console.log('No neighbors found.'); return; }
+    console.log(`Neighbors of "${e.name}":\n`);
+    for (const n of nbrs)
+      console.log(`  ${n.direction === 'out' ? '→' : '←'} [${n.rel_type}] ${n.name} (${n.entity_type})  conf=${n.rel_confidence}`);
+  },
+
+  'graph related'(args) {
+    const { positional, flags } = parseArgs(args);
+    if (!positional) die('Usage: hive graph related <entity_id> [--limit N]');
+    const e = entities.get(positional);
+    if (!e) die(`Entity not found: ${positional}`);
+    const mems = graph.relatedMemories(positional, flags.limit ? +flags.limit : 10);
+    if (!mems.length) { console.log(`No memories mention "${e.name}".`); return; }
+    console.log(`Memories mentioning "${e.name}":\n`);
+    for (const m of mems) {
+      const preview = m.content.replace(/\n/g, ' ').substring(0, 120);
+      console.log(`[${m.id.slice(0,8)}] [${m.memory_type}] ${m.title}`);
+      console.log(`  ${preview}${m.content.length > 120 ? '…' : ''}\n`);
+    }
+  },
+
   // ── utility ───────────────────────────────────────────────────────────────
 
   'export'() {
@@ -294,6 +410,18 @@ const COMMANDS = {
   'help'() {
     console.log(`
 HIVE — Personal AI Knowledge & Memory System
+
+Entity commands:
+  hive entity add    --name "..." [--type person|tool|org|concept|project|file|domain|other] [--description "..."] [--aliases "a,b"]
+  hive entity get    <id>
+  hive entity list   [--type TYPE] [--limit N]
+  hive entity find   "<name>"
+  hive entity link   --from <id> --rel <REL_TYPE> --to <id> [--confidence 0.9] [--notes "..."]
+  hive entity merge  --keep <id> --drop <id>
+
+Graph commands:
+  hive graph neighbors <entity_id>  [--direction out|in|both] [--rel REL_TYPE] [--limit N]
+  hive graph related   <entity_id>  [--limit N]
 
 Memory commands:
   hive memory add     --title "…" --content "…" [--type TYPE] [--domain D] [--project ID]
