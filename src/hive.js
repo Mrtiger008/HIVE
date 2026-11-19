@@ -11,7 +11,8 @@ const ingest   = require('./ingest');
 const { decayScore, sweep, stalest } = require('./decay');
 const { reinforce }  = require('./reinforce');
 const { topKeywords } = require('./patterns');
-const semantic = require('./semantic');
+const semantic  = require('./semantic');
+const briefing  = require('./briefing');
 
 const [,, cmd, ...rawArgs] = process.argv;
 
@@ -445,6 +446,24 @@ const COMMANDS = {
     console.log(`Decay sweep complete — ${changed} memories marked OUTDATED (90+ days idle)`);
   },
 
+  // ── briefings ─────────────────────────────────────────────────────────────
+
+  'brief'(args) {
+    const { positional, flags } = parseArgs(args);
+    const daily  = flags.daily  === true || flags.daily  === 'true';
+    const budget = flags.budget ? +flags.budget : 1500;
+    const proj   = flags.project || null;
+
+    const run = daily || !positional
+      ? briefing.dailyBriefing({ projectId: proj, budget })
+      : briefing.generateBriefing(positional, { projectId: proj, budget });
+
+    run.then(r => {
+      console.log(r.text);
+      console.log(`─── ${r.memoryCount} memories  |  ${r.staleCount} stale  |  ~${r.tokenEstimate} tokens ───`);
+    }).catch(err => { console.error(`Error: ${err.message}`); process.exit(1); });
+  },
+
   // ── utility ───────────────────────────────────────────────────────────────
 
   'export'() {
@@ -537,6 +556,10 @@ const COMMANDS = {
   'help'() {
     console.log(`
 HIVE — Personal AI Knowledge & Memory System
+
+Smart briefings:
+  hive brief "<what I'm working on today>"  [--project <id>] [--budget 1500]
+  hive brief --daily                        Auto-infer topic from last 7 days
 
 Semantic search:
   hive semantic "<query>"  [--limit N] [--project <id>] [--hybrid]

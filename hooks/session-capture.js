@@ -58,7 +58,8 @@ if (projectDir) {
   if (fs.existsSync(hiveDb)) process.env.HIVE_DB = hiveDb;
 }
 
-const { fromSession } = require(path.join(__dirname, '..', 'src', 'ingest'));
+const { fromSession }   = require(path.join(__dirname, '..', 'src', 'ingest'));
+const { dailyBriefing } = require(path.join(__dirname, '..', 'src', 'briefing'));
 
 try {
   const { stored } = fromSession(jsonlPath, { auto: true, maxProposals: 10 });
@@ -67,4 +68,17 @@ try {
   }
 } catch (err) {
   process.stderr.write(`[hive:session-capture] Error: ${err.message}\n`);
+}
+
+// Generate daily briefing so the next session has a context pack ready.
+const briefingPath = projectDir
+  ? path.join(projectDir, 'database', 'last-briefing.md')
+  : null;
+if (briefingPath) {
+  dailyBriefing({ budget: 1500 })
+    .then(r => {
+      fs.writeFileSync(briefingPath, r.text, 'utf8');
+      process.stdout.write(`[hive:session-capture] Briefing saved (${r.memoryCount} memories, ~${r.tokenEstimate} tokens)\n`);
+    })
+    .catch(() => {}); // non-fatal
 }
