@@ -13,6 +13,7 @@ const { reinforce }  = require('./reinforce');
 const { topKeywords } = require('./patterns');
 const semantic  = require('./semantic');
 const briefing  = require('./briefing');
+const extract   = require('./extract');
 
 const [,, cmd, ...rawArgs] = process.argv;
 
@@ -446,6 +447,53 @@ const COMMANDS = {
     console.log(`Decay sweep complete — ${changed} memories marked OUTDATED (90+ days idle)`);
   },
 
+  // ── extraction ───────────────────────────────────────────────────────────
+
+  'extract'(args) {
+    const { positional, flags } = parseArgs(args);
+    if (flags.all) {
+      const r = extract.backfill({ limit: flags.limit ? +flags.limit : 500 });
+      console.log(`Backfill complete — ${r.processed} memories scanned, ${r.linked} had entity links created.`);
+      return;
+    }
+    if (!positional) die('Usage: hive extract <memory_id>  |  hive extract --all [--limit N]');
+    const m = memory.get(positional);
+    if (!m) die(`Memory not found: ${positional}`);
+    const links = extract.extractAndLink(m.id, { title: m.title, content: m.content });
+    if (!links.length) { console.log('No entity mentions detected.'); return; }
+    console.log(`Linked ${links.length} entities to [${m.id.slice(0,8)}] "${m.title}":\n`);
+    for (const l of links) console.log(`  [${l.type}] ${l.name}  conf=${l.confidence.toFixed(2)}`);
+  },
+
+  'memory links'(args) {
+    const { positional } = parseArgs(args);
+    if (!positional) die('Usage: hive memory links <memory_id>');
+    const m = memory.get(positional);
+    if (!m) die(`Memory not found: ${positional}`);
+    const links = extract.linkedEntities(m.id);
+    if (!links.length) { console.log(`No entity links for "${m.title}".`); return; }
+    console.log(`Entities linked to "${m.title}":\n`);
+    for (const e of links) {
+      const auto = e.auto ? ' [auto]' : '';
+      console.log(`  [${e.entity_type}] ${e.name}  conf=${e.confidence.toFixed(2)}${auto}`);
+    }
+  },
+
+  'entity links'(args) {
+    const { positional, flags } = parseArgs(args);
+    if (!positional) die('Usage: hive entity links <entity_id> [--limit N]');
+    const e = entities.get(positional);
+    if (!e) die(`Entity not found: ${positional}`);
+    const mems = extract.linkedMemories(positional, { limit: flags.limit ? +flags.limit : 10 });
+    if (!mems.length) { console.log(`No memories linked to "${e.name}".`); return; }
+    console.log(`Memories mentioning "${e.name}":\n`);
+    for (const m of mems) {
+      const preview = m.content.replace(/\n/g, ' ').slice(0, 120);
+      console.log(`[${m.id.slice(0,8)}] [${m.memory_type}] [conf=${m.confidence.toFixed(2)}] ${m.title}`);
+      console.log(`  ${preview}${m.content.length > 120 ? '…' : ''}\n`);
+    }
+  },
+
   // ── briefings ─────────────────────────────────────────────────────────────
 
   'brief'(args) {
@@ -556,6 +604,12 @@ const COMMANDS = {
   'help'() {
     console.log(`
 HIVE — Personal AI Knowledge & Memory System
+
+Entity extraction:
+  hive extract <memory_id>              Extract entity mentions from one memory
+  hive extract --all  [--limit N]       Backfill all memories without entity links
+  hive memory links   <memory_id>       List entities linked to a memory
+  hive entity links   <entity_id>       List memories mentioning an entity
 
 Smart briefings:
   hive brief "<what I'm working on today>"  [--project <id>] [--budget 1500]

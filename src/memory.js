@@ -74,6 +74,8 @@ function add(opts) {
 
   const m = get(id);
   syncToMarkdown(m);
+  // Auto-extract entity mentions — soft dependency, never blocks the add
+  try { require('./extract').extractAndLink(id, { title, content }); } catch {}
   return m;
 }
 

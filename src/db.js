@@ -156,6 +156,21 @@ function _initSchema(db) {
     try { db.exec('ALTER TABLE memories ADD COLUMN embedding TEXT'); } catch {}
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (3, ?)').run(Date.now());
   }
+  // v4: memory_entity_links — auto-extracted entity mentions per memory
+  if (sv < 4) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS memory_entity_links (
+        memory_id    TEXT NOT NULL,
+        entity_id    TEXT NOT NULL,
+        confidence   REAL NOT NULL DEFAULT 0.5,
+        auto         INTEGER NOT NULL DEFAULT 1,
+        created_at   INTEGER NOT NULL,
+        PRIMARY KEY (memory_id, entity_id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_mel_entity ON memory_entity_links(entity_id);
+    `);
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (4, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {
