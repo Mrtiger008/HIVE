@@ -1,5 +1,32 @@
 # CHANGELOG.md
 
+## 2026-11-19 — Phase 7 Complete
+
+**Phase 7: Smart Briefings**
+
+`src/briefing.js` — `generateBriefing(task, { projectId, budget, embedFn })`:
+- Merges FTS5 keyword results (from `search.js`) + semantic results (from `semantic.js`), deduplicated by id
+- Propagates `_sim` onto KW-matched entries found in semantic results — so combined score uses both signals
+- Re-ranks: 40% keyword position + 40% cosine similarity + 20% decay score
+- Minimum similarity threshold (0.1) drops truly orthogonal semantic results
+- Budget enforcement: stops appending memory entries once `tokenEstimate > budget` (default 1500 tokens)
+- "Needs Review" section: `stalest()` top 3 memories not touched in 14+ days, not already surfaced
+- Returns `{ text, tokenEstimate, memoryCount, staleCount }`
+
+`dailyBriefing({ projectId, budget, embedFn })` — infers topic from `topKeywords({ days: 7 })`, delegates to `generateBriefing`.
+
+CLI:
+- `hive brief "<task>"  [--project <id>] [--budget N]` — task-focused briefing
+- `hive brief --daily                                 ` — topic inferred from last 7 days
+
+`hooks/session-capture.js` — saves daily briefing to `database/last-briefing.md` on session stop so next session finds a ready context pack.
+
+Tests: 10/10 passing (`tests/test-briefing.js`). All suites: 70/70 total. Git: 932b901
+
+**Next**: Phase 8 — Entity extraction / auto-tagging, or UI dashboard (TBD)
+
+---
+
 ## 2026-11-19 — Phase 6 Complete
 
 **Phase 6: Semantic Search**
