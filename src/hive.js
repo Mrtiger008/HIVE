@@ -117,6 +117,7 @@ const COMMANDS = {
     if (flags.content)    updates.content    = flags.content;
     if (flags.trust)      updates.trust_level = flags.trust;
     if (flags.importance) updates.importance = +flags.importance;
+    if (flags.confidence != null) updates.confidence = Math.min(1, Math.max(0, +flags.confidence));
     if (flags.status)     updates.status     = flags.status;
     if (flags.domain)     updates.domain     = flags.domain;
     if (flags.tags)       updates.tags       = flags.tags.split(',').map(t => t.trim()).filter(Boolean);

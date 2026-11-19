@@ -39,9 +39,11 @@
 
 ## Phase 22 — REST API Key Authentication — DONE ✅ (2026-11-20)
 
-## Phase 23 — Candidates
+## Phase 23 — Memory Confidence Scores — DONE ✅ (2026-11-20)
 
-- **Memory confidence scores**: visual confidence bar on each card, filter by range
-- **Graph visualization**: D3 force-directed entity relationship graph in dashboard
-- **Embedding pipeline improvements**: auto-embed on `memory.add()` (backfill is manual today)
+## Phase 24 — Candidates
+
+- **Graph visualization**: D3 force-directed entity relationship graph in dashboard (replace canvas stub)
 - **Webhook / push notifications**: POST to a configured URL when memories are added/updated
+- **Memory versioning**: track content changes over time, diff view in dashboard
+- **Duplicate detection**: warn before adding a memory too similar to an existing one

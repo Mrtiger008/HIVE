@@ -1,5 +1,29 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 23 Complete
+
+**Phase 23: Memory Confidence Scores**
+
+`src/memory.js`:
+- `memory.list()` gains `min_conf` and `max_conf` optional params → SQL `confidence >= ?` / `<= ?` filters
+- `memory.update()` already accepted `confidence`; `memory.add()` already defaulted to 0.5 — both now documented/tested
+
+`src/server.js`:
+- `handleMemories`: passes `min_conf`/`max_conf` from query string to `memory.list()`
+- `handleUpdateMemory`: clamps `confidence` to [0,1] before updating
+- `handleAddMemory`: clamps `confidence` to [0,1]; defaults to 0.5
+- Dashboard: `confBar(c)` renders a coloured percentage + mini bar (green ≥0.8, amber ≥0.5, red <0.5)
+- Dashboard `card()`: confidence bar shown before type/trust badges
+- Dashboard Memories tab: `<select id="mconf">` with "Any / ≥0.8 / ≥0.6 / ≤0.4" options; `loadMem()` reads `min_conf`/`max_conf`
+- Dashboard modal: `<input id="nm-cf">` confidence field; `showAdd`/`showEdit`/`submitAdd` wired up
+
+`src/hive.js`:
+- `hive memory update <id> --confidence 0.9` now accepted; clamped to [0,1]
+
+Tests: 10/10 passing (`tests/test-phase23.js`). All suites: **230/230 total**.
+
+---
+
 ## 2026-11-20 — Phase 22 Complete
 
 **Phase 22: REST API Key Authentication**

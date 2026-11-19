@@ -108,10 +108,12 @@ function handleSearch(req, res, q) {
 
 function handleMemories(req, res, q) {
   let results = memory.list({
-    type:       q.type    || undefined,
-    trust_level: q.trust  || undefined,
-    project_id: q.project || undefined,
-    limit:      +(q.limit) || 50,
+    type:        q.type    || undefined,
+    trust_level: q.trust   || undefined,
+    project_id:  q.project || undefined,
+    limit:       +(q.limit) || 50,
+    min_conf:    q.min_conf != null ? +q.min_conf : undefined,
+    max_conf:    q.max_conf != null ? +q.max_conf : undefined,
   });
   if (q.tag) results = results.filter(m => (m.tags || []).includes(q.tag));
   json(res, results);
@@ -207,6 +209,7 @@ async function handleAddMemory(req, res) {
     memory_type: body.memory_type || 'semantic',
     trust_level: body.trust_level || 'OBSERVED',
     importance:  body.importance  ? +body.importance : 5,
+    confidence:  body.confidence  != null ? Math.min(1, Math.max(0, +body.confidence)) : 0.5,
     tags:        body.tags        || [],
   });
   json(res, m, 201);
@@ -228,6 +231,7 @@ async function handleUpdateMemory(req, res, id) {
   if (body.memory_type !== undefined) updates.memory_type = body.memory_type;
   if (body.trust_level !== undefined) updates.trust_level = body.trust_level;
   if (body.importance  !== undefined) updates.importance  = +body.importance;
+  if (body.confidence  !== undefined) updates.confidence  = Math.min(1, Math.max(0, +body.confidence));
   if (body.tags        !== undefined) updates.tags        = body.tags;
   if (!Object.keys(updates).length) { json(res, { error: 'no fields to update' }, 400); return; }
   json(res, memory.update(id, updates));
@@ -423,6 +427,7 @@ input{width:360px}
 .legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
 .lk{display:flex;align-items:center;gap:5px;font-size:12px;color:#8b949e}
 .lc{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+.cbar{display:inline-block;height:6px;border-radius:3px;vertical-align:middle;margin-left:4px}
 </style></head>
 <body>
 <header><h1>&#x1F9E0; HIVE</h1><span id="stats">loading…</span><span style="margin-left:auto;display:flex;gap:8px"><a href="/api/export?format=json" download="hive-export.json" class="btn" style="text-decoration:none;font-size:12px">⬇ JSON</a><a href="/api/export?format=csv" download="hive-export.csv" class="btn" style="text-decoration:none;font-size:12px">⬇ CSV</a></span></header>
@@ -455,6 +460,7 @@ input{width:360px}
     <select id="mtrust" onchange="loadMem()"><option value="">All trust</option><option>USER_CONFIRMED</option><option>SOURCE_VERIFIED</option><option>OBSERVED</option><option>INFERRED</option></select>
     <select id="mproj" onchange="loadMem()"><option value="">All projects</option></select>
     <select id="mtag" onchange="loadMem()"><option value="">All tags</option></select>
+    <select id="mconf" onchange="loadMem()" title="Min confidence"><option value="">Any confidence</option><option value="0.8">≥ 0.8 (high)</option><option value="0.6">≥ 0.6 (medium+)</option><option value="0.0" data-max="0.4">≤ 0.4 (low)</option></select>
     <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
   </div>
   <div id="bulk-bar" style="display:none;padding:8px 0;display:none;gap:10px;align-items:center;border-bottom:1px solid #30363d;margin-bottom:8px">
@@ -507,6 +513,7 @@ input{width:360px}
     <div class="f"><label>Type</label><select id="nm-ty"><option>semantic</option><option>core</option><option>domain</option><option>project</option><option>episodic</option><option>skill</option></select></div>
     <div class="f"><label>Trust</label><select id="nm-tr"><option>OBSERVED</option><option>USER_CONFIRMED</option><option>SOURCE_VERIFIED</option><option>INFERRED</option></select></div>
     <div class="f"><label>Importance (1–10)</label><input id="nm-i" type="number" min="1" max="10" value="5"></div>
+    <div class="f"><label>Confidence (0–1) <span style="font-weight:normal;color:#8b949e">how certain this is</span></label><input id="nm-cf" type="number" min="0" max="1" step="0.05" value="0.5" style="width:88px"></div>
     <div class="f"><label>Tags <span style="font-weight:normal;color:#8b949e">(comma-separated)</span></label><input id="nm-tg" style="width:100%" placeholder="e.g. javascript, async, todo"></div>
     <p id="nm-err" class="merr"></p>
     <div class="mbtns">
@@ -535,12 +542,17 @@ function show(id, btn) {
   if (id==='apikeys') loadKeys();
 }
 
+function confBar(c) {
+  const pct = Math.round((c||0.5)*100);
+  const col = c >= 0.8 ? '#3fb950' : c >= 0.5 ? '#d29922' : '#f85149';
+  return \`<span title="confidence \${pct}%" style="font-size:11px;color:\${col};margin-right:4px">▸\${pct}%<span class="cbar" style="width:\${pct/2}px;background:\${col}"></span></span>\`;
+}
 function card(m) {
   const preview = (m.content||'').replace(/\\n/g,' ').slice(0,280);
   const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
   return \`<div class="card" data-id="\${m.id}">
     <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button></div>
-    <div class="cm"><span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
+    <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
     <div class="cc">\${esc(preview)}\${m.content.length>280?'…':''}</div>
   </div>\`;
 }
@@ -584,8 +596,12 @@ async function bulkRetype() {
 async function loadMem() {
   _sel.clear(); g('bulk-bar').style.display='none';
   let u = '/api/memories?limit=50';
-  const t = g('mtype').value, r = g('mtrust').value, p = g('mproj').value, tg = g('mtag').value;
+  const t=g('mtype').value, r=g('mtrust').value, p=g('mproj').value, tg=g('mtag').value;
+  const confOpt = g('mconf').selectedOptions[0];
+  const minC = confOpt ? confOpt.value : '';
+  const maxC = confOpt ? (confOpt.dataset.max||'') : '';
   if (t) u += '&type='+t; if (r) u += '&trust='+r; if (p) u += '&project='+p; if (tg) u += '&tag='+encodeURIComponent(tg);
+  if (minC !== '') u += '&min_conf='+minC; if (maxC !== '') u += '&max_conf='+maxC;
   const d = await api(u);
   g('ml').innerHTML = d.length ? d.map(card).join('') : '<p class="empty">No memories.</p>';
 }
@@ -709,15 +725,15 @@ async function loadGraph() {
 
 function refreshStats() { api('/api/stats').then(d => g('stats').textContent = \`\${d.memories} memories · \${d.entities} entities · \${d.projects} projects\`); }
 let _editId = null;
-function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-tg').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
-async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
+function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-cf').value='0.5'; g('nm-tg').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
+async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-cf').value=d.confidence!=null?d.confidence:0.5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
 function closeAdd() { g('add-modal').classList.remove('on'); }
 async function submitAdd() {
   const title = g('nm-t').value.trim(), content = g('nm-c').value.trim();
   if (!title || !content) { g('nm-err').textContent = 'Title and content are required.'; return; }
   g('nm-err').textContent = '';
   const rawTags = g('nm-tg').value.split(',').map(t=>t.trim()).filter(Boolean);
-  const payload = { title, content, memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value, tags: rawTags };
+  const payload = { title, content, memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value, confidence: +g('nm-cf').value, tags: rawTags };
   const r = _editId
     ? await fetch('/api/memories/'+_editId, { method:'PUT',  headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
     : await fetch('/api/memories',           { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
