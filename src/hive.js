@@ -828,6 +828,32 @@ const COMMANDS = {
     console.log('──────────────────────────────────────────\n');
   },
 
+  'digest'(args) {
+    const { flags } = parseArgs(args);
+    const period = flags.weekly ? 'weekly' : 'daily';
+    const dg = require('./digest');
+    const d = period === 'weekly' ? dg.weekly() : dg.daily();
+    const ts = t => new Date(t).toLocaleDateString();
+    console.log(`\n── HIVE ${period.charAt(0).toUpperCase() + period.slice(1)} Digest ──────────────────`);
+    console.log(`  Generated: ${new Date(d.generated_at).toLocaleString()}`);
+    console.log(`  Active memories: ${d.total_active}\n`);
+    const label = period === 'weekly' ? 'last 7 days' : 'last 24 h';
+    const staleLabel = period === 'weekly' ? '30 days' : '7 days';
+    console.log(`  New (${label}): ${d.new_memories.length}`);
+    d.new_memories.forEach(m => console.log(`    + [${m.memory_type}] ${m.title}  (${ts(m.created_at)})`));
+    console.log(`\n  Stale (not updated in ${staleLabel}): ${d.stale_memories.length}`);
+    d.stale_memories.slice(0, 10).forEach(m => console.log(`    · ${m.title}  (last: ${ts(m.updated_at)})`));
+    if (d.low_conf_memories) {
+      console.log(`\n  Low confidence (< 40%): ${d.low_conf_memories.length}`);
+      d.low_conf_memories.forEach(m => console.log(`    ⚠ ${m.title}  (${(m.confidence * 100 | 0)}%)`));
+    }
+    if (d.top_domains && d.top_domains.length) {
+      console.log('\n  Top domains (new):');
+      d.top_domains.forEach(r => console.log(`    ${r.domain.padEnd(20)} ${r.count} new`));
+    }
+    console.log('──────────────────────────────────────────\n');
+  },
+
   'template'(args) {
     const { positional } = parseArgs(args);
     const t = require('./templates');

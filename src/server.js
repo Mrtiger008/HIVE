@@ -17,6 +17,7 @@ const templates        = require('./templates');
 const kstats           = require('./stats');
 const links            = require('./links');
 const bookmarks        = require('./bookmarks');
+const digest           = require('./digest');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -442,6 +443,11 @@ const ROUTES = {
   'POST /api/apikeys':       handleCreateKey,
   'GET /api/templates':      (req, res) => json(res, templates.list()),
   'GET /api/stats/full':     (req, res) => json(res, kstats.full()),
+  'GET /api/digest':         (req, res) => {
+    const u = new URL(req.url, 'http://localhost');
+    const period = u.searchParams.get('period') || 'daily';
+    json(res, period === 'weekly' ? digest.weekly() : digest.daily());
+  },
   'GET /api/bookmarks':      handleListBookmarks,
   'POST /api/bookmarks':     handleAddBookmark,
   'GET /api/tags/stats':     (req, res) => { const u = new URL(req.url,'http://l'); handleTagStats(req, res, Object.fromEntries(u.searchParams)); },
@@ -614,6 +620,7 @@ input{width:360px}
   <button onclick="show('webhooks',this)">Webhooks</button>
   <button onclick="show('tagcloud',this)">Tags</button>
   <button onclick="show('kstats',this)">Stats</button>
+  <button onclick="show('digest',this);loadDigest()">Digest</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -705,6 +712,14 @@ input{width:360px}
 <div id="kstats" class="tab">
   <div class="row" style="margin-bottom:16px"><button class="btn" onclick="loadKStats()">↺ Refresh</button></div>
   <div id="ks-body"><p class="empty">Click Refresh to load stats.</p></div>
+</div>
+
+<div id="digest" class="tab">
+  <div class="row" style="margin-bottom:16px;gap:8px">
+    <button class="btn" onclick="loadDigest('daily')" id="dg-daily">Daily</button>
+    <button class="btn" onclick="loadDigest('weekly')" id="dg-weekly">Weekly</button>
+  </div>
+  <div id="dg-body"><p class="empty">Loading…</p></div>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -1287,6 +1302,34 @@ async function addLink() {
 async function removeLink(linkId) {
   await fetch('/api/links/'+linkId, {method:'DELETE',headers:{'X-Hive-Local':'1'}});
   await _renderLinks();
+}
+async function loadDigest(period) {
+  period = period || 'daily';
+  ['dg-daily','dg-weekly'].forEach(id => g(id).style.fontWeight = id.endsWith(period) ? '700' : '400');
+  const d = await api('/api/digest?period='+period);
+  const ts = t => new Date(t).toLocaleDateString();
+  const memList = (arr, fields) => arr.length
+    ? arr.map(m => \`<div style="padding:6px 0;border-bottom:1px solid #21262d;font-size:13px">
+        <span style="color:#c9d1d9">\${esc(m.title)}</span>
+        <span class="b bt" style="margin-left:6px">\${m.memory_type}</span>
+        \${fields.includes('conf') ? \`<span class="b" style="color:\${m.confidence<0.4?'#f85149':'#8b949e'}">\${(m.confidence*100|0)}%</span>\` : ''}
+        \${fields.includes('date') ? \`<span style="color:#8b949e;font-size:11px;margin-left:6px">\${ts(m.created_at||m.updated_at)}</span>\` : ''}
+      </div>\`).join('')
+    : '<p class="empty">None.</p>';
+  const section = (title, content) => \`
+    <div style="margin-bottom:20px">
+      <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">\${title}</h4>
+      \${content}
+    </div>\`;
+  let html = \`<div style="color:#8b949e;font-size:12px;margin-bottom:16px">Generated \${new Date(d.generated_at).toLocaleString()} · \${d.total_active} active memories</div>\`;
+  html += section(\`New (last \${period==='weekly'?'7 days':'24 h'})\`, memList(d.new_memories, ['date']));
+  html += section(\`Stale (not updated in \${period==='weekly'?'30':'7'} days)\`, memList(d.stale_memories, ['date']));
+  if (d.low_conf_memories) html += section('Low confidence (< 40%)', memList(d.low_conf_memories, ['conf']));
+  if (d.top_domains && d.top_domains.length) {
+    const rows = d.top_domains.map(r => \`<div style="font-size:13px;padding:4px 0"><span style="color:#c9d1d9">\${esc(r.domain)}</span><span style="color:#8b949e;margin-left:8px">\${r.count} new</span></div>\`).join('');
+    html += section('Top domains (new this week)', rows);
+  }
+  g('dg-body').innerHTML = html;
 }
 async function loadKStats() {
   const d = await api('/api/stats/full');

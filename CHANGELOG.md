@@ -1,5 +1,23 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 34 Complete
+
+**Phase 34: Scheduled Digests**
+
+`src/digest.js` (new):
+- `daily()` — new memories (last 24 h), stale memories (not updated in 7+ days), low-confidence memories (< 40%), total active count
+- `weekly()` — new memories (last 7 days), stale memories (30+ days), top domains by new activity
+
+`src/server.js`:
+- `GET /api/digest` — returns daily digest (default) or `?period=weekly` for weekly
+- Dashboard: **Digest** tab with Daily/Weekly toggle, sections for new, stale, and low-confidence memories
+
+`src/hive.js`:
+- `hive digest [--weekly]` — prints digest to stdout
+
+`tests/test-phase34.js` — 10/10 passing
+Full regression: 250/250 (Phases 10–34, zero regressions)
+
 ## 2026-11-20 — Phase 33 Complete
 
 **Phase 33: Memory Pinning**

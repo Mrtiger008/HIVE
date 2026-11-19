@@ -61,9 +61,11 @@
 
 ## Phase 33 — Memory Pinning — DONE ✅ (2026-11-20)
 
-## Phase 34 — Candidates
+## Phase 34 — Scheduled Digests — DONE ✅ (2026-11-20)
 
-- **Scheduled digests**: daily/weekly summary of stale + new memories (file or stdout)
+## Phase 35 — Candidates
+
 - **Full-text export to Obsidian**: sync memories as markdown vault notes with backlinks
 - **Keyboard shortcuts**: keyboard-driven navigation (j/k scroll, / focus search, n new)
 - **Memory decay**: confidence auto-decreases for old unaccessed memories; reinforce to restore
+- **Conflict resolution**: flag contradicting memories and suggest merge/deprecate actions
