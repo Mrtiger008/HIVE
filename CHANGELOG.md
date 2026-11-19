@@ -1,5 +1,27 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 35 Complete
+
+**Phase 35: Memory Decay**
+
+`src/decay.js` (new):
+- `preview({ minIdleDays=14 })` — lists memories whose confidence would decrease; sorted by idle days descending
+- `run({ minIdleDays=14 })` — applies decay and returns `{ applied, changes }`
+- `stalest({ projectId, limit })` — existing review helper preserved (was previously in this module)
+- Decay rate: 1%/week idle for normal memories; 0.5%/week for pinned or high-importance (≥7); floor: 0.1
+
+`src/server.js`:
+- `GET /api/decay/preview?min_idle_days=N` — preview without applying
+- `POST /api/decay/run` — applies decay; returns count + change list
+- Dashboard: **Decay** tab with Preview and Apply buttons; idle days + confidence change per memory
+
+`src/hive.js`:
+- `hive decay` — preview (dry-run)
+- `hive decay --run` — apply; `--min-idle-days=N` to adjust threshold
+
+`tests/test-phase35.js` — 10/10 passing
+Full regression: 260/260 (Phases 10–35, zero regressions)
+
 ## 2026-11-20 — Phase 34 Complete
 
 **Phase 34: Scheduled Digests**

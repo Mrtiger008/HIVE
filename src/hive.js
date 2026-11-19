@@ -854,6 +854,24 @@ const COMMANDS = {
     console.log('──────────────────────────────────────────\n');
   },
 
+  'decay'(args) {
+    const { flags } = parseArgs(args);
+    const dcy = require('./decay');
+    if (flags.run) {
+      const r = dcy.run({ minIdleDays: flags['min-idle-days'] ? +flags['min-idle-days'] : 14 });
+      console.log(`\nApplied decay to ${r.applied} memories.`);
+      r.changes.forEach(c => console.log(`  ${c.title}: ${(c.confidence*100|0)}% → ${(c.new_confidence*100|0)}%  (${c.idle_days}d idle)`));
+      console.log('');
+    } else {
+      const minIdleDays = flags['min-idle-days'] ? +flags['min-idle-days'] : 14;
+      const changes = dcy.preview({ minIdleDays });
+      console.log(`\n── Decay Preview (idle > ${minIdleDays} days) ──────────`);
+      if (!changes.length) { console.log('  No memories eligible for decay.\n'); return; }
+      changes.forEach(c => console.log(`  ${c.title.slice(0,40).padEnd(40)} ${(c.confidence*100|0)}% → ${(c.new_confidence*100|0)}%  (${c.idle_days}d idle)`));
+      console.log(`\n  ${changes.length} memories eligible. Run with --run to apply.\n`);
+    }
+  },
+
   'template'(args) {
     const { positional } = parseArgs(args);
     const t = require('./templates');

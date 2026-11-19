@@ -1,42 +1,71 @@
 'use strict';
 const { getDb } = require('./db');
 
-const MS_PER_DAY = 86400000;
-const HALF_LIFE_DAYS = 30; // score halves after 30 idle days
+const DAY = 24 * 60 * 60 * 1000;
+const WEEK = 7 * DAY;
 
-function decayScore(memory) {
-  const now = Date.now();
-  const lastAccess = memory.last_accessed_at || memory.created_at || now;
-  const days = Math.max(0, (now - lastAccess) / MS_PER_DAY);
-  return memory.importance / (1 + days / HALF_LIFE_DAYS);
+// Decay rate: 1% per week idle, halved for high-importance (>=7) or pinned memories.
+// Min confidence floor: 0.1. Only active memories decay.
+function _decayFactor(idleMs, importance, pinned) {
+  const weeks = idleMs / WEEK;
+  const rate = (importance >= 7 || pinned) ? 0.005 : 0.01; // per week
+  return Math.max(0, 1 - rate * weeks);
 }
 
-// Mark active memories not accessed in 90+ days as OUTDATED; skip USER_CONFIRMED.
-function sweep() {
-  const { changes } = getDb().prepare(`
-    UPDATE memories
-    SET trust_level = 'OUTDATED', updated_at = ?
-    WHERE status = 'active'
-      AND trust_level NOT IN ('OUTDATED', 'USER_CONFIRMED')
-      AND COALESCE(last_accessed_at, created_at) < ?
-  `).run(Date.now(), Date.now() - 90 * MS_PER_DAY);
-  return changes;
+function preview(opts = {}) {
+  const { minIdleDays = 14 } = opts;
+  const db = getDb();
+  const now = Date.now();
+  const cutoff = now - minIdleDays * DAY;
+
+  const rows = db.prepare(`
+    SELECT id, title, memory_type, confidence, importance, pinned,
+           last_accessed_at, created_at
+    FROM memories WHERE status = 'active' AND confidence > 0.1
+  `).all();
+
+  return rows
+    .map(m => {
+      const lastSeen = m.last_accessed_at || m.created_at;
+      const idleMs = now - lastSeen;
+      if (lastSeen > cutoff) return null; // recently active — skip
+      const factor = _decayFactor(idleMs, m.importance, m.pinned);
+      const newConf = Math.max(0.1, +(m.confidence * factor).toFixed(3));
+      if (newConf >= m.confidence) return null; // no change
+      return {
+        id: m.id, title: m.title, memory_type: m.memory_type,
+        confidence: m.confidence, new_confidence: newConf,
+        idle_days: Math.round(idleMs / DAY),
+        importance: m.importance, pinned: m.pinned,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.idle_days - a.idle_days);
 }
 
-// Return memories sorted by decay score ascending (stalest first).
-function stalest({ projectId, limit = 10 } = {}) {
+function run(opts = {}) {
+  const changes = preview(opts);
+  if (!changes.length) return { applied: 0, changes };
+  const db = getDb();
+  const stmt = db.prepare('UPDATE memories SET confidence = ?, updated_at = ? WHERE id = ?');
   const now = Date.now();
-  const halfLifeMs = HALF_LIFE_DAYS * MS_PER_DAY;
-  let sql = `SELECT * FROM memories WHERE status = 'active'`;
+  const apply = db.transaction(() => {
+    for (const c of changes) stmt.run(c.new_confidence, now, c.id);
+  });
+  apply();
+  return { applied: changes.length, changes };
+}
+
+// Kept for handleReview compatibility — returns active memories sorted by staleness
+function stalest({ projectId = null, limit = 20 } = {}) {
+  const db = getDb();
+  let sql = "SELECT * FROM memories WHERE status = 'active'";
   const params = [];
   if (projectId) { sql += ' AND project_id = ?'; params.push(projectId); }
-  sql += ` ORDER BY (importance * 1.0 / (1.0 + (? - COALESCE(last_accessed_at, created_at)) * 1.0 / ?)) ASC LIMIT ?`;
-  params.push(now, halfLifeMs, limit);
-  return getDb().prepare(sql).all(...params).map(m => ({
-    ...m,
-    tags: JSON.parse(m.tags || '[]'),
-    decay_score: decayScore(m),
-  }));
+  sql += ' ORDER BY COALESCE(last_accessed_at, created_at) ASC LIMIT ?';
+  params.push(limit);
+  const rows = db.prepare(sql).all(...params);
+  return rows.map(m => { try { m.tags = JSON.parse(m.tags || '[]'); } catch {} return m; });
 }
 
-module.exports = { decayScore, sweep, stalest, HALF_LIFE_DAYS };
+module.exports = { preview, run, stalest };

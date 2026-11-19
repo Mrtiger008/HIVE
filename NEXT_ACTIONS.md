@@ -63,9 +63,11 @@
 
 ## Phase 34 — Scheduled Digests — DONE ✅ (2026-11-20)
 
-## Phase 35 — Candidates
+## Phase 35 — Memory Decay — DONE ✅ (2026-11-20)
+
+## Phase 36 — Candidates
 
 - **Full-text export to Obsidian**: sync memories as markdown vault notes with backlinks
 - **Keyboard shortcuts**: keyboard-driven navigation (j/k scroll, / focus search, n new)
-- **Memory decay**: confidence auto-decreases for old unaccessed memories; reinforce to restore
 - **Conflict resolution**: flag contradicting memories and suggest merge/deprecate actions
+- **Memory relations graph**: visualize memory-to-memory links as a force-directed graph (separate from entity graph)

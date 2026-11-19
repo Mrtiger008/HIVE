@@ -18,6 +18,7 @@ const kstats           = require('./stats');
 const links            = require('./links');
 const bookmarks        = require('./bookmarks');
 const digest           = require('./digest');
+const decay            = require('./decay');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -448,6 +449,16 @@ const ROUTES = {
     const period = u.searchParams.get('period') || 'daily';
     json(res, period === 'weekly' ? digest.weekly() : digest.daily());
   },
+  'GET /api/decay/preview':  (req, res) => {
+    const u = new URL(req.url, 'http://localhost');
+    const minIdleDays = u.searchParams.get('min_idle_days') ? +u.searchParams.get('min_idle_days') : 14;
+    json(res, { changes: decay.preview({ minIdleDays }) });
+  },
+  'POST /api/decay/run':     async (req, res) => {
+    const body = await readBody(req).catch(() => ({}));
+    const minIdleDays = body.min_idle_days || 14;
+    json(res, decay.run({ minIdleDays }));
+  },
   'GET /api/bookmarks':      handleListBookmarks,
   'POST /api/bookmarks':     handleAddBookmark,
   'GET /api/tags/stats':     (req, res) => { const u = new URL(req.url,'http://l'); handleTagStats(req, res, Object.fromEntries(u.searchParams)); },
@@ -621,6 +632,7 @@ input{width:360px}
   <button onclick="show('tagcloud',this)">Tags</button>
   <button onclick="show('kstats',this)">Stats</button>
   <button onclick="show('digest',this);loadDigest()">Digest</button>
+  <button onclick="show('decay',this);loadDecayPreview()">Decay</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -720,6 +732,15 @@ input{width:360px}
     <button class="btn" onclick="loadDigest('weekly')" id="dg-weekly">Weekly</button>
   </div>
   <div id="dg-body"><p class="empty">Loading…</p></div>
+</div>
+
+<div id="decay" class="tab">
+  <div class="row" style="margin-bottom:16px;gap:8px">
+    <button class="btn" onclick="loadDecayPreview()">↺ Preview decay</button>
+    <button class="btn" style="color:#f85149" onclick="runDecay()">▶ Apply decay</button>
+  </div>
+  <p style="font-size:12px;color:#8b949e;margin:0 0 16px">Confidence decays at ~1%/week for memories idle &gt;14 days (0.5%/week for pinned or high-importance). Floor: 10%.</p>
+  <div id="dc-body"><p class="empty">Click "Preview decay" to see which memories would decay.</p></div>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -1302,6 +1323,24 @@ async function addLink() {
 async function removeLink(linkId) {
   await fetch('/api/links/'+linkId, {method:'DELETE',headers:{'X-Hive-Local':'1'}});
   await _renderLinks();
+}
+async function loadDecayPreview() {
+  g('dc-body').innerHTML = '<p class="empty">Loading…</p>';
+  const d = await api('/api/decay/preview');
+  if (!d.changes.length) { g('dc-body').innerHTML = '<p class="empty">No memories eligible for decay.</p>'; return; }
+  g('dc-body').innerHTML = d.changes.map(c => \`<div style="padding:6px 0;border-bottom:1px solid #21262d;font-size:13px;display:flex;gap:12px;align-items:center">
+    <span style="flex:1;color:#c9d1d9;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="\${esc(c.id)}">\${esc(c.title)}</span>
+    <span class="b bt">\${c.memory_type}</span>
+    <span style="color:#8b949e;font-size:11px">\${c.idle_days}d idle</span>
+    <span style="color:#ffa657">\${(c.confidence*100|0)}% → \${(c.new_confidence*100|0)}%</span>
+  </div>\`).join('') + \`<p style="margin-top:12px;font-size:12px;color:#8b949e">\${d.changes.length} memories would decay. Click "Apply decay" to commit.</p>\`;
+}
+async function runDecay() {
+  if (!confirm('Apply confidence decay to all eligible memories?')) return;
+  const r = await fetch('/api/decay/run', {method:'POST',headers:{'Content-Type':'application/json','X-Hive-Local':'1'},body:'{}'});
+  const d = await r.json();
+  g('dc-body').innerHTML = \`<p style="color:#3fb950">Applied decay to \${d.applied} memories.</p>\`;
+  refreshStats();
 }
 async function loadDigest(period) {
   period = period || 'daily';
