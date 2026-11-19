@@ -23,6 +23,7 @@ const obsidian         = require('./obsidian');
 const conflicts        = require('./conflicts');
 const memgraph         = require('./memgraph');
 const timeline         = require('./timeline');
+const clusters         = require('./clusters');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -460,6 +461,13 @@ const ROUTES = {
   },
   'GET /api/export/obsidian': (req, res) => json(res, obsidian.generate()),
   'GET /api/memories/graph': (req, res) => json(res, memgraph.build()),
+  'GET /api/clusters': (req, res) => {
+    const q = new URL(req.url, 'http://x').searchParams;
+    json(res, clusters.get({
+      minShared: q.get('min_shared') ? +q.get('min_shared') : 2,
+      limit:     q.get('limit')      ? +q.get('limit')      : 20,
+    }));
+  },
   'GET /api/timeline': (req, res) => {
     const q = new URL(req.url, 'http://x').searchParams;
     json(res, timeline.get({
@@ -667,6 +675,7 @@ input{width:360px}
   <button onclick="show('conflicts',this);loadConflicts()">Conflicts</button>
   <button onclick="show('memgraph',this);loadMemGraph()">Mem Graph</button>
   <button onclick="show('timeline',this);loadTimeline()">Timeline</button>
+  <button onclick="show('clusters',this);loadClusters()">Clusters</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -811,6 +820,18 @@ input{width:360px}
   </div>
   <div id="tl-chart" style="margin:8px 0 20px"></div>
   <div id="tl-detail"></div>
+</div>
+
+<div id="clusters" class="tab">
+  <div class="row" style="gap:8px">
+    <select id="cl-min" onchange="loadClusters()">
+      <option value="2" selected>Min 2 shared tags</option>
+      <option value="3">Min 3 shared tags</option>
+      <option value="1">Min 1 shared tag</option>
+    </select>
+    <span id="cl-summary" style="font-size:12px;color:#8b949e;margin-left:8px"></span>
+  </div>
+  <div id="cl-list" style="margin-top:16px"></div>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -1157,6 +1178,35 @@ async function loadMemGraph() {
     ctx.fillStyle='#8b949e'; ctx.textAlign='left'; ctx.textBaseline='top';
     ctx.fillText(t,28,10+i*18);
   });
+}
+async function loadClusters() {
+  const minShared = g('cl-min').value;
+  const d = await api(\`/api/clusters?min_shared=\${minShared}\`);
+  g('cl-summary').textContent = \`\${d.clusters.length} clusters · \${d.unclustered.length} unclustered\`;
+  if (!d.clusters.length) {
+    g('cl-list').innerHTML = '<p class="empty">No clusters yet — add tags to memories to group them.</p>';
+    return;
+  }
+  const TYPE_COL = {core:'#ff7b72',domain:'#d2a8ff',project:'#3fb950',episodic:'#ffa657',semantic:'#58a6ff',skill:'#79c0ff'};
+  g('cl-list').innerHTML = d.clusters.map((c, i) => {
+    const tagChips = c.top_tags.map(t => \`<span class="b" style="color:#79c0ff">#\${esc(t)}</span>\`).join(' ');
+    const preview = c.members.slice(0, 3).map(m =>
+      \`<div style="font-size:12px;padding:4px 0;border-top:1px solid #21262d;color:#8b949e">
+        <span style="color:\${TYPE_COL[m.memory_type]||'#8b949e'};margin-right:6px">●</span>\${esc(m.title)}
+      </div>\`
+    ).join('');
+    const more = c.size > 3 ? \`<div style="font-size:11px;color:#8b949e;padding-top:4px">+\${c.size-3} more</div>\` : '';
+    return \`<div class="card" style="margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <div style="font-size:18px;font-weight:700;color:#58a6ff;min-width:28px">\${c.size}</div>
+        <div>
+          <div style="font-weight:600;color:#e6edf3">\${esc(c.label)}</div>
+          <div style="margin-top:3px">\${tagChips}</div>
+        </div>
+      </div>
+      \${preview}\${more}
+    </div>\`;
+  }).join('');
 }
 async function loadTimeline() {
   const days  = g('tl-days').value;

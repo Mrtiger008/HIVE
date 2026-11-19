@@ -1003,6 +1003,24 @@ const COMMANDS = {
     }
   },
 
+  'clusters'(args) {
+    const { flags } = parseArgs(args);
+    const cl = require('./clusters');
+    const { clusters: cs, unclustered } = cl.get({
+      minShared: +(flags['min-shared'] || flags['min'] || 2),
+      limit:     +(flags.limit || 20),
+    });
+    console.log(`\n── Memory Clusters ──────────────────────────`);
+    if (!cs.length) { console.log('  No clusters yet. Add tags to memories to group them.\n'); return; }
+    cs.forEach((c, i) => {
+      console.log(`\n  [${c.size}] ${c.label}`);
+      console.log(`       tags: ${c.top_tags.map(t => '#'+t).join(', ')}`);
+      c.members.slice(0, 3).forEach(m => console.log(`       · ${m.title.slice(0, 60)}`));
+      if (c.size > 3) console.log(`       + ${c.size - 3} more`);
+    });
+    console.log(`\n  ${unclustered.length} unclustered memories.\n`);
+  },
+
   'timeline'(args) {
     const { flags } = parseArgs(args);
     const tl = require('./timeline');
@@ -1139,6 +1157,11 @@ Webhooks:
   hive webhook list             List registered webhooks
   hive webhook add <url>        Register a webhook URL [--events ev1,ev2  default: *]
   hive webhook remove <id>      Delete a webhook by id
+
+Memory clusters:
+  hive clusters                   Show tag-based memory clusters
+  hive clusters --min-shared 3    Require N shared tags to cluster
+  hive clusters --limit 10        Show top N clusters
 
 Knowledge timeline:
   hive timeline                   Show daily memory creation for last 30 days

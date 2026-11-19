@@ -1,5 +1,27 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 40 Complete
+
+**Phase 40: Memory Clusters**
+
+`src/clusters.js` (new):
+- `get(opts)` — groups active memories by shared tags using Union-Find
+  - Options: `minShared` (default 2), `limit` (default 20)
+  - Returns: `{ clusters: [{label, size, top_tags, members}], unclustered }`
+  - Clusters sorted by size descending; label = top 2 shared tags
+  - Memories with no shared tags (or below threshold) go to `unclustered`
+
+`src/server.js`:
+- `GET /api/clusters` — query params: `?min_shared=N&limit=N`
+- Dashboard: **Clusters** tab with expandable cluster cards; each shows size, tag chips, top 3 member titles; min-shared selector filter
+
+`src/hive.js`:
+- `hive clusters` — text breakdown of clusters with member previews
+- Flags: `--min-shared N`, `--limit N`
+
+`tests/test-phase40.js` — 10/10 passing
+Full regression: 310/310 (Phases 10–40, zero regressions)
+
 ## 2026-11-20 — Phase 39 Complete
 
 **Phase 39: Knowledge Timeline**
