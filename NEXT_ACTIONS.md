@@ -77,9 +77,11 @@
 
 ## Phase 41 — Smart Reminders — DONE ✅ (2026-11-20)
 
-## Phase 42 — Candidates
+## Phase 42 — Keyboard Shortcuts — DONE ✅ (2026-11-20)
 
-- **Keyboard shortcuts**: keyboard-driven navigation (j/k scroll, / focus search, n new)
+## Phase 43 — Candidates
+
 - **Multi-file import**: batch import from a directory of markdown files
 - **Memory compare**: side-by-side diff view of two memories
 - **Knowledge gaps**: detect topic areas with low confidence or sparse coverage
+- **Quick capture**: minimal CLI mode — `hive add "thought here"` one-liner without prompts

@@ -1,5 +1,24 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 42 Complete
+
+**Phase 42: Keyboard Shortcuts**
+
+`src/shortcuts.js` (new):
+- `SHORTCUTS` array — 6 shortcut definitions with `key`, `guard`, `action`, `description`
+- Consumed by server.js at both runtime (help overlay) and API level
+
+`src/server.js`:
+- `GET /api/shortcuts` — returns `{ shortcuts: SHORTCUTS }` for introspection/testing
+- Dashboard: keyboard event handler (`/` search, `n` new, `m` memories, `r` reminders, `Escape` close, `?` toggle help)
+- Dashboard: `#kb-help` overlay — dark modal with shortcuts table; closes on backdrop click or Escape
+
+`src/hive.js`:
+- `hive shortcuts` — prints all shortcuts to terminal
+
+Tests: `tests/test-phase42.js` — 10/10 passing
+Full regression: 330/330 (phases 10–42), zero regressions
+
 ## 2026-11-20 — Phase 41 Complete
 
 **Phase 41: Smart Reminders**

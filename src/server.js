@@ -25,6 +25,7 @@ const memgraph         = require('./memgraph');
 const timeline         = require('./timeline');
 const clusters         = require('./clusters');
 const reminders        = require('./reminders');
+const shortcuts        = require('./shortcuts');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -462,6 +463,7 @@ const ROUTES = {
   },
   'GET /api/export/obsidian': (req, res) => json(res, obsidian.generate()),
   'GET /api/memories/graph': (req, res) => json(res, memgraph.build()),
+  'GET /api/shortcuts': (req, res) => json(res, { shortcuts: shortcuts.SHORTCUTS }),
   'GET /api/reminders': (req, res) => {
     const q = new URL(req.url, 'http://x').searchParams;
     json(res, reminders.get({
@@ -1822,5 +1824,46 @@ async function showDiff(versionId) {
   g('hist-diff-out').innerHTML = colored;
   g('hist-diff').style.display='block';
 }
+
+// ── Keyboard Shortcuts ─────────────────────────────────────────────────────
+(function() {
+  const overlay = document.createElement('div');
+  overlay.id = 'kb-help';
+  overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center';
+  overlay.innerHTML = \`<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:28px 36px;min-width:320px">
+    <h3 style="margin:0 0 20px;color:#e6edf3;font-size:16px">Keyboard Shortcuts</h3>
+    <table style="border-collapse:collapse;width:100%">
+      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">/</td><td style="padding:6px 0;color:#e6edf3">Focus search box</td></tr>
+      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">n</td><td style="padding:6px 0;color:#e6edf3">New memory</td></tr>
+      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">m</td><td style="padding:6px 0;color:#e6edf3">Go to Memories tab</td></tr>
+      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">r</td><td style="padding:6px 0;color:#e6edf3">Go to Reminders tab</td></tr>
+      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">Esc</td><td style="padding:6px 0;color:#e6edf3">Close modal / clear focus</td></tr>
+      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">?</td><td style="padding:6px 0;color:#e6edf3">Show / hide shortcuts</td></tr>
+    </table>
+    <button onclick="document.getElementById('kb-help').style.display='none'" style="margin-top:20px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:6px 16px;cursor:pointer">Close</button>
+  </div>\`;
+  document.body.appendChild(overlay);
+
+  document.addEventListener('keydown', e => {
+    const inInput = ['INPUT','TEXTAREA','SELECT'].includes(e.target.tagName) || e.target.isContentEditable;
+    if (e.key === '/' && !inInput) {
+      e.preventDefault();
+      const q = g('q'); if (q) { q.focus(); q.select(); }
+    } else if (e.key === 'n' && !inInput && !e.ctrlKey && !e.metaKey) {
+      showAdd();
+    } else if (e.key === 'm' && !inInput) {
+      document.querySelectorAll('nav button').forEach(b => { if (b.textContent==='Memories') b.click(); });
+    } else if (e.key === 'r' && !inInput) {
+      document.querySelectorAll('nav button').forEach(b => { if (b.textContent==='Reminders') b.click(); });
+    } else if (e.key === 'Escape') {
+      overlay.style.display = 'none';
+      const am = g('add-modal'); if (am) am.style.display='none';
+      if (document.activeElement) document.activeElement.blur();
+    } else if (e.key === '?' && !inInput) {
+      overlay.style.display = overlay.style.display === 'none' ? 'flex' : 'none';
+    }
+  });
+  overlay.addEventListener('click', e => { if (e.target===overlay) overlay.style.display='none'; });
+})();
 </script>
 </body></html>`;

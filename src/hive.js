@@ -1021,6 +1021,16 @@ const COMMANDS = {
     console.log('');
   },
 
+  'shortcuts'() {
+    const { SHORTCUTS } = require('./shortcuts');
+    console.log('\n── Keyboard Shortcuts ───────────────────────');
+    SHORTCUTS.forEach(s => {
+      const key = s.key === 'Escape' ? 'Esc' : s.key;
+      console.log(`  ${key.padEnd(8)}  ${s.description}`);
+    });
+    console.log('\n  Press ? in the dashboard to show this overlay.\n');
+  },
+
   'clusters'(args) {
     const { flags } = parseArgs(args);
     const cl = require('./clusters');
@@ -1195,6 +1205,9 @@ Knowledge timeline:
 Memory relations graph:
   hive memory-graph                      Show graph stats (nodes, edges, type/rel breakdown)
   hive serve → Mem Graph tab            Interactive force-directed visualization in browser
+
+Keyboard shortcuts:
+  hive shortcuts              List all dashboard keyboard shortcuts
 
 Utility:
   hive export    Export all active memories to Markdown files
