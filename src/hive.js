@@ -854,6 +854,41 @@ const COMMANDS = {
     console.log('──────────────────────────────────────────\n');
   },
 
+  'conflicts'(args) {
+    const { positional, flags } = parseArgs(args);
+    const cf = require('./conflicts');
+    if (positional === 'mark') {
+      const [, id1, id2] = args;
+      if (!id1 || !id2) die('Usage: hive conflicts mark <id1> <id2> [--notes "..."]');
+      const l = cf.markConflict(id1, id2, flags.notes || null);
+      console.log(`Marked conflict: ${id1} ←→ ${id2}  (link: ${l.id.slice(0,8)})`);
+    } else if (positional === 'resolve') {
+      const id = args[1];
+      const action = flags.action || 'trust';
+      if (!id) die('Usage: hive conflicts resolve <id> --action archive|trust|downgrade');
+      const r = cf.resolve(id, action);
+      console.log(`Resolved [${action}]: ${id}`);
+    } else {
+      const d = cf.detect();
+      const total = d.conflicted.length + d.contradictLinks.length + d.superseded.length;
+      console.log(`\n── Conflicts (${total} total) ──────────────────`);
+      if (d.conflicted.length) {
+        console.log(`\n  CONFLICTED trust level (${d.conflicted.length}):`);
+        d.conflicted.forEach(m => console.log(`    [${m.id.slice(0,8)}] ${m.title}`));
+      }
+      if (d.contradictLinks.length) {
+        console.log(`\n  Contradicting pairs (${d.contradictLinks.length}):`);
+        d.contradictLinks.forEach(l => console.log(`    ${l.from_title} ←→ ${l.to_title}`));
+      }
+      if (d.superseded.length) {
+        console.log(`\n  Superseded but still active (${d.superseded.length}):`);
+        d.superseded.forEach(m => console.log(`    [${m.id.slice(0,8)}] ${m.title}  (by: ${m.superseded_by_title})`));
+      }
+      if (!total) console.log('  No conflicts detected.');
+      console.log('');
+    }
+  },
+
   'obsidian'(args) {
     const { positional } = parseArgs(args);
     const dir = positional || './obsidian-vault';

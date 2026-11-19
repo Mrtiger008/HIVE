@@ -67,9 +67,11 @@
 
 ## Phase 36 — Obsidian Export — DONE ✅ (2026-11-20)
 
-## Phase 37 — Candidates
+## Phase 37 — Conflict Resolution — DONE ✅ (2026-11-20)
+
+## Phase 38 — Candidates
 
 - **Keyboard shortcuts**: keyboard-driven navigation (j/k scroll, / focus search, n new)
-- **Conflict resolution**: flag contradicting memories and suggest merge/deprecate actions
 - **Memory relations graph**: visualize memory-to-memory links as a force-directed graph
-- **Multi-file import**: drag-and-drop / batch import from a directory of markdown files
+- **Multi-file import**: batch import from a directory of markdown files
+- **Knowledge timeline**: chronological view of memory creation and updates with filtering

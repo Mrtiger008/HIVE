@@ -1,5 +1,31 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 37 Complete
+
+**Phase 37: Conflict Resolution**
+
+`src/conflicts.js` (new):
+- `detect()` — finds three categories of conflicts:
+  - Memories with `trust_level = 'CONFLICTED'`
+  - Memory pairs linked with `rel_type = 'contradicts'` (Phase 31)
+  - Memories with `superseded_by` set but still active
+- `markConflict(id1, id2, notes)` — adds a `contradicts` relationship and sets both memories to `CONFLICTED`
+- `resolve(id, action)` — actions: `trust` (→ USER_CONFIRMED), `archive`, `downgrade` (→ OUTDATED)
+
+`src/server.js`:
+- `GET /api/conflicts` — returns full conflict report
+- `POST /api/conflicts` — mark two memories as conflicting (`{ id1, id2, notes }`)
+- `POST /api/memories/:id/resolve` — resolve one memory (`{ action }`)
+- Dashboard: **Conflicts** tab with three sections + inline trust/archive/downgrade buttons
+
+`src/hive.js`:
+- `hive conflicts` — list all conflicts
+- `hive conflicts mark <id1> <id2> [--notes "..."]`
+- `hive conflicts resolve <id> --action trust|archive|downgrade`
+
+`tests/test-phase37.js` — 10/10 passing
+Full regression: 280/280 (Phases 10–37, zero regressions)
+
 ## 2026-11-20 — Phase 36 Complete
 
 **Phase 36: Obsidian Export**

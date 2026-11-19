@@ -20,6 +20,7 @@ const bookmarks        = require('./bookmarks');
 const digest           = require('./digest');
 const decay            = require('./decay');
 const obsidian         = require('./obsidian');
+const conflicts        = require('./conflicts');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -456,6 +457,13 @@ const ROUTES = {
     json(res, { changes: decay.preview({ minIdleDays }) });
   },
   'GET /api/export/obsidian': (req, res) => json(res, obsidian.generate()),
+  'GET /api/conflicts':      (req, res) => json(res, conflicts.detect()),
+  'POST /api/conflicts':     async (req, res) => {
+    const body = await readBody(req);
+    if (!body.id1 || !body.id2) { json(res, { error: 'id1 and id2 required' }, 400); return; }
+    try { json(res, conflicts.markConflict(body.id1, body.id2, body.notes || null)); }
+    catch (e) { json(res, { error: e.message }, 400); }
+  },
   'POST /api/decay/run':     async (req, res) => {
     const body = await readBody(req).catch(() => ({}));
     const minIdleDays = body.min_idle_days || 14;
@@ -500,6 +508,15 @@ function createServer() {
       if (p && req.method === 'GET') {
         const id = p[1];
         handler = (req, res) => handleProjectStats(req, res, id);
+      }
+      const rs = pathname.match(/^\/api\/memories\/([^/]+)\/resolve$/);
+      if (rs && req.method === 'POST') {
+        const id = rs[1];
+        handler = async (req, res) => {
+          const body = await readBody(req);
+          try { json(res, conflicts.resolve(id, body.action || 'trust')); }
+          catch (e) { json(res, { error: e.message }, e.message.startsWith('Memory') ? 404 : 400); }
+        };
       }
       const rf = pathname.match(/^\/api\/memories\/([^/]+)\/reinforce$/);
       if (rf && req.method === 'POST') {
@@ -635,6 +652,7 @@ input{width:360px}
   <button onclick="show('kstats',this)">Stats</button>
   <button onclick="show('digest',this);loadDigest()">Digest</button>
   <button onclick="show('decay',this);loadDecayPreview()">Decay</button>
+  <button onclick="show('conflicts',this);loadConflicts()">Conflicts</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -743,6 +761,11 @@ input{width:360px}
   </div>
   <p style="font-size:12px;color:#8b949e;margin:0 0 16px">Confidence decays at ~1%/week for memories idle &gt;14 days (0.5%/week for pinned or high-importance). Floor: 10%.</p>
   <div id="dc-body"><p class="empty">Click "Preview decay" to see which memories would decay.</p></div>
+</div>
+
+<div id="conflicts" class="tab">
+  <div class="row" style="margin-bottom:16px"><button class="btn" onclick="loadConflicts()">↺ Refresh</button></div>
+  <div id="cf-body"><p class="empty">Loading…</p></div>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -1354,6 +1377,45 @@ async function runDecay() {
   const d = await r.json();
   g('dc-body').innerHTML = \`<p style="color:#3fb950">Applied decay to \${d.applied} memories.</p>\`;
   refreshStats();
+}
+async function loadConflicts() {
+  const d = await api('/api/conflicts');
+  const total = d.conflicted.length + d.contradictLinks.length + d.superseded.length;
+  if (!total) { g('cf-body').innerHTML = '<p class="empty">No conflicts detected.</p>'; return; }
+  let html = '';
+  const resolve = async (id, action, btn) => {
+    btn.disabled = true;
+    await fetch(\`/api/memories/\${id}/resolve\`, {method:'POST',headers:{'Content-Type':'application/json','X-Hive-Local':'1'},body:JSON.stringify({action})});
+    loadConflicts();
+  };
+  if (d.conflicted.length) {
+    html += \`<h4 style="font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin:0 0 8px">Marked CONFLICTED (\${d.conflicted.length})</h4>\`;
+    html += d.conflicted.map(m => \`<div style="padding:8px 0;border-bottom:1px solid #21262d;display:flex;gap:8px;align-items:center;font-size:13px">
+      <span style="flex:1;color:#c9d1d9">\${esc(m.title)}</span>
+      <span class="b bt">\${m.memory_type}</span>
+      <button class="btn" style="font-size:11px;color:#3fb950" onclick="(async(b)=>{b.disabled=true;await fetch('/api/memories/\${m.id}/resolve',{method:'POST',headers:{'Content-Type':'application/json','X-Hive-Local':'1'},body:JSON.stringify({action:'trust'})});loadConflicts()})(this)">✓ trust</button>
+      <button class="btn" style="font-size:11px;color:#ffa657" onclick="(async(b)=>{b.disabled=true;await fetch('/api/memories/\${m.id}/resolve',{method:'POST',headers:{'Content-Type':'application/json','X-Hive-Local':'1'},body:JSON.stringify({action:'downgrade'})});loadConflicts()})(this)">↓ outdated</button>
+      <button class="arch" onclick="(async(b)=>{b.disabled=true;await fetch('/api/memories/\${m.id}/resolve',{method:'POST',headers:{'Content-Type':'application/json','X-Hive-Local':'1'},body:JSON.stringify({action:'archive'})});loadConflicts()})(this)">archive</button>
+    </div>\`).join('');
+  }
+  if (d.contradictLinks.length) {
+    html += \`<h4 style="font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px">Contradicting pairs (\${d.contradictLinks.length})</h4>\`;
+    html += d.contradictLinks.map(l => \`<div style="padding:8px 0;border-bottom:1px solid #21262d;font-size:13px">
+      <span style="color:#f85149">\${esc(l.from_title)}</span>
+      <span style="color:#8b949e;margin:0 8px">contradicts</span>
+      <span style="color:#f85149">\${esc(l.to_title)}</span>
+      <span style="color:#8b949e;font-size:11px;margin-left:8px">\${l.notes || ''}</span>
+    </div>\`).join('');
+  }
+  if (d.superseded.length) {
+    html += \`<h4 style="font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em;margin:16px 0 8px">Superseded but still active (\${d.superseded.length})</h4>\`;
+    html += d.superseded.map(m => \`<div style="padding:8px 0;border-bottom:1px solid #21262d;display:flex;gap:8px;align-items:center;font-size:13px">
+      <span style="flex:1;color:#c9d1d9">\${esc(m.title)}</span>
+      <span style="color:#8b949e;font-size:11px">superseded by: \${esc(m.superseded_by_title||'')}</span>
+      <button class="arch" onclick="(async(b)=>{b.disabled=true;await fetch('/api/memories/\${m.id}/resolve',{method:'POST',headers:{'Content-Type':'application/json','X-Hive-Local':'1'},body:JSON.stringify({action:'archive'})});loadConflicts()})(this)">archive</button>
+    </div>\`).join('');
+  }
+  g('cf-body').innerHTML = html;
 }
 async function loadDigest(period) {
   period = period || 'daily';
