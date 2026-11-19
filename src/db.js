@@ -196,6 +196,21 @@ function _initSchema(db) {
     `);
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (6, ?)').run(Date.now());
   }
+  // v7: webhooks — outbound HTTP POST on memory events
+  if (sv < 7) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS webhooks (
+        id                INTEGER PRIMARY KEY AUTOINCREMENT,
+        url               TEXT NOT NULL UNIQUE,
+        events            TEXT NOT NULL DEFAULT '["*"]',
+        active            INTEGER NOT NULL DEFAULT 1,
+        created_at        INTEGER NOT NULL,
+        last_triggered_at INTEGER,
+        last_status       TEXT
+      );
+    `);
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (7, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {

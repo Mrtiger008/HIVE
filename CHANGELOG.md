@@ -1,5 +1,33 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 26 Complete
+
+**Phase 26: Webhook Push Notifications**
+
+`src/db.js`:
+- Schema v7 migration: `webhooks` table (id, url UNIQUE, events JSON, active, created_at, last_triggered_at, last_status)
+
+`src/webhooks.js` (new):
+- `list()` — returns all webhooks with events parsed from JSON
+- `add(url, events)` — validates http/https URL, inserts, returns row
+- `remove(id)` — deletes by id, returns change count
+- `fire(eventName, data)` — fire-and-forget POST to all active matching webhooks; 5s timeout; updates last_triggered_at and last_status; never throws to caller
+
+`src/server.js`:
+- `GET /api/webhooks` — list all webhooks
+- `POST /api/webhooks` — register webhook (`{url, events}`)
+- `DELETE /api/webhooks/:id` — remove webhook
+- Webhooks fired on: `memory.created`, `memory.updated`, `memory.archived`
+- Dashboard: Webhooks tab with register form (URL + events) and delete button
+
+`src/hive.js`:
+- `hive webhook list` — list registered webhooks
+- `hive webhook add <url> [--events ev1,ev2]` — register webhook
+- `hive webhook remove <id>` — delete webhook
+
+`tests/test-phase26.js`: 10/10 tests passing
+Full regression: 170/170 (Phases 10–26)
+
 ## 2026-11-20 — Phase 25 Complete
 
 **Phase 25: Duplicate Detection**

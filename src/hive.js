@@ -724,6 +724,32 @@ const COMMANDS = {
     }
   },
 
+  'webhook'(args) {
+    const { positional, flags } = parseArgs(args);
+    const wh = require('./webhooks');
+    const sub = positional;
+    if (sub === 'list' || !sub) {
+      const hooks = wh.list();
+      if (!hooks.length) { console.log('No webhooks registered.'); return; }
+      const fmt = ts => ts ? new Date(ts).toLocaleString() : '—';
+      hooks.forEach(h => console.log(`[${h.id}] ${h.url}  events:${h.events.join(',')}  last:${fmt(h.last_triggered_at)}  status:${h.last_status||'—'}`));
+    } else if (sub === 'add') {
+      const url = flags.url || args[1];
+      if (!url) die('Usage: hive webhook add <url>  [--events event1,event2]');
+      const events = flags.events ? flags.events.split(',').map(e => e.trim()) : ['*'];
+      const h = wh.add(url, events);
+      console.log(`Webhook registered: [${h.id}] ${h.url}  events:${events.join(',')}`);
+    } else if (sub === 'remove') {
+      const id = flags.id || args[1];
+      if (!id) die('Usage: hive webhook remove <id>');
+      const n = wh.remove(+id);
+      if (n) console.log(`Removed webhook ${id}.`);
+      else console.log(`No webhook with id ${id}.`);
+    } else {
+      die(`Unknown webhook subcommand: ${sub}\nUsage: hive webhook [list|add|remove]`);
+    }
+  },
+
   'help'() {
     console.log(`
 HIVE — Personal AI Knowledge & Memory System
@@ -795,6 +821,11 @@ API key management:
   hive apikey list              List all API keys
   hive apikey create <name>     Generate a new Bearer token (shown once)
   hive apikey revoke <name>     Delete a key
+
+Webhooks:
+  hive webhook list             List registered webhooks
+  hive webhook add <url>        Register a webhook URL [--events ev1,ev2  default: *]
+  hive webhook remove <id>      Delete a webhook by id
 
 Utility:
   hive export    Export all active memories to Markdown files

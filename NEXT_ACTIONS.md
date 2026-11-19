@@ -45,9 +45,11 @@
 
 ## Phase 25 — Duplicate Detection — DONE ✅ (2026-11-20)
 
-## Phase 26 — Candidates
+## Phase 26 — Webhook Push Notifications — DONE ✅ (2026-11-20)
 
-- **Webhook / push notifications**: POST to a configured URL when memories are added/updated
+## Phase 27 — Candidates
+
 - **Memory versioning**: track content changes over time, diff view in dashboard
 - **Scheduled digests**: daily/weekly summary Slack/email of stale + new memories
 - **Memory templates**: pre-fill the add modal with type-specific field defaults
+- **Full-text export to Obsidian**: sync memories as markdown vault notes with backlinks

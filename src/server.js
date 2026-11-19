@@ -10,6 +10,7 @@ const memory           = require('./memory');
 const entities         = require('./entities');
 const projects         = require('./projects');
 const apikeys          = require('./apikeys');
+const webhooks         = require('./webhooks');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -224,6 +225,7 @@ async function handleAddMemory(req, res) {
     confidence:  body.confidence  != null ? Math.min(1, Math.max(0, +body.confidence)) : 0.5,
     tags:        body.tags        || [],
   });
+  webhooks.fire('memory.created', { id: m.id, title: m.title, memory_type: m.memory_type, trust_level: m.trust_level, importance: m.importance });
   json(res, m, 201);
 }
 
@@ -246,13 +248,16 @@ async function handleUpdateMemory(req, res, id) {
   if (body.confidence  !== undefined) updates.confidence  = Math.min(1, Math.max(0, +body.confidence));
   if (body.tags        !== undefined) updates.tags        = body.tags;
   if (!Object.keys(updates).length) { json(res, { error: 'no fields to update' }, 400); return; }
-  json(res, memory.update(id, updates));
+  const updated = memory.update(id, updates);
+  webhooks.fire('memory.updated', { id: updated.id, title: updated.title, memory_type: updated.memory_type, changes: Object.keys(updates) });
+  json(res, updated);
 }
 
 async function handleDeleteMemory(req, res, id) {
   const m = memory.get(id);
   if (!m) { json(res, { error: 'not found' }, 404); return; }
   memory.update(id, { status: 'archived' });
+  webhooks.fire('memory.archived', { id: m.id, title: m.title });
   json(res, { ok: true });
 }
 
@@ -280,6 +285,28 @@ function handleSimilar(req, res, q) {
   if (!title.trim() && !content.trim()) { json(res, []); return; }
   json(res, findSimilar(title, content, { threshold, limit })
     .map(m => ({ id: m.id, title: m.title, memory_type: m.memory_type, score: +m._score.toFixed(3) })));
+}
+
+function handleListWebhooks(req, res) {
+  json(res, webhooks.list());
+}
+
+async function handleAddWebhook(req, res) {
+  const body = await readBody(req);
+  if (!body.url) { json(res, { error: 'url required' }, 400); return; }
+  try {
+    const events = Array.isArray(body.events) ? body.events : ['*'];
+    const w = webhooks.add(body.url, events);
+    json(res, { ...w, events }, 201);
+  } catch (e) {
+    json(res, { error: e.message.includes('UNIQUE') ? 'url already registered' : e.message }, 409);
+  }
+}
+
+async function handleDeleteWebhook(req, res, id) {
+  const changes = webhooks.remove(+id);
+  if (!changes) { json(res, { error: 'not found' }, 404); return; }
+  json(res, { ok: true });
 }
 
 function handleListKeys(req, res) {
@@ -331,6 +358,8 @@ const ROUTES = {
   'GET /api/brief':          handleBrief,
   'GET /api/apikeys':        handleListKeys,
   'POST /api/apikeys':       handleCreateKey,
+  'GET /api/webhooks':       handleListWebhooks,
+  'POST /api/webhooks':      handleAddWebhook,
   'GET /':                   handleIndex,
 };
 
@@ -375,6 +404,10 @@ function createServer() {
       if (ak && req.method === 'DELETE') {
         const name = ak[1];
         handler = (req, res) => handleRevokeKey(req, res, name);
+      }
+      const wh = pathname.match(/^\/api\/webhooks\/(\d+)$/);
+      if (wh && req.method === 'DELETE') {
+        handler = (req, res) => handleDeleteWebhook(req, res, wh[1]);
       }
     }
     if (!handler) { res.writeHead(404); res.end('Not Found'); return; }
@@ -466,6 +499,7 @@ input{width:360px}
   <button onclick="show('review',this)">Review</button>
   <button onclick="show('activity',this)">Activity</button>
   <button onclick="show('apikeys',this)">API Keys</button>
+  <button onclick="show('webhooks',this)">Webhooks</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -540,6 +574,15 @@ input{width:360px}
   <div id="akl"><p class="empty">Loading keys…</p></div>
 </div>
 
+<div id="webhooks" class="tab">
+  <div class="row" style="margin-bottom:16px;gap:8px">
+    <input id="wh-url" placeholder="https://example.com/hook" style="width:300px">
+    <input id="wh-events" placeholder="Events (comma-sep, * = all)" style="width:220px" value="*">
+    <button class="btn" onclick="addWebhook()">Register</button>
+  </div>
+  <div id="whl"><p class="empty">Loading webhooks…</p></div>
+</div>
+
 <div id="add-modal" class="modal">
   <div class="mbox">
     <h3 id="nm-h">Add Memory</h3>
@@ -583,6 +626,7 @@ function show(id, btn) {
   if (id==='review') loadReview();
   if (id==='activity') loadActivity();
   if (id==='apikeys') loadKeys();
+  if (id==='webhooks') loadWebhooks();
 }
 
 function confBar(c) {
@@ -934,6 +978,35 @@ async function revokeKey(name) {
   if (!confirm(\`Revoke key "\${name}"?\`)) return;
   await localFetch('/api/apikeys/'+encodeURIComponent(name),{method:'DELETE',headers:{'X-Hive-Local':'1'}});
   loadKeys();
+}
+async function loadWebhooks() {
+  const ws = await localFetch('/api/webhooks').then(r=>r.json());
+  const el = g('whl');
+  if (!ws.length) { el.innerHTML='<p class="empty">No webhooks registered yet.</p>'; return; }
+  const fmt = ts => ts ? new Date(ts).toLocaleString() : '—';
+  el.innerHTML = ws.map(w=>\`<div class="card" style="display:flex;align-items:center;gap:12px">
+    <div style="flex:1;min-width:0">
+      <div style="font-family:monospace;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">\${w.url}</div>
+      <div style="font-size:11px;color:#8b949e;margin-top:4px">Events: \${Array.isArray(w.events)?w.events.join(', '):w.events} &nbsp;·&nbsp; Last fired: \${fmt(w.last_triggered_at)} &nbsp;·&nbsp; Status: \${w.last_status||'—'}</div>
+    </div>
+    <button class="arch" onclick="deleteWebhook(\${w.id})">Delete</button>
+  </div>\`).join('');
+}
+async function addWebhook() {
+  const url = g('wh-url').value.trim();
+  if (!url) return;
+  const evRaw = g('wh-events').value.trim();
+  const events = evRaw ? evRaw.split(',').map(e=>e.trim()).filter(Boolean) : ['*'];
+  const r = await localFetch('/api/webhooks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url,events})});
+  const d = await r.json();
+  if (d.error) { alert(d.error); return; }
+  g('wh-url').value=''; g('wh-events').value='*';
+  loadWebhooks();
+}
+async function deleteWebhook(id) {
+  if (!confirm('Delete this webhook?')) return;
+  await localFetch('/api/webhooks/'+id,{method:'DELETE'});
+  loadWebhooks();
 }
 </script>
 </body></html>`;
