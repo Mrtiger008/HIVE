@@ -26,6 +26,7 @@ const timeline         = require('./timeline');
 const clusters         = require('./clusters');
 const reminders        = require('./reminders');
 const shortcuts        = require('./shortcuts');
+const compare          = require('./compare');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -464,6 +465,13 @@ const ROUTES = {
   'GET /api/export/obsidian': (req, res) => json(res, obsidian.generate()),
   'GET /api/memories/graph': (req, res) => json(res, memgraph.build()),
   'GET /api/shortcuts': (req, res) => json(res, { shortcuts: shortcuts.SHORTCUTS }),
+  'GET /api/memories/compare': (req, res) => {
+    const q = new URL(req.url, 'http://x').searchParams;
+    const id1 = q.get('id1'), id2 = q.get('id2');
+    if (!id1 || !id2) return json(res, { error: 'id1 and id2 required' }, 400);
+    try { json(res, compare.diff(id1, id2)); }
+    catch (e) { json(res, { error: e.message }, 404); }
+  },
   'GET /api/reminders': (req, res) => {
     const q = new URL(req.url, 'http://x').searchParams;
     json(res, reminders.get({
@@ -693,6 +701,7 @@ input{width:360px}
   <button onclick="show('timeline',this);loadTimeline()">Timeline</button>
   <button onclick="show('clusters',this);loadClusters()">Clusters</button>
   <button onclick="show('reminders',this);loadReminders()" id="rem-btn">Reminders</button>
+  <button onclick="show('compare',this);initCompare()">Compare</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -863,6 +872,23 @@ input{width:360px}
     <span id="rem-summary" style="font-size:12px;color:#8b949e;margin-left:8px"></span>
   </div>
   <div id="rem-list" style="margin-top:16px"></div>
+</div>
+
+<div id="compare" class="tab">
+  <div class="row" style="gap:8px;align-items:flex-end">
+    <div style="flex:1">
+      <div style="font-size:11px;color:#8b949e;margin-bottom:4px">Memory A</div>
+      <input id="cmp-a" placeholder="Search memory A…" oninput="cmpSearch('a')" autocomplete="off" style="width:100%">
+      <div id="cmp-a-list" style="position:relative"></div>
+    </div>
+    <div style="flex:1">
+      <div style="font-size:11px;color:#8b949e;margin-bottom:4px">Memory B</div>
+      <input id="cmp-b" placeholder="Search memory B…" oninput="cmpSearch('b')" autocomplete="off" style="width:100%">
+      <div id="cmp-b-list" style="position:relative"></div>
+    </div>
+    <button class="btn" onclick="runCompare()">Compare →</button>
+  </div>
+  <div id="cmp-out" style="margin-top:20px"></div>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -1149,35 +1175,54 @@ async function loadMemGraph() {
     return;
   }
   g('mg-stats').textContent = \`\${data.nodes.length} memories · \${data.edges.length} links\`;
-  // Position nodes
+  // Spread nodes on a large circle so initial forces are manageable
+  const initR = Math.min(W, H) * 0.38;
   const nodes = data.nodes.map((n,i) => ({
-    ...n, x: W/2 + Math.cos(i/data.nodes.length*Math.PI*2)*200,
-           y: H/2 + Math.sin(i/data.nodes.length*Math.PI*2)*150, vx:0, vy:0
+    ...n, x: W/2 + Math.cos(i/data.nodes.length*Math.PI*2)*initR,
+           y: H/2 + Math.sin(i/data.nodes.length*Math.PI*2)*initR*0.8, vx:0, vy:0
   }));
   const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+
+  function simStep() {
+    // Repulsion: normalized direction + soft minimum distance (prevents blow-up when overlapping)
+    for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+      const a=nodes[i],b=nodes[j];
+      const dx=b.x-a.x, dy=b.y-a.y;
+      const d=Math.sqrt(dx*dx+dy*dy)||1;
+      const minD=a.size+b.size+16;
+      const eff=Math.max(minD,d);
+      const f=1400/(eff*eff);
+      const nx=dx/d, ny=dy/d;
+      a.vx-=nx*f; a.vy-=ny*f; b.vx+=nx*f; b.vy+=ny*f;
+    }
+    // Spring along edges (normalized)
+    for (const e of data.edges) {
+      const a=byId[e.from],b=byId[e.to]; if(!a||!b) continue;
+      const dx=b.x-a.x, dy=b.y-a.y;
+      const d=Math.sqrt(dx*dx+dy*dy)||1;
+      const f=(d-150)*0.025;
+      const nx=dx/d, ny=dy/d;
+      a.vx+=nx*f; a.vy+=ny*f; b.vx-=nx*f; b.vy-=ny*f;
+    }
+    // Center gravity + velocity clamp + damping + bounds
+    for (const n of nodes) {
+      n.vx += (W/2-n.x)*0.0006; n.vy += (H/2-n.y)*0.0006;
+      const spd=Math.sqrt(n.vx*n.vx+n.vy*n.vy);
+      if (spd>5){n.vx=n.vx/spd*5;n.vy=n.vy/spd*5;}
+      n.vx*=0.86; n.vy*=0.86;
+      n.x=Math.max(n.size+4,Math.min(W-n.size-4,n.x+n.vx));
+      n.y=Math.max(n.size+4,Math.min(H-n.size-4,n.y+n.vy));
+    }
+  }
+
+  // Pre-settle before first draw so nodes don't start in a pile
+  for (let s=0;s<60;s++) simStep();
+
   let running = true;
   mgStop = () => { running = false; };
   const tick = () => {
     if (!running) return;
-    // Repulsion
-    for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
-      const a=nodes[i],b=nodes[j]; const dx=b.x-a.x,dy=b.y-a.y;
-      const d=Math.max(1,Math.sqrt(dx*dx+dy*dy)); const f=800/(d*d);
-      a.vx-=dx*f; a.vy-=dy*f; b.vx+=dx*f; b.vy+=dy*f;
-    }
-    // Spring attraction along edges
-    for (const e of data.edges) {
-      const a=byId[e.from],b=byId[e.to]; if(!a||!b) continue;
-      const dx=b.x-a.x,dy=b.y-a.y; const d=Math.max(1,Math.sqrt(dx*dx+dy*dy));
-      const f=(d-80)*0.004; a.vx+=dx*f; a.vy+=dy*f; b.vx-=dx*f; b.vy-=dy*f;
-    }
-    // Center gravity + damping + bounds
-    for (const n of nodes) {
-      n.vx += (W/2-n.x)*0.001; n.vy += (H/2-n.y)*0.001;
-      n.vx*=0.85; n.vy*=0.85;
-      n.x=Math.max(n.size,Math.min(W-n.size,n.x+n.vx));
-      n.y=Math.max(n.size,Math.min(H-n.size,n.y+n.vy));
-    }
+    simStep();
     ctx.clearRect(0,0,W,H);
     // Draw edges
     for (const e of data.edges) {
@@ -1240,6 +1285,57 @@ async function loadReminders() {
       </div>
     </div>\`;
   }).join('');
+}
+// ── Memory Compare ────────────────────────────────────────────────────────
+let _cmpA = null, _cmpB = null;
+function initCompare() { g('cmp-out').innerHTML = ''; }
+async function cmpSearch(side) {
+  const inp = g('cmp-'+side);
+  const listEl = g('cmp-'+side+'-list');
+  const q = inp.value.trim(); if (q.length < 2) { listEl.innerHTML=''; return; }
+  const d = await api('/api/memories?q='+encodeURIComponent(q)+'&limit=8&mode=keyword');
+  const mems = d.memories || d;
+  if (!mems.length) { listEl.innerHTML=''; return; }
+  listEl.innerHTML = \`<div style="position:absolute;z-index:20;background:#161b22;border:1px solid #30363d;border-radius:6px;width:100%;max-height:200px;overflow-y:auto">\${
+    mems.map(m=>\`<div onclick="cmpPick('\${side}','\${m.id}',\${JSON.stringify(m.title).replace(/'/g,"\\\\'")})" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid #21262d;font-size:13px;color:#e6edf3" onmouseenter="this.style.background='#21262d'" onmouseleave="this.style.background=''">\${esc(m.title)}</div>\`).join('')
+  }</div>\`;
+}
+function cmpPick(side, id, title) {
+  if (side==='a') _cmpA=id; else _cmpB=id;
+  g('cmp-'+side).value = title;
+  g('cmp-'+side+'-list').innerHTML = '';
+}
+async function runCompare() {
+  if (!_cmpA || !_cmpB) { g('cmp-out').innerHTML='<p class="empty">Pick two memories above, then click Compare.</p>'; return; }
+  if (_cmpA===_cmpB) { g('cmp-out').innerHTML='<p class="empty">Pick two different memories.</p>'; return; }
+  const d = await api(\`/api/memories/compare?id1=\${_cmpA}&id2=\${_cmpB}\`);
+  if (d.error) { g('cmp-out').innerHTML=\`<p style="color:#f85149">\${esc(d.error)}</p>\`; return; }
+  const changedFields = d.fields.filter(f=>f.changed);
+  const sameFields = d.fields.filter(f=>!f.changed);
+  const diffHtml = d.content_diff.map(op=>{
+    const col = op.type==='add'?'#3fb950':op.type==='del'?'#f85149':'#8b949e';
+    const pre = op.type==='add'?'+ ':op.type==='del'?'- ':'  ';
+    return \`<div style="color:\${col};font-family:monospace;font-size:12px;white-space:pre-wrap">\${esc(pre+op.text)}</div>\`;
+  }).join('');
+  g('cmp-out').innerHTML = \`
+    <div style="display:flex;gap:16px;margin-bottom:16px">
+      <div class="card" style="flex:1"><strong style="color:#e6edf3">\${esc(d.a.title)}</strong><br><span style="font-size:11px;color:#8b949e">A</span></div>
+      <div class="card" style="flex:1"><strong style="color:#e6edf3">\${esc(d.b.title)}</strong><br><span style="font-size:11px;color:#8b949e">B</span></div>
+    </div>
+    <div style="font-size:12px;color:#8b949e;margin-bottom:12px">\${d.changed_count} field\${d.changed_count!==1?'s':''} changed · content \${d.content_identical?'<span style="color:#3fb950">identical</span>':'<span style="color:#ffa657">differs</span>'}</div>
+    \${changedFields.length ? \`<h4 style="font-size:13px;color:#ffa657;margin:0 0 8px">Changed fields</h4>
+    <table style="border-collapse:collapse;width:100%;margin-bottom:16px;font-size:13px">
+    \${changedFields.map(f=>\`<tr>
+      <td style="padding:4px 10px 4px 0;color:#8b949e;white-space:nowrap">\${f.field}</td>
+      <td style="padding:4px 10px;color:#f85149;text-decoration:line-through">\${esc(String(f.a??'—'))}</td>
+      <td style="padding:4px 0;color:#3fb950">\${esc(String(f.b??'—'))}</td>
+    </tr>\`).join('')}</table>\` : ''}
+    \${!d.content_identical ? \`<h4 style="font-size:13px;color:#8b949e;margin:0 0 8px">Content diff</h4>
+    <div style="background:#0d1117;border:1px solid #21262d;border-radius:6px;padding:12px;max-height:360px;overflow-y:auto">\${diffHtml}</div>\` : ''}
+    \${sameFields.length ? \`<details style="margin-top:12px"><summary style="font-size:12px;color:#8b949e;cursor:pointer">\${sameFields.length} unchanged fields</summary>
+    <table style="border-collapse:collapse;font-size:12px;margin-top:8px">
+    \${sameFields.map(f=>\`<tr><td style="padding:3px 12px 3px 0;color:#8b949e">\${f.field}</td><td style="color:#8b949e">\${esc(String(f.a??'—'))}</td></tr>\`).join('')}</table></details>\` : ''}
+  \`;
 }
 async function markReviewed(id, btn) {
   btn.disabled = true;

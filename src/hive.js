@@ -1021,6 +1021,36 @@ const COMMANDS = {
     console.log('');
   },
 
+  'compare'(args) {
+    const { positional } = parseArgs(args);
+    const [id1, id2] = positional;
+    if (!id1 || !id2) {
+      console.log('Usage: hive compare <id1> <id2>');
+      return;
+    }
+    const cmp = require('./compare');
+    try {
+      const d = cmp.diff(id1, id2);
+      console.log(`\n── Compare ──────────────────────────────────`);
+      console.log(`  A: ${d.a.title}`);
+      console.log(`  B: ${d.b.title}`);
+      console.log(`\n  ${d.changed_count} field(s) changed · content ${d.content_identical ? 'identical' : 'differs'}\n`);
+      const changed = d.fields.filter(f => f.changed);
+      if (changed.length) {
+        console.log('  Changed fields:');
+        changed.forEach(f => console.log(`    ${f.field.padEnd(14)} A: ${String(f.a ?? '—').slice(0,40).padEnd(40)}  B: ${String(f.b ?? '—').slice(0,40)}`));
+      }
+      if (!d.content_identical) {
+        console.log('\n  Content diff:');
+        d.content_diff.forEach(op => {
+          const pre = op.type==='add' ? '\x1b[32m+ ' : op.type==='del' ? '\x1b[31m- ' : '  ';
+          console.log(`  ${pre}${op.text.slice(0,100)}\x1b[0m`);
+        });
+      }
+      console.log('');
+    } catch (e) { console.error('Error:', e.message); }
+  },
+
   'shortcuts'() {
     const { SHORTCUTS } = require('./shortcuts');
     console.log('\n── Keyboard Shortcuts ───────────────────────');
@@ -1205,6 +1235,9 @@ Knowledge timeline:
 Memory relations graph:
   hive memory-graph                      Show graph stats (nodes, edges, type/rel breakdown)
   hive serve → Mem Graph tab            Interactive force-directed visualization in browser
+
+Memory compare:
+  hive compare <id1> <id2>    Side-by-side field diff + content diff of two memories
 
 Keyboard shortcuts:
   hive shortcuts              List all dashboard keyboard shortcuts

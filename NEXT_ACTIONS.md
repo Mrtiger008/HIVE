@@ -79,9 +79,11 @@
 
 ## Phase 42 — Keyboard Shortcuts — DONE ✅ (2026-11-20)
 
-## Phase 43 — Candidates
+## Phase 43 — Memory Compare — DONE ✅ (2026-11-20)
+
+## Phase 44 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
-- **Memory compare**: side-by-side diff view of two memories
 - **Knowledge gaps**: detect topic areas with low confidence or sparse coverage
 - **Quick capture**: minimal CLI mode — `hive add "thought here"` one-liner without prompts
+- **Memory templates**: pre-fill new memories from named templates

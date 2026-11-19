@@ -1,5 +1,26 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 43 Complete
+
+**Phase 43: Memory Compare**
+
+`src/compare.js` (new):
+- `diff(id1, id2)` — field-by-field comparison + LCS content diff; returns `{a, b, fields, content_diff, changed_count, content_identical}`
+- `lineDiff(a, b)` — LCS-based line diff returning `[{type:'eq'|'add'|'del', text}]`
+- `COMPARE_FIELDS` — the 8 fields compared (title, type, domain, confidence, importance, status, source, tags)
+
+`src/server.js`:
+- `GET /api/memories/compare?id1=X&id2=Y` — returns structured diff
+- Dashboard: **Compare** tab — search and pick two memories, see changed fields (red strikethrough → green) + content diff block
+
+`src/hive.js`:
+- `hive compare <id1> <id2>` — terminal diff with color-coded add/del lines
+
+Also fixed: Mem Graph physics (normalized forces + velocity clamping — nodes no longer bunch at edges)
+
+Tests: `tests/test-phase43.js` — 10/10 passing
+Full regression: 340/340 (phases 10–43), zero regressions
+
 ## 2026-11-20 — Phase 42 Complete
 
 **Phase 42: Keyboard Shortcuts**
