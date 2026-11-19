@@ -15,6 +15,7 @@ const versions         = require('./versions');
 const tags             = require('./tags');
 const templates        = require('./templates');
 const kstats           = require('./stats');
+const links            = require('./links');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -293,6 +294,29 @@ function handleSimilar(req, res, q) {
     .map(m => ({ id: m.id, title: m.title, memory_type: m.memory_type, score: +m._score.toFixed(3) })));
 }
 
+function handleListLinks(req, res, id) {
+  const m = memory.get(id);
+  if (!m) { json(res, { error: 'not found' }, 404); return; }
+  json(res, links.list(id));
+}
+
+async function handleAddLink(req, res, id) {
+  const body = await readBody(req);
+  if (!body.to_id) { json(res, { error: 'to_id required' }, 400); return; }
+  try {
+    const link = links.add(id, body.rel_type || 'related', body.to_id, body.notes || null);
+    json(res, link, 201);
+  } catch (e) {
+    json(res, { error: e.message }, e.message.includes('not found') ? 404 : 400);
+  }
+}
+
+function handleRemoveLink(req, res, linkId) {
+  const n = links.remove(linkId);
+  if (!n) { json(res, { error: 'not found' }, 404); return; }
+  json(res, { ok: true });
+}
+
 function handleTagStats(req, res, q) {
   const limit = +(q.limit) || 50;
   const top = tags.topTags(limit);
@@ -443,6 +467,15 @@ function createServer() {
       const mv = pathname.match(/^\/api\/memories\/([^/]+)\/versions$/);
       if (mv && req.method === 'GET') {
         handler = (req, res) => handleListVersions(req, res, mv[1]);
+      }
+      const lk = pathname.match(/^\/api\/memories\/([^/]+)\/links$/);
+      if (lk) {
+        if (req.method === 'GET')  handler = (req, res) => handleListLinks(req, res, lk[1]);
+        if (req.method === 'POST') handler = (req, res) => handleAddLink(req, res, lk[1]);
+      }
+      const ld = pathname.match(/^\/api\/links\/([^/]+)$/);
+      if (ld && req.method === 'DELETE') {
+        handler = (req, res) => handleRemoveLink(req, res, ld[1]);
       }
       const vd = pathname.match(/^\/api\/versions\/(\d+)\/diff$/);
       if (vd && req.method === 'GET') {
@@ -642,6 +675,26 @@ input{width:360px}
   </div>
 </div>
 
+<div id="link-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
+  <div class="mbox" style="max-width:620px">
+    <h3>Memory Links</h3>
+    <div id="lk-list" style="margin-bottom:16px"></div>
+    <div style="border-top:1px solid #21262d;padding-top:12px">
+      <h4 style="margin:0 0 8px;font-size:13px;color:#8b949e">Add link</h4>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select id="lk-type" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:6px 8px">
+          <option>related</option><option>supports</option><option>contradicts</option><option>supersedes</option><option>predecessor</option><option>see-also</option>
+        </select>
+        <input id="lk-to" placeholder="Target memory ID" style="flex:1;min-width:200px">
+        <input id="lk-notes" placeholder="Notes (optional)" style="flex:1;min-width:160px">
+        <button class="btn" onclick="addLink()">Link</button>
+      </div>
+      <p id="lk-err" style="color:#f85149;font-size:12px;margin:6px 0 0"></p>
+    </div>
+    <div class="mbtns"><button class="btn" onclick="g('link-modal').style.display='none'">Close</button></div>
+  </div>
+</div>
+
 <div id="hist-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
   <div class="mbox" style="max-width:700px;max-height:85vh;overflow-y:auto">
     <h3>Version History</h3>
@@ -711,7 +764,7 @@ function card(m) {
   const preview = (m.content||'').replace(/\\n/g,' ').slice(0,280);
   const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
   return \`<div class="card" data-id="\${m.id}">
-    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button></div>
+    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button></div>
     <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
     <div class="cc">\${esc(preview)}\${m.content.length>280?'…':''}</div>
   </div>\`;
@@ -1109,6 +1162,50 @@ async function showHistory(memId) {
     <div style="flex:1"><div style="font-size:13px">\${esc(v.title)}</div><div style="font-size:11px;color:#8b949e">\${fmt(v.snapshot_at)}</div></div>
     <button class="btn" style="font-size:11px;padding:3px 8px" onclick="showDiff(\${v.id})">View diff</button>
   </div>\`).join('');
+}
+let _lkMemId = null;
+async function showLinks(memId) {
+  _lkMemId = memId;
+  g('lk-err').textContent = '';
+  g('lk-to').value = ''; g('lk-notes').value = '';
+  g('link-modal').style.display = 'flex';
+  await _renderLinks();
+}
+async function _renderLinks() {
+  const ls = await api('/api/memories/'+_lkMemId+'/links');
+  if (!ls.length) { g('lk-list').innerHTML='<p class="empty">No links yet.</p>'; return; }
+  const relCol = { related:'#79c0ff', supports:'#3fb950', contradicts:'#f85149', supersedes:'#d2a8ff', predecessor:'#ffa657', 'see-also':'#8b949e' };
+  g('lk-list').innerHTML = ls.map(l => {
+    const isFrom = l.from_id === _lkMemId;
+    const other = isFrom ? l.to_title : l.from_title;
+    const otherId = isFrom ? l.to_id : l.from_id;
+    const col = relCol[l.rel_type] || '#8b949e';
+    const dir = isFrom ? '→' : '←';
+    return \`<div class="card" style="display:flex;align-items:center;gap:10px;padding:8px 12px">
+      <span style="color:\${col};font-size:12px;white-space:nowrap">\${dir} \${l.rel_type}</span>
+      <span style="flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="\${esc(otherId)}">\${esc(other||otherId)}</span>
+      \${l.notes?'<span style="font-size:11px;color:#8b949e">'+esc(l.notes)+'</span>':''}
+      <button class="arch" onclick="removeLink('\${l.id}')">× remove</button>
+    </div>\`;
+  }).join('');
+}
+async function addLink() {
+  const toId = g('lk-to').value.trim();
+  const relType = g('lk-type').value;
+  const notes = g('lk-notes').value.trim() || null;
+  if (!toId) { g('lk-err').textContent = 'Target memory ID is required'; return; }
+  const r = await fetch('/api/memories/'+_lkMemId+'/links', {
+    method:'POST', headers:{'Content-Type':'application/json','X-Hive-Local':'1'},
+    body: JSON.stringify({ to_id: toId, rel_type: relType, notes })
+  });
+  const d = await r.json();
+  if (d.error) { g('lk-err').textContent = d.error; return; }
+  g('lk-err').textContent = ''; g('lk-to').value = ''; g('lk-notes').value = '';
+  await _renderLinks();
+}
+async function removeLink(linkId) {
+  await fetch('/api/links/'+linkId, {method:'DELETE',headers:{'X-Hive-Local':'1'}});
+  await _renderLinks();
 }
 async function loadKStats() {
   const d = await api('/api/stats/full');

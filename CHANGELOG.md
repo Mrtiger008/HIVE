@@ -1,5 +1,28 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 31 Complete
+
+**Phase 31: Memory Linking**
+
+`src/links.js` (new):
+- `add(fromId, relType, toId, notes)` — creates a memory-to-memory relationship in the existing `relationships` table; validates both memory ids exist; accepted types: related, supports, contradicts, supersedes, predecessor, see-also
+- `list(memoryId)` — returns all links where the memory appears on either side, with `from_title` / `to_title` joined in
+- `remove(id)` — deletes by relationship id, returns change count
+
+`src/server.js`:
+- `GET /api/memories/:id/links` — list links for a memory
+- `POST /api/memories/:id/links` — add link (`{to_id, rel_type, notes}`)
+- `DELETE /api/links/:id` — remove a link
+- Dashboard: "⇄ links" button on each card → modal with link list (direction arrow + colour-coded rel_type) and add-link form
+
+`src/hive.js`:
+- `hive link add <from> <rel_type> <to> [--notes "..."]`
+- `hive link list --id <memory_id>`
+- `hive link remove <link_id>`
+
+`tests/test-phase31.js`: 10/10 passing
+Full regression: 220/220 (Phases 10–31)
+
 ## 2026-11-20 — Phase 30 Complete
 
 **Phase 30: Knowledge Stats Dashboard**

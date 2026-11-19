@@ -55,9 +55,11 @@
 
 ## Phase 30 — Knowledge Stats Dashboard — DONE ✅ (2026-11-20)
 
-## Phase 31 — Candidates
+## Phase 31 — Memory Linking — DONE ✅ (2026-11-20)
 
-- **Memory linking**: manually link two memories as related, predecessor, or supersedes
+## Phase 32 — Candidates
+
 - **Scheduled digests**: daily/weekly summary of stale + new memories (file or stdout)
 - **Full-text export to Obsidian**: sync memories as markdown vault notes with backlinks
 - **Search bookmarks**: save and name frequently used search queries
+- **Memory pinning**: pin important memories to top of list / always include in context

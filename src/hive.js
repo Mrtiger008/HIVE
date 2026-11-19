@@ -724,6 +724,37 @@ const COMMANDS = {
     }
   },
 
+  'link'(args) {
+    const { positional, flags } = parseArgs(args);
+    const lk = require('./links');
+    const sub = positional;
+    if (sub === 'list' || (!sub && flags.id)) {
+      const id = flags.id || args[1];
+      if (!id) die('Usage: hive link list --id <memory_id>');
+      const ls = lk.list(id);
+      if (!ls.length) { console.log('No links for this memory.'); return; }
+      ls.forEach(l => {
+        const isFrom = l.from_id === id;
+        const other = isFrom ? l.to_title || l.to_id : l.from_title || l.from_id;
+        const dir = isFrom ? '→' : '←';
+        console.log(`  [${l.id.slice(0,8)}] ${dir} ${l.rel_type.padEnd(12)} ${other}${l.notes ? '  ('+l.notes+')' : ''}`);
+      });
+    } else if (sub === 'add') {
+      const [fromId, relType, toId] = args.slice(1, 4);
+      if (!fromId || !toId) die('Usage: hive link add <from_id> <rel_type> <to_id> [--notes "..."]');
+      const l = lk.add(fromId, relType || 'related', toId, flags.notes || null);
+      console.log(`Linked: ${fromId} --[${l.rel_type}]--> ${toId}  (link id: ${l.id.slice(0,8)})`);
+    } else if (sub === 'remove') {
+      const id = args[1] || flags.id;
+      if (!id) die('Usage: hive link remove <link_id>');
+      const n = lk.remove(id);
+      if (n) console.log(`Removed link ${id}.`);
+      else console.log(`No link with id ${id}.`);
+    } else {
+      die(`Usage: hive link [list --id <id> | add <from> <type> <to> | remove <link_id>]`);
+    }
+  },
+
   'stats'() {
     const s = require('./stats').full();
     console.log('\n── HIVE Knowledge Stats ─────────────────');
@@ -908,6 +939,12 @@ API key management:
   hive apikey list              List all API keys
   hive apikey create <name>     Generate a new Bearer token (shown once)
   hive apikey revoke <name>     Delete a key
+
+Memory linking:
+  hive link add <from_id> <rel_type> <to_id>  [--notes "..."]   Link two memories
+  hive link list --id <memory_id>              Show all links for a memory
+  hive link remove <link_id>                   Remove a link
+  Rel types: related | supports | contradicts | supersedes | predecessor | see-also
 
 Knowledge stats:
   hive stats                    Full knowledge base breakdown (type/trust/domain/growth)
