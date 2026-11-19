@@ -724,6 +724,40 @@ const COMMANDS = {
     }
   },
 
+  'bookmark'(args) {
+    const { positional, flags } = parseArgs(args);
+    const bk = require('./bookmarks');
+    const sub = positional;
+    if (sub === 'list' || !sub) {
+      const all = bk.list();
+      if (!all.length) { console.log('No bookmarks saved.'); return; }
+      all.forEach(b => console.log(`  [${b.id}] ${b.name.padEnd(20)} [${b.mode}]  ${b.query}`));
+    } else if (sub === 'add') {
+      const name = flags.name || args[1];
+      const query = flags.query || args[2];
+      if (!name || !query) die('Usage: hive bookmark add --name <n> --query "..." [--mode keyword|semantic|hybrid]');
+      const b = bk.add(name, query, flags.mode || 'keyword');
+      console.log(`Saved bookmark "${b.name}" → ${b.query} [${b.mode}]`);
+    } else if (sub === 'run') {
+      const name = flags.name || args[1];
+      if (!name) die('Usage: hive bookmark run <name>');
+      const b = bk.get(name);
+      if (!b) die(`No bookmark named "${name}"`);
+      const { search } = require('./search');
+      const results = search(b.query, { limit: 20, mode: b.mode });
+      if (!results.length) { console.log('No results.'); return; }
+      results.forEach(m => console.log(`  [${m.memory_type}] ${m.title}  (score: ${(m._score||0).toFixed(2)})`));
+    } else if (sub === 'remove') {
+      const id = flags.id || args[1];
+      if (!id) die('Usage: hive bookmark remove <id>');
+      const n = bk.remove(+id);
+      if (n) console.log(`Removed bookmark ${id}.`);
+      else console.log(`No bookmark with id ${id}.`);
+    } else {
+      die('Usage: hive bookmark [list|add|run|remove]');
+    }
+  },
+
   'link'(args) {
     const { positional, flags } = parseArgs(args);
     const lk = require('./links');
@@ -939,6 +973,12 @@ API key management:
   hive apikey list              List all API keys
   hive apikey create <name>     Generate a new Bearer token (shown once)
   hive apikey revoke <name>     Delete a key
+
+Search bookmarks:
+  hive bookmark list                              List saved search bookmarks
+  hive bookmark add --name <n> --query "..."      Save a search [--mode keyword|semantic|hybrid]
+  hive bookmark run <name>                        Execute a saved bookmark search
+  hive bookmark remove <id>                       Delete a bookmark
 
 Memory linking:
   hive link add <from_id> <rel_type> <to_id>  [--notes "..."]   Link two memories

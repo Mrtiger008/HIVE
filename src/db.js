@@ -226,6 +226,19 @@ function _initSchema(db) {
     `);
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (8, ?)').run(Date.now());
   }
+  // v9: search_bookmarks — named saved searches
+  if (sv < 9) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS search_bookmarks (
+        id         INTEGER PRIMARY KEY AUTOINCREMENT,
+        name       TEXT NOT NULL UNIQUE,
+        query      TEXT NOT NULL,
+        mode       TEXT NOT NULL DEFAULT 'keyword',
+        created_at INTEGER NOT NULL
+      );
+    `);
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (9, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {

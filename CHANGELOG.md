@@ -1,5 +1,28 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 32 Complete
+
+**Phase 32: Search Bookmarks**
+
+`src/db.js`:
+- Schema v9: `search_bookmarks` table (id, name UNIQUE, query, mode, created_at)
+
+`src/bookmarks.js` (new):
+- `add(name, query, mode)` — saves named search; validates mode ∈ {keyword, semantic, hybrid}; rejects duplicate names
+- `list()` — returns all bookmarks sorted by name
+- `get(name)` — returns bookmark by name or null
+- `remove(id)` — deletes by id, returns change count
+
+`src/server.js`:
+- `GET /api/bookmarks`, `POST /api/bookmarks`, `DELETE /api/bookmarks/:id`
+- Search tab: "★ Save" button to bookmark the current query; bookmark chips bar auto-appears when any bookmarks exist; click a chip to re-run; × to delete
+
+`src/hive.js`:
+- `hive bookmark list|add|run|remove`; `run` executes the saved query and prints results
+
+`tests/test-phase32.js`: 10/10 passing
+Full regression: 230/230 (Phases 10–32)
+
 ## 2026-11-20 — Phase 31 Complete
 
 **Phase 31: Memory Linking**

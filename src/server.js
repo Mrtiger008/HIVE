@@ -16,6 +16,7 @@ const tags             = require('./tags');
 const templates        = require('./templates');
 const kstats           = require('./stats');
 const links            = require('./links');
+const bookmarks        = require('./bookmarks');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -294,6 +295,27 @@ function handleSimilar(req, res, q) {
     .map(m => ({ id: m.id, title: m.title, memory_type: m.memory_type, score: +m._score.toFixed(3) })));
 }
 
+function handleListBookmarks(req, res) {
+  json(res, bookmarks.list());
+}
+
+async function handleAddBookmark(req, res) {
+  const body = await readBody(req);
+  if (!body.name || !body.query) { json(res, { error: 'name and query required' }, 400); return; }
+  try {
+    json(res, bookmarks.add(body.name, body.query, body.mode || 'keyword'), 201);
+  } catch (e) {
+    json(res, { error: e.message.includes('UNIQUE') ? 'name already exists' : e.message },
+      e.message.includes('UNIQUE') ? 409 : 400);
+  }
+}
+
+function handleDeleteBookmark(req, res, id) {
+  const n = bookmarks.remove(+id);
+  if (!n) { json(res, { error: 'not found' }, 404); return; }
+  json(res, { ok: true });
+}
+
 function handleListLinks(req, res, id) {
   const m = memory.get(id);
   if (!m) { json(res, { error: 'not found' }, 404); return; }
@@ -412,6 +434,8 @@ const ROUTES = {
   'POST /api/apikeys':       handleCreateKey,
   'GET /api/templates':      (req, res) => json(res, templates.list()),
   'GET /api/stats/full':     (req, res) => json(res, kstats.full()),
+  'GET /api/bookmarks':      handleListBookmarks,
+  'POST /api/bookmarks':     handleAddBookmark,
   'GET /api/tags/stats':     (req, res) => { const u = new URL(req.url,'http://l'); handleTagStats(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/webhooks':       handleListWebhooks,
   'POST /api/webhooks':      handleAddWebhook,
@@ -476,6 +500,10 @@ function createServer() {
       const ld = pathname.match(/^\/api\/links\/([^/]+)$/);
       if (ld && req.method === 'DELETE') {
         handler = (req, res) => handleRemoveLink(req, res, ld[1]);
+      }
+      const bk = pathname.match(/^\/api\/bookmarks\/(\d+)$/);
+      if (bk && req.method === 'DELETE') {
+        handler = (req, res) => handleDeleteBookmark(req, res, bk[1]);
       }
       const vd = pathname.match(/^\/api\/versions\/(\d+)\/diff$/);
       if (vd && req.method === 'GET') {
@@ -582,6 +610,10 @@ input{width:360px}
     <datalist id="q-history"></datalist>
     <select id="smode" title="Search mode"><option value="keyword">Keyword</option><option value="hybrid">Hybrid</option><option value="semantic">Semantic</option></select>
     <button class="btn" onclick="doSearch()">Search</button>
+    <button class="btn" style="margin-left:4px" onclick="saveBookmark()" title="Save this search">★ Save</button>
+  </div>
+  <div id="bk-bar" style="display:none;padding:6px 0 10px;border-bottom:1px solid #21262d;margin-bottom:10px;font-size:12px;color:#8b949e">
+    <span style="margin-right:8px">Bookmarks:</span><span id="bk-chips"></span>
   </div>
   <div id="sr"></div>
 </div>
@@ -742,6 +774,7 @@ function show(id, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('on'));
   g(id).classList.add('on'); btn.classList.add('on');
+  if (id==='search') loadBookmarks();
   if (id==='patterns') loadPat();
   if (id==='entities') loadEnt();
   if (id==='memories') loadMem();
@@ -770,6 +803,31 @@ function card(m) {
   </div>\`;
 }
 
+async function loadBookmarks() {
+  const bs = await api('/api/bookmarks');
+  const bar = g('bk-bar'), chips = g('bk-chips');
+  if (!bs.length) { bar.style.display='none'; return; }
+  bar.style.display='block';
+  chips.innerHTML = bs.map(b => \`<span style="display:inline-flex;align-items:center;gap:4px;background:#21262d;border-radius:12px;padding:2px 10px;margin:2px;cursor:pointer" onclick="runBookmark('\${esc(b.query)}','\${b.mode}')" title="\${esc(b.query)} [\${b.mode}]">\${esc(b.name)}<span onclick="event.stopPropagation();deleteBookmark(\${b.id})" style="color:#8b949e;margin-left:4px;cursor:pointer">×</span></span>\`).join('');
+}
+async function saveBookmark() {
+  const q = g('q').value.trim();
+  if (!q) { alert('Enter a search query first.'); return; }
+  const name = prompt('Bookmark name:');
+  if (!name) return;
+  const mode = g('smode').value;
+  const r = await localFetch('/api/bookmarks',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name,query:q,mode})});
+  const d = await r.json();
+  if (d.error) { alert(d.error); return; }
+  loadBookmarks();
+}
+function runBookmark(q, mode) {
+  g('q').value = q; g('smode').value = mode; doSearch();
+}
+async function deleteBookmark(id) {
+  await localFetch('/api/bookmarks/'+id,{method:'DELETE'});
+  loadBookmarks();
+}
 async function doSearch() {
   const q = g('q').value.trim();
   if (!q) return;
@@ -1084,6 +1142,7 @@ async function archiveMem(id, btn) {
 function filterTag(tag) { const sel=g('mtag'); sel.value=tag; document.querySelectorAll('nav button').forEach(b=>{if(b.textContent==='Memories')b.click();}); }
 function loadTagSelect() { api('/api/tags').then(ts => { const sel=g('mtag'); sel.innerHTML='<option value="">All tags</option>'; ts.forEach(({tag,count})=>{const o=document.createElement('option');o.value=tag;o.textContent=tag+' ('+count+')';sel.appendChild(o);}); }); }
 refreshStats();
+loadBookmarks();
 api('/api/projects').then(ps => { const sel=g('mproj'); ps.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);}); });
 loadTagSelect();
 function loadHistory() { api('/api/search/history?limit=30').then(hs => { const dl=g('q-history'); dl.innerHTML=''; hs.forEach(h=>{const o=document.createElement('option');o.value=h.query;dl.appendChild(o);}); }); }
