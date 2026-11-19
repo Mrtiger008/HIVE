@@ -1452,7 +1452,7 @@ async function obsidianExport() {
   const files = await api('/api/export/obsidian');
   if (!files.length) { alert('No active memories to export.'); return; }
   // Bundle as a single text blob with file separators for quick copy, or download each
-  const text = files.map(f => \`===== \${f.filename} =====\n\${f.content}\`).join('\n\n');
+  const text = files.map(f => \`===== \${f.filename} =====\\n\${f.content}\`).join('\\n\\n');
   const blob = new Blob([text], { type: 'text/plain' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
