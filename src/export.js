@@ -78,4 +78,19 @@ function backup() {
   return dest;
 }
 
-module.exports = { syncToMarkdown, exportAll, backup };
+function exportJson() {
+  const rows = getDb().prepare("SELECT * FROM memories WHERE status = 'active' ORDER BY importance DESC, updated_at DESC").all();
+  return JSON.stringify(rows.map(m => ({ ...m, tags: JSON.parse(m.tags || '[]') })), null, 2);
+}
+
+const CSV_FIELDS = ['id','title','memory_type','domain','trust_level','importance','status','created_at','updated_at','content'];
+
+function exportCsv() {
+  const rows = getDb().prepare("SELECT * FROM memories WHERE status = 'active' ORDER BY importance DESC, updated_at DESC").all();
+  const esc = v => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+  const header = CSV_FIELDS.join(',');
+  const lines = rows.map(m => CSV_FIELDS.map(f => esc(m[f])).join(','));
+  return [header, ...lines].join('\n');
+}
+
+module.exports = { syncToMarkdown, exportAll, exportJson, exportCsv, backup };

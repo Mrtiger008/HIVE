@@ -588,10 +588,23 @@ const COMMANDS = {
 
   // ── utility ───────────────────────────────────────────────────────────────
 
-  'export'() {
-    console.log('Exporting all active memories to Markdown…');
-    const count = exportAll();
-    console.log(`Done — ${count} memories written to memory/`);
+  'export'(args) {
+    const { flags } = parseArgs(args);
+    const fmt = (flags.format || 'md').toLowerCase();
+    const { exportAll, exportJson, exportCsv } = require('./export');
+    if (fmt === 'json') {
+      const out = exportJson();
+      if (flags.out) { require('fs').writeFileSync(flags.out, out, 'utf8'); console.log(`JSON exported to ${flags.out}`); }
+      else process.stdout.write(out + '\n');
+    } else if (fmt === 'csv') {
+      const out = exportCsv();
+      if (flags.out) { require('fs').writeFileSync(flags.out, out, 'utf8'); console.log(`CSV exported to ${flags.out}`); }
+      else process.stdout.write(out + '\n');
+    } else {
+      console.log('Exporting all active memories to Markdown…');
+      const count = exportAll();
+      console.log(`Done — ${count} memories written to memory/`);
+    }
   },
 
   'backup'() {

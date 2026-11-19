@@ -89,6 +89,18 @@ function handleProjects(req, res) {
   json(res, projects.list({ status: 'active', limit: 50 }));
 }
 
+function handleExport(req, res, q) {
+  const { exportJson, exportCsv } = require('./export');
+  const fmt = (q.format || 'json').toLowerCase();
+  if (fmt === 'csv') {
+    res.writeHead(200, { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="hive-export.csv"' });
+    res.end(exportCsv());
+  } else {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="hive-export.json"' });
+    res.end(exportJson());
+  }
+}
+
 function handleReview(req, res, q) {
   const { stalest } = require('./decay');
   const limit = +(q.limit) || 20;
@@ -188,6 +200,7 @@ const ROUTES = {
   'GET /api/graph':     handleGraph,
   'GET /api/entities':  handleEntities,
   'GET /api/projects':  handleProjects,
+  'GET /api/export':    handleExport,
   'GET /api/review':    handleReview,
   'GET /api/brief':     handleBrief,
   'GET /':              handleIndex,
@@ -292,7 +305,7 @@ input{width:360px}
 .lc{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 </style></head>
 <body>
-<header><h1>&#x1F9E0; HIVE</h1><span id="stats">loading…</span></header>
+<header><h1>&#x1F9E0; HIVE</h1><span id="stats">loading…</span><span style="margin-left:auto;display:flex;gap:8px"><a href="/api/export?format=json" download="hive-export.json" class="btn" style="text-decoration:none;font-size:12px">⬇ JSON</a><a href="/api/export?format=csv" download="hive-export.csv" class="btn" style="text-decoration:none;font-size:12px">⬇ CSV</a></span></header>
 <nav>
   <button class="on" onclick="show('search',this)">Search</button>
   <button onclick="show('memories',this)">Memories</button>

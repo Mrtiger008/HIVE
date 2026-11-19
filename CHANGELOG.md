@@ -1,5 +1,24 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 17 Complete
+
+**Phase 17: Export Formats**
+
+`src/export.js`:
+- `exportJson()` — all active memories as a pretty-printed JSON array; tags parsed to arrays
+- `exportCsv()` — all active memories as CSV (id, title, memory_type, domain, trust_level, importance, status, timestamps, content); double-quotes escaped per RFC 4180
+
+`src/hive.js`:
+- `hive export [--format json|csv|md] [--out <file>]` — JSON/CSV go to stdout (or file via `--out`); MD still writes to `memory/` as before
+
+`src/server.js`:
+- `GET /api/export?format=json|csv` — download endpoint with `Content-Disposition: attachment` and correct MIME type
+- Dashboard header: ⬇ JSON and ⬇ CSV download links (native `<a download>` — no JS needed)
+
+Tests: 10/10 passing (`tests/test-phase17.js`). All suites: **160/160 total**.
+
+---
+
 ## 2026-11-20 — Phase 16 Complete
 
 **Phase 16: Review Digest**

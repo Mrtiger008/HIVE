@@ -27,7 +27,9 @@
 
 ## Phase 16 — Review Digest — DONE ✅ (2026-11-20)
 
-## Phase 17 — Candidates
+## Phase 17 — Export Formats — DONE ✅ (2026-11-20)
+
+## Phase 18 — Candidates
 
 - **REST API + integrations**: JSON API for external tools (Obsidian plugin, Alfred, etc.)
 - **Dashboard search improvements**: semantic search toggle in the Search tab
