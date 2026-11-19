@@ -1,5 +1,20 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 15 Complete
+
+**Phase 15: Project Dashboard**
+
+`src/server.js`:
+- `GET /api/projects/:id/stats` — returns project fields + `memory_count` (active only) + `entity_count` (via entity links)
+- Dynamic routing extended to match `/api/projects/:id/stats`
+- Dashboard "Projects" nav button + tab: project cards with memory/entity counts, objective preview, "→ memories" click-through
+- `loadProjects()`: fetches all projects, enriches each with stats via parallel `/api/projects/:id/stats` calls
+- `viewProject(id)`: sets `mproj` select and switches to Memories tab, filtered to that project
+
+Tests: 10/10 passing (`tests/test-phase15.js`). All suites: **140/140 total**.
+
+---
+
 ## 2026-11-20 — Phase 14 Complete
 
 **Phase 14: Semantic Search Toggle**

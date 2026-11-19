@@ -89,6 +89,17 @@ function handleProjects(req, res) {
   json(res, projects.list({ status: 'active', limit: 50 }));
 }
 
+function handleProjectStats(req, res, id) {
+  const p = projects.get(id);
+  if (!p) { res.writeHead(404); res.end('Not Found'); return; }
+  const db = getDb();
+  const memCount = db.prepare("SELECT COUNT(*) as n FROM memories WHERE project_id=? AND status='active'").get(id).n;
+  const entCount = db.prepare(
+    "SELECT COUNT(DISTINCT mel.entity_id) as n FROM memory_entity_links mel JOIN memories m ON mel.memory_id=m.id WHERE m.project_id=? AND m.status='active'"
+  ).get(id).n;
+  json(res, { ...p, memory_count: memCount, entity_count: entCount });
+}
+
 async function handleBrief(req, res) {
   // Serve cached file if available, else generate (keyword-only, no model needed)
   const briefPath = path.join(path.dirname(DB_PATH), 'last-briefing.md');
@@ -176,6 +187,11 @@ function createServer() {
         if (req.method === 'PUT')    handler = (req, res) => handleUpdateMemory(req, res, id);
         if (req.method === 'DELETE') handler = (req, res) => handleDeleteMemory(req, res, id);
       }
+      const p = pathname.match(/^\/api\/projects\/([^/]+)\/stats$/);
+      if (p && req.method === 'GET') {
+        const id = p[1];
+        handler = (req, res) => handleProjectStats(req, res, id);
+      }
     }
     if (!handler) { res.writeHead(404); res.end('Not Found'); return; }
     Promise.resolve(handler(req, res, query)).catch(err => {
@@ -257,6 +273,7 @@ input{width:360px}
   <button onclick="show('patterns',this)">Patterns</button>
   <button onclick="show('entities',this)">Entities</button>
   <button onclick="show('graph',this)">Graph</button>
+  <button onclick="show('projects',this)">Projects</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -291,6 +308,8 @@ input{width:360px}
   <p id="gmt" class="empty" style="display:none">No entities yet — add some via the CLI or the Memories tab.</p>
 </div>
 
+<div id="projects" class="tab"><div id="pl"><p class="empty">Loading…</p></div></div>
+
 <div id="add-modal" class="modal">
   <div class="mbox">
     <h3 id="nm-h">Add Memory</h3>
@@ -320,6 +339,7 @@ function show(id, btn) {
   if (id==='entities') loadEnt();
   if (id==='memories') loadMem();
   if (id==='graph') loadGraph();
+  if (id==='projects') loadProjects();
 }
 
 function card(m) {
@@ -354,6 +374,24 @@ async function loadBrief() {
     .replace(/\\*\\*(.+?)\\*\\*/g,'<strong>$1</strong>').replace(/^- (.+)$/gm,'<li>$1</li>')
     .replace(/\\*([^*]+)\\*/g,'<em>$1</em>').replace(/\\n\\n/g,'<br>');
   g('brief-out').innerHTML = t || '<p class="empty">No briefing available.</p>';
+}
+
+async function loadProjects() {
+  const ps = await api('/api/projects');
+  if (!ps.length) { g('pl').innerHTML='<p class="empty">No projects yet — create one with <code>hive project create</code>.</p>'; return; }
+  const cards = await Promise.all(ps.map(async p => {
+    let mc=0, ec=0;
+    try { const s=await api('/api/projects/'+p.id+'/stats'); mc=s.memory_count||0; ec=s.entity_count||0; } catch {}
+    return \`<div class="card"><div class="ct">\${esc(p.name)}<button class="arch" onclick="viewProject('\${p.id}')" title="View memories">→ memories</button></div>
+    <div class="cm"><span class="b bt">\${p.domain||'—'}</span><span class="b bi">\${mc} memories</span><span class="b br">\${ec} entities</span></div>
+    \${p.objective?'<div class="cc">'+esc(p.objective.slice(0,180))+'</div>':''}</div>\`;
+  }));
+  g('pl').innerHTML = cards.join('');
+}
+function viewProject(id) {
+  const sel = g('mproj');
+  if (sel) { sel.value = id; }
+  document.querySelectorAll('nav button').forEach(b => { if (b.textContent==='Memories') b.click(); });
 }
 
 async function loadPat() {

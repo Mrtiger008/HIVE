@@ -23,7 +23,9 @@
 
 ## Phase 14 — Semantic Search Toggle — DONE ✅ (2026-11-20)
 
-## Phase 15 — Candidates
+## Phase 15 — Project Dashboard — DONE ✅ (2026-11-20)
+
+## Phase 16 — Candidates
 
 - **REST API + integrations**: JSON API for external tools (Obsidian plugin, Alfred, etc.)
 - **Dashboard search improvements**: semantic search toggle in the Search tab
