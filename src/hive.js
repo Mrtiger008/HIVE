@@ -419,6 +419,28 @@ const COMMANDS = {
     console.log(`\nRun: hive reinforce <id>  to bump a memory's importance`);
   },
 
+  'review'(args) {
+    const { flags } = parseArgs(args);
+    const limit = flags.limit ? +flags.limit : 20;
+    const projectId = flags.project || null;
+    const results = stalest({ projectId, limit });
+    if (!results.length) { console.log('No memories to review.'); return; }
+    const now = Date.now();
+    const MS = 86400000;
+    const critical = results.filter(m => (now - (m.last_accessed_at || m.created_at)) / MS > 90);
+    const warning  = results.filter(m => { const d = (now - (m.last_accessed_at || m.created_at)) / MS; return d > 30 && d <= 90; });
+    const recent   = results.filter(m => (now - (m.last_accessed_at || m.created_at)) / MS <= 30);
+    const fmt = m => {
+      const days = Math.round((now - (m.last_accessed_at || m.created_at)) / MS);
+      return `  [${m.id.slice(0,8)}] [i=${m.importance}] ${m.title} (${days}d idle)`;
+    };
+    console.log('# HIVE Review Digest\n');
+    if (critical.length) { console.log('## ⛔ Critical — not accessed in 90+ days'); critical.forEach(m => console.log(fmt(m))); console.log(); }
+    if (warning.length)  { console.log('## ⚠️  Warning — not accessed in 30–90 days'); warning.forEach(m => console.log(fmt(m))); console.log(); }
+    if (recent.length)   { console.log('## ✅ Recent — accessed within 30 days'); recent.forEach(m => console.log(fmt(m))); console.log(); }
+    console.log(`Total: ${results.length} | Run: hive reinforce <id>  to bump importance`);
+  },
+
   'patterns'(args) {
     const { flags } = parseArgs(args);
     const keywords = topKeywords({

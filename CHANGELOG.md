@@ -1,5 +1,22 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 16 Complete
+
+**Phase 16: Review Digest**
+
+`src/hive.js`:
+- `hive review [--limit N] [--project <id>]` — Markdown-formatted digest grouped into Critical (>90d idle), Warning (30–90d), and Recent (<30d) sections
+
+`src/server.js`:
+- `GET /api/review?limit=N&project=...` — returns stalest memories with `days_idle` and `urgency` fields (critical/warning/ok)
+- `POST /api/memories/:id/reinforce` — bumps importance +1, updates `last_accessed_at`
+- Dashboard "Review" tab: color-coded cards (red/yellow/green border), inline "↑ reinforce" and "× archive" buttons; `loadReview()` auto-loads on tab switch
+- `reinforceMem(id, btn)` — calls reinforce endpoint, disables button on success
+
+Tests: 10/10 passing (`tests/test-phase16.js`). All suites: **150/150 total**.
+
+---
+
 ## 2026-11-20 — Phase 15 Complete
 
 **Phase 15: Project Dashboard**

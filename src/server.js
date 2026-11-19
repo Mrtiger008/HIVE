@@ -89,6 +89,27 @@ function handleProjects(req, res) {
   json(res, projects.list({ status: 'active', limit: 50 }));
 }
 
+function handleReview(req, res, q) {
+  const { stalest } = require('./decay');
+  const limit = +(q.limit) || 20;
+  const projectId = q.project || null;
+  const now = Date.now();
+  const MS = 86400000;
+  const results = stalest({ projectId, limit }).map(m => ({
+    ...m,
+    days_idle: Math.round((now - (m.last_accessed_at || m.created_at)) / MS),
+    urgency: (now - (m.last_accessed_at || m.created_at)) / MS > 90 ? 'critical'
+           : (now - (m.last_accessed_at || m.created_at)) / MS > 30 ? 'warning' : 'ok',
+  }));
+  json(res, results);
+}
+
+function handleReinforce(req, res, id) {
+  const { reinforce } = require('./reinforce');
+  try { reinforce(id); json(res, { ok: true }); }
+  catch (e) { res.writeHead(404); res.end(e.message); }
+}
+
 function handleProjectStats(req, res, id) {
   const p = projects.get(id);
   if (!p) { res.writeHead(404); res.end('Not Found'); return; }
@@ -167,6 +188,7 @@ const ROUTES = {
   'GET /api/graph':     handleGraph,
   'GET /api/entities':  handleEntities,
   'GET /api/projects':  handleProjects,
+  'GET /api/review':    handleReview,
   'GET /api/brief':     handleBrief,
   'GET /':              handleIndex,
 };
@@ -191,6 +213,11 @@ function createServer() {
       if (p && req.method === 'GET') {
         const id = p[1];
         handler = (req, res) => handleProjectStats(req, res, id);
+      }
+      const rf = pathname.match(/^\/api\/memories\/([^/]+)\/reinforce$/);
+      if (rf && req.method === 'POST') {
+        const id = rf[1];
+        handler = (req, res) => handleReinforce(req, res, id);
       }
     }
     if (!handler) { res.writeHead(404); res.end('Not Found'); return; }
@@ -274,6 +301,7 @@ input{width:360px}
   <button onclick="show('entities',this)">Entities</button>
   <button onclick="show('graph',this)">Graph</button>
   <button onclick="show('projects',this)">Projects</button>
+  <button onclick="show('review',this)">Review</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -309,6 +337,7 @@ input{width:360px}
 </div>
 
 <div id="projects" class="tab"><div id="pl"><p class="empty">Loading…</p></div></div>
+<div id="review" class="tab"><div class="row"><button class="btn" onclick="loadReview()">Load Review Digest</button></div><div id="rv"><p class="empty">Click "Load Review Digest" to see memories due for review.</p></div></div>
 
 <div id="add-modal" class="modal">
   <div class="mbox">
@@ -340,6 +369,7 @@ function show(id, btn) {
   if (id==='memories') loadMem();
   if (id==='graph') loadGraph();
   if (id==='projects') loadProjects();
+  if (id==='review') loadReview();
 }
 
 function card(m) {
@@ -392,6 +422,30 @@ function viewProject(id) {
   const sel = g('mproj');
   if (sel) { sel.value = id; }
   document.querySelectorAll('nav button').forEach(b => { if (b.textContent==='Memories') b.click(); });
+}
+
+async function loadReview() {
+  const d = await api('/api/review?limit=30');
+  if (!d.length) { g('rv').innerHTML='<p class="empty">Nothing to review — all memories are fresh!</p>'; return; }
+  const U = {critical:'#f85149', warning:'#d29922', ok:'#3fb950'};
+  const rows = d.map(m => {
+    const col = U[m.urgency]||'#8b949e';
+    return \`<div class="card" data-id="\${m.id}">
+      <div class="ct" style="border-left:3px solid \${col};padding-left:8px">\${esc(m.title)}
+        <button class="arch" onclick="archiveMem('\${m.id}',this)">× archive</button>
+        <button class="arch" onclick="reinforceMem('\${m.id}',this)">↑ reinforce</button>
+      </div>
+      <div class="cm"><span class="b bi">\${m.days_idle}d idle</span><span class="b bt">\${m.memory_type}</span><span class="b" style="color:\${col}">\${m.urgency}</span></div>
+      <div class="cc">\${esc((m.content||'').slice(0,180))}</div>
+    </div>\`;
+  });
+  g('rv').innerHTML = rows.join('');
+}
+
+async function reinforceMem(id, btn) {
+  await fetch('/api/memories/'+id+'/reinforce', {method:'POST'});
+  btn.textContent='✓';
+  btn.disabled=true;
 }
 
 async function loadPat() {
