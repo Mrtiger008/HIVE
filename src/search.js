@@ -1,5 +1,6 @@
 'use strict';
 const { getDb } = require('./db');
+const { touch } = require('./reinforce');
 
 // Full-text search over memories using SQLite FTS5 (BM25 ranking).
 // Falls back to LIKE search if the FTS query has syntax errors.
@@ -33,7 +34,9 @@ function search(query, { domain, project_id, type, trust_level, status = 'active
   params.push(limit);
 
   try {
-    return db.prepare(sql).all(...params).map(m => ({ ...m, tags: JSON.parse(m.tags || '[]') }));
+    const results = db.prepare(sql).all(...params).map(m => ({ ...m, tags: JSON.parse(m.tags || '[]') }));
+    results.forEach(m => touch(m.id));
+    return results;
   } catch {
     // FTS5 syntax error (e.g., bare special chars) — fall back to LIKE
     return _likeFallback(db, query, { domain, project_id, type, trust_level, status, limit });

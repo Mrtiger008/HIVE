@@ -5,24 +5,26 @@
 ## Phase 3 — DONE ✅ (2026-11-19)
 
 ## Phase 4 — DONE ✅ (2026-11-19)
+## Phase 5 — DONE ✅ (2026-11-19)
 
-## Phase 5 — Learning System (next)
+## Phase 6 — Semantic Search (next)
 
-Goal: Make HIVE learn from patterns — reinforce important memories, decay stale ones, detect recurring topics, offer proactive suggestions.
+Goal: Add vector/semantic search so HIVE can find memories by meaning, not just keywords.
 
 Key tasks:
-1. `src/decay.js` — recency decay score: `importance × (1 / (1 + days_since_access / 30))`. Scheduled sweep marks OUTDATED memories not accessed in 90d.
-2. `src/reinforce.js` — bump importance (+1, max 10) each time a memory is retrieved via search. Keeps high-utility memories surfaced.
-3. `src/patterns.js` — sliding-window keyword frequency over last 30d of memories. Returns top recurring topics.
-4. `hive suggest [--project <id>]` — surfaces 5 memories due for reinforcement or review (high decay, low importance, long ago accessed).
-5. `hive patterns` — lists top recurring topics/entities across recent memories.
-6. Tests: 10 cases covering decay math, reinforcement capping, pattern extraction, suggest ranking.
+1. Decide embedding approach: **transformers.js** (pure JS, ~80MB, `Xenova/all-MiniLM-L6-v2`) vs Python bridge (`sentence-transformers`). transformers.js is simpler (no Python subprocess); Python bridge is faster on CPU.
+2. `src/embeddings.js` — generate 384-dim embedding for a text string. Cache in `database/embeddings/` keyed by content hash to avoid re-computing.
+3. Schema v3 migration: add `embedding BLOB` column to memories; backfill on first run.
+4. `src/semantic.js` — cosine similarity search: embed query, compare against all stored embeddings, return top-N by similarity. Hybrid mode: combine FTS5 BM25 score with cosine similarity.
+5. `hive semantic "<query>" [--limit N] [--hybrid]` — CLI command.
+6. `hive embed backfill` — recompute embeddings for all memories missing one.
+7. Tests: 10 cases covering embedding generation, cosine similarity math, semantic search returning semantically related results.
 
 ## Upcoming decisions
 
-- Semantic/vector search: transformers.js (~80MB pure JS) vs Python-based bridge — still deferred to Phase 6
-- Auto-entity extraction from memory content: candidate for Phase 5 or 6
+- Embedding model: MiniLM-L6-v2 (fast, 384 dims) vs MPNet (better quality, 768 dims)
+- Auto-entity extraction from memory content: Phase 7 candidate
 
 ## Blocked on
 
-Nothing. Phase 5 can start immediately.
+Decision: transformers.js vs Python bridge. transformers.js is recommended — no Python subprocess, same Node.js process, works without extra install.

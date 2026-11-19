@@ -1,5 +1,37 @@
 # CHANGELOG.md
 
+## 2026-11-19 — Phase 5 Complete
+
+**Phase 5: Learning System**
+
+`src/decay.js` — recency-weighted score and idle sweep:
+- `decayScore(memory)`: `importance / (1 + days_idle / 30)` — halves every 30 idle days
+- `sweep()`: marks active memories idle 90+ days as OUTDATED; skips USER_CONFIRMED
+- `stalest({ projectId, limit })`: memories sorted by decay score ascending (most forgotten first)
+
+`src/reinforce.js` — access tracking:
+- `reinforce(id)`: bumps importance +1 (max 10), updates `last_accessed_at`
+- `touch(id)`: records access time without changing importance (called auto by search)
+
+`src/patterns.js` — keyword frequency:
+- `topKeywords({ days, limit, projectId })`: sliding-window word frequency over recent memories, stop-word filtered
+
+`src/db.js` — schema v2 migration adds `last_accessed_at INTEGER` to memories table
+
+`src/search.js` — auto-calls `touch()` on every search result so retrieval feeds decay tracking
+
+CLI:
+- `hive suggest` — stalest memories ranked by decay score
+- `hive patterns` — top recurring keywords with bar chart
+- `hive reinforce <id>` — manually bump a memory
+- `hive decay sweep` — run the 90-day idle sweep
+
+Tests: 10/10 passing (`tests/test-learning.js`). All suites: 50/50 total.
+
+**Next**: Phase 6 — Semantic Search (vector embeddings via transformers.js or Python bridge)
+
+---
+
 ## 2026-11-19 — Phase 4 Complete
 
 **Phase 4: Session Capture & Ingestion**

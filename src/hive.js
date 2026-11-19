@@ -8,6 +8,9 @@ const graph    = require('./graph');
 const { search }    = require('./search');
 const { exportAll, backup } = require('./export');
 const ingest   = require('./ingest');
+const { decayScore, sweep, stalest } = require('./decay');
+const { reinforce }  = require('./reinforce');
+const { topKeywords } = require('./patterns');
 
 const [,, cmd, ...rawArgs] = process.argv;
 
@@ -366,6 +369,51 @@ const COMMANDS = {
     }
   },
 
+  // ── learning system ───────────────────────────────────────────────────────
+
+  'suggest'(args) {
+    const { flags } = parseArgs(args);
+    const results = stalest({ projectId: flags.project || null, limit: flags.limit ? +flags.limit : 5 });
+    if (!results.length) { console.log('No memories found.'); return; }
+    console.log('Memories most in need of review (stalest first):\n');
+    for (const m of results) {
+      const score = m.decay_score.toFixed(2);
+      const accessed = m.last_accessed_at
+        ? `accessed ${Math.round((Date.now() - m.last_accessed_at) / 86400000)}d ago`
+        : 'never accessed';
+      console.log(`[${m.id.slice(0,8)}] [i=${m.importance}] [score=${score}] (${accessed}) ${m.title}`);
+    }
+    console.log(`\nRun: hive reinforce <id>  to bump a memory's importance`);
+  },
+
+  'patterns'(args) {
+    const { flags } = parseArgs(args);
+    const keywords = topKeywords({
+      days: flags.days ? +flags.days : 30,
+      limit: flags.limit ? +flags.limit : 15,
+      projectId: flags.project || null,
+    });
+    if (!keywords.length) { console.log('No memories in this window.'); return; }
+    console.log(`Top recurring topics (last ${flags.days || 30} days):\n`);
+    for (const { word, count } of keywords) {
+      const bar = '█'.repeat(Math.min(count, 20));
+      console.log(`  ${word.padEnd(24)} ${bar} (${count})`);
+    }
+  },
+
+  'reinforce'(args) {
+    const { positional } = parseArgs(args);
+    if (!positional) die('Usage: hive reinforce <memory-id>');
+    const result = reinforce(positional);
+    if (!result) die(`Memory not found: ${positional}`);
+    console.log(`Reinforced [${positional.slice(0,8)}] — importance now ${result.importance}/10`);
+  },
+
+  'decay sweep'() {
+    const changed = sweep();
+    console.log(`Decay sweep complete — ${changed} memories marked OUTDATED (90+ days idle)`);
+  },
+
   // ── utility ───────────────────────────────────────────────────────────────
 
   'export'() {
@@ -458,6 +506,12 @@ const COMMANDS = {
   'help'() {
     console.log(`
 HIVE — Personal AI Knowledge & Memory System
+
+Learning system:
+  hive suggest      [--project <id>] [--limit N]       Stale memories ranked by decay score
+  hive patterns     [--days 30] [--limit 15] [--project <id>]  Top recurring keywords
+  hive reinforce    <id>                                Bump a memory's importance (+1, max 10)
+  hive decay sweep                                     Mark 90+-day idle memories as OUTDATED
 
 Session & ingest commands:
   hive session import <path.jsonl>  [--auto] [--project <id>] [--limit N]

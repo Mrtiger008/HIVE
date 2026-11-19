@@ -140,9 +140,16 @@ function _initSchema(db) {
     CREATE INDEX IF NOT EXISTS idx_rel_to           ON relationships(to_id);
   `);
 
-  const v = db.prepare('SELECT MAX(version) as v FROM schema_version').get();
-  if (!v.v) {
+  const { v: schemaVersion } = db.prepare('SELECT MAX(version) as v FROM schema_version').get();
+  const sv = schemaVersion || 0;
+
+  if (sv < 1) {
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (1, ?)').run(Date.now());
+  }
+  // v2: last_accessed_at for decay/reinforce system
+  if (sv < 2) {
+    try { db.exec('ALTER TABLE memories ADD COLUMN last_accessed_at INTEGER'); } catch {}
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (2, ?)').run(Date.now());
   }
 }
 
