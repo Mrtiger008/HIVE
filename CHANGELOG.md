@@ -1,5 +1,23 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 13 Complete
+
+**Phase 13: Memory Editing**
+
+`src/server.js`:
+- `GET /api/memories/:id` — fetch a single memory by id (404 if not found)
+- `PUT /api/memories/:id` — update title/content/memory_type/trust_level/importance (400 on empty body, 404 if not found)
+- Consolidated dynamic routing: one regex match handles GET/PUT/DELETE for `/api/memories/:id`
+- Dashboard "✎ edit" button on every memory card — fetches the memory, opens the shared Add/Edit modal pre-filled
+- Add/Edit modal is now dual-mode: POST when adding, PUT when editing (`_editId` toggle)
+
+`src/memory.js`:
+- Added `memory_type` to the `ALLOWED` update fields in `update()` — was previously blocked silently
+
+Tests: 10/10 passing (`tests/test-phase13.js`). All suites: **130/130 total**.
+
+---
+
 ## 2026-11-20 — Phase 12 Complete
 
 **Phase 12: Markdown Import**

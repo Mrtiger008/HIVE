@@ -95,8 +95,8 @@ function update(id, updates) {
     if (hit) throw new Error(`Secret detected (${hit}).`);
   }
 
-  const ALLOWED = ['title', 'content', 'domain', 'project_id', 'confidence', 'trust_level',
-                   'status', 'importance', 'tags', 'valid_until', 'superseded_by',
+  const ALLOWED = ['title', 'content', 'memory_type', 'domain', 'project_id', 'confidence',
+                   'trust_level', 'status', 'importance', 'tags', 'valid_until', 'superseded_by',
                    'retrieval_keywords', 'user_confirmed'];
   const setClauses = [], values = [];
   for (const [k, v] of Object.entries(updates)) {

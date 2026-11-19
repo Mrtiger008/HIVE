@@ -105,6 +105,26 @@ async function handleAddMemory(req, res) {
   json(res, m, 201);
 }
 
+function handleGetMemory(req, res, id) {
+  const m = memory.get(id);
+  if (!m) { json(res, { error: 'not found' }, 404); return; }
+  json(res, m);
+}
+
+async function handleUpdateMemory(req, res, id) {
+  const m = memory.get(id);
+  if (!m) { json(res, { error: 'not found' }, 404); return; }
+  const body = await readBody(req);
+  const updates = {};
+  if (body.title       !== undefined) updates.title       = body.title;
+  if (body.content     !== undefined) updates.content     = body.content;
+  if (body.memory_type !== undefined) updates.memory_type = body.memory_type;
+  if (body.trust_level !== undefined) updates.trust_level = body.trust_level;
+  if (body.importance  !== undefined) updates.importance  = +body.importance;
+  if (!Object.keys(updates).length) { json(res, { error: 'no fields to update' }, 400); return; }
+  json(res, memory.update(id, updates));
+}
+
 async function handleDeleteMemory(req, res, id) {
   const m = memory.get(id);
   if (!m) { json(res, { error: 'not found' }, 404); return; }
@@ -138,9 +158,14 @@ function createServer() {
     const pathname = u.pathname;
     const query = Object.fromEntries(u.searchParams);
     let handler = ROUTES[`${req.method} ${pathname}`];
-    if (!handler && req.method === 'DELETE' && pathname.startsWith('/api/memories/')) {
-      const id = pathname.slice('/api/memories/'.length);
-      handler = (req, res) => handleDeleteMemory(req, res, id);
+    if (!handler) {
+      const m = pathname.match(/^\/api\/memories\/([^/]+)$/);
+      if (m) {
+        const id = m[1];
+        if (req.method === 'GET')    handler = (req, res) => handleGetMemory(req, res, id);
+        if (req.method === 'PUT')    handler = (req, res) => handleUpdateMemory(req, res, id);
+        if (req.method === 'DELETE') handler = (req, res) => handleDeleteMemory(req, res, id);
+      }
     }
     if (!handler) { res.writeHead(404); res.end('Not Found'); return; }
     Promise.resolve(handler(req, res, query)).catch(err => {
@@ -257,7 +282,7 @@ input{width:360px}
 
 <div id="add-modal" class="modal">
   <div class="mbox">
-    <h3>Add Memory</h3>
+    <h3 id="nm-h">Add Memory</h3>
     <div class="f"><label>Title *</label><input id="nm-t" style="width:100%" placeholder="Memory title"></div>
     <div class="f"><label>Content *</label><textarea id="nm-c" rows="5" placeholder="Memory content…"></textarea></div>
     <div class="f"><label>Type</label><select id="nm-ty"><option>semantic</option><option>core</option><option>domain</option><option>project</option><option>episodic</option><option>skill</option></select></div>
@@ -289,7 +314,7 @@ function show(id, btn) {
 function card(m) {
   const preview = (m.content||'').replace(/\\n/g,' ').slice(0,280);
   return \`<div class="card" data-id="\${m.id}">
-    <div class="ct">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button></div>
+    <div class="ct">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button></div>
     <div class="cm"><span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span></div>
     <div class="cc">\${esc(preview)}\${m.content.length>280?'…':''}</div>
   </div>\`;
@@ -370,13 +395,18 @@ async function loadGraph() {
 }
 
 function refreshStats() { api('/api/stats').then(d => g('stats').textContent = \`\${d.memories} memories · \${d.entities} entities · \${d.projects} projects\`); }
-function showAdd() { g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
+let _editId = null;
+function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
+async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
 function closeAdd() { g('add-modal').classList.remove('on'); }
 async function submitAdd() {
   const title = g('nm-t').value.trim(), content = g('nm-c').value.trim();
   if (!title || !content) { g('nm-err').textContent = 'Title and content are required.'; return; }
   g('nm-err').textContent = '';
-  const r = await fetch('/api/memories', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ title, content, memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value }) });
+  const payload = { title, content, memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value };
+  const r = _editId
+    ? await fetch('/api/memories/'+_editId, { method:'PUT',  headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
+    : await fetch('/api/memories',           { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
   if (!r.ok) { const e = await r.json(); g('nm-err').textContent = e.error || 'Save failed.'; return; }
   g('nm-t').value = ''; g('nm-c').value = '';
   closeAdd(); loadMem(); refreshStats();
