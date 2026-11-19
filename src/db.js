@@ -211,6 +211,21 @@ function _initSchema(db) {
     `);
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (7, ?)').run(Date.now());
   }
+  // v8: memory_versions — snapshot of title/content on each update
+  if (sv < 8) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS memory_versions (
+        id          INTEGER PRIMARY KEY AUTOINCREMENT,
+        memory_id   TEXT NOT NULL,
+        title       TEXT NOT NULL,
+        content     TEXT NOT NULL,
+        snapshot_at INTEGER NOT NULL,
+        FOREIGN KEY(memory_id) REFERENCES memories(id)
+      );
+      CREATE INDEX IF NOT EXISTS idx_mv_memory ON memory_versions(memory_id, snapshot_at DESC);
+    `);
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (8, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {

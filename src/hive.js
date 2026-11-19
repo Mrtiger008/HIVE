@@ -724,6 +724,29 @@ const COMMANDS = {
     }
   },
 
+  'versions'(args) {
+    const { positional, flags } = parseArgs(args);
+    const v = require('./versions');
+    const id = positional || flags.id;
+    if (!id) die('Usage: hive versions <memory_id>');
+    const list = v.list(id);
+    if (!list.length) { console.log('No prior versions recorded for this memory.'); return; }
+    const fmt = ts => new Date(ts).toLocaleString();
+    list.forEach(ver => console.log(`[v${ver.id}] ${fmt(ver.snapshot_at)} — ${ver.title}`));
+    if (flags.diff) {
+      const ver = v.get(+flags.diff);
+      if (!ver) die(`Version ${flags.diff} not found`);
+      const mem = require('./memory').get(ver.memory_id);
+      if (!mem) die('Memory not found');
+      const ops = v.diff(ver.content, mem.content);
+      console.log(`\nDiff v${ver.id} → current:`);
+      for (const op of ops) {
+        const prefix = op.type === 'add' ? '+' : op.type === 'del' ? '-' : ' ';
+        console.log(`${prefix} ${op.text}`);
+      }
+    }
+  },
+
   'webhook'(args) {
     const { positional, flags } = parseArgs(args);
     const wh = require('./webhooks');
@@ -821,6 +844,10 @@ API key management:
   hive apikey list              List all API keys
   hive apikey create <name>     Generate a new Bearer token (shown once)
   hive apikey revoke <name>     Delete a key
+
+Version history:
+  hive versions <memory_id>              List all prior versions of a memory
+  hive versions <memory_id> --diff <id>  Show diff between version <id> and current
 
 Webhooks:
   hive webhook list             List registered webhooks

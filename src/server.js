@@ -11,6 +11,7 @@ const entities         = require('./entities');
 const projects         = require('./projects');
 const apikeys          = require('./apikeys');
 const webhooks         = require('./webhooks');
+const versions         = require('./versions');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -248,6 +249,8 @@ async function handleUpdateMemory(req, res, id) {
   if (body.confidence  !== undefined) updates.confidence  = Math.min(1, Math.max(0, +body.confidence));
   if (body.tags        !== undefined) updates.tags        = body.tags;
   if (!Object.keys(updates).length) { json(res, { error: 'no fields to update' }, 400); return; }
+  if (updates.title !== undefined || updates.content !== undefined)
+    versions.snapshot(id, m.title, m.content);
   const updated = memory.update(id, updates);
   webhooks.fire('memory.updated', { id: updated.id, title: updated.title, memory_type: updated.memory_type, changes: Object.keys(updates) });
   json(res, updated);
@@ -285,6 +288,20 @@ function handleSimilar(req, res, q) {
   if (!title.trim() && !content.trim()) { json(res, []); return; }
   json(res, findSimilar(title, content, { threshold, limit })
     .map(m => ({ id: m.id, title: m.title, memory_type: m.memory_type, score: +m._score.toFixed(3) })));
+}
+
+function handleListVersions(req, res, id) {
+  const m = memory.get(id);
+  if (!m) { json(res, { error: 'not found' }, 404); return; }
+  json(res, versions.list(id));
+}
+
+function handleGetVersion(req, res, vid) {
+  const v = versions.get(+vid);
+  if (!v) { json(res, { error: 'not found' }, 404); return; }
+  const current = memory.get(v.memory_id);
+  if (!current) { json(res, { error: 'memory not found' }, 404); return; }
+  json(res, { version: v, diff: versions.diff(v.content, current.content) });
 }
 
 function handleListWebhooks(req, res) {
@@ -408,6 +425,14 @@ function createServer() {
       const wh = pathname.match(/^\/api\/webhooks\/(\d+)$/);
       if (wh && req.method === 'DELETE') {
         handler = (req, res) => handleDeleteWebhook(req, res, wh[1]);
+      }
+      const mv = pathname.match(/^\/api\/memories\/([^/]+)\/versions$/);
+      if (mv && req.method === 'GET') {
+        handler = (req, res) => handleListVersions(req, res, mv[1]);
+      }
+      const vd = pathname.match(/^\/api\/versions\/(\d+)\/diff$/);
+      if (vd && req.method === 'GET') {
+        handler = (req, res) => handleGetVersion(req, res, vd[1]);
       }
     }
     if (!handler) { res.writeHead(404); res.end('Not Found'); return; }
@@ -583,6 +608,18 @@ input{width:360px}
   <div id="whl"><p class="empty">Loading webhooks…</p></div>
 </div>
 
+<div id="hist-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
+  <div class="mbox" style="max-width:700px;max-height:85vh;overflow-y:auto">
+    <h3>Version History</h3>
+    <div id="hist-list"></div>
+    <div id="hist-diff" style="display:none;margin-top:12px">
+      <h4 style="margin:0 0 8px;font-size:13px;color:#8b949e">Diff vs current (snapshot → current)</h4>
+      <pre id="hist-diff-out" style="font-size:12px;line-height:1.6;white-space:pre-wrap;background:#0d1117;padding:12px;border-radius:6px;border:1px solid #21262d;overflow-x:auto"></pre>
+    </div>
+    <div class="mbtns"><button class="btn" onclick="g('hist-modal').style.display='none'">Close</button></div>
+  </div>
+</div>
+
 <div id="add-modal" class="modal">
   <div class="mbox">
     <h3 id="nm-h">Add Memory</h3>
@@ -638,7 +675,7 @@ function card(m) {
   const preview = (m.content||'').replace(/\\n/g,' ').slice(0,280);
   const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
   return \`<div class="card" data-id="\${m.id}">
-    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button></div>
+    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button></div>
     <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
     <div class="cc">\${esc(preview)}\${m.content.length>280?'…':''}</div>
   </div>\`;
@@ -1007,6 +1044,34 @@ async function deleteWebhook(id) {
   if (!confirm('Delete this webhook?')) return;
   await localFetch('/api/webhooks/'+id,{method:'DELETE'});
   loadWebhooks();
+}
+async function showHistory(memId) {
+  g('hist-diff').style.display='none';
+  g('hist-list').innerHTML='<p class="empty">Loading…</p>';
+  g('hist-modal').style.display='flex';
+  const vs = await api('/api/memories/'+memId+'/versions');
+  if (!vs.length) { g('hist-list').innerHTML='<p class="empty">No prior versions — history is recorded after each edit.</p>'; return; }
+  const fmt = ts => new Date(ts).toLocaleString();
+  g('hist-list').innerHTML = vs.map(v=>\`<div class="card" style="display:flex;align-items:center;gap:10px;padding:8px 12px">
+    <div style="flex:1"><div style="font-size:13px">\${esc(v.title)}</div><div style="font-size:11px;color:#8b949e">\${fmt(v.snapshot_at)}</div></div>
+    <button class="btn" style="font-size:11px;padding:3px 8px" onclick="showDiff(\${v.id})">View diff</button>
+  </div>\`).join('');
+}
+async function showDiff(versionId) {
+  const d = await api('/api/versions/'+versionId+'/diff');
+  const lines = d.diff.map(op => {
+    if (op.type==='add') return \`\x1b[32m+ \${op.text}\x1b[0m\`;
+    if (op.type==='del') return \`\x1b[31m- \${op.text}\x1b[0m\`;
+    return \`  \${op.text}\`;
+  });
+  const colored = d.diff.map(op => {
+    const t = esc(op.text);
+    if (op.type==='add') return \`<span style="color:#3fb950;display:block">+ \${t}</span>\`;
+    if (op.type==='del') return \`<span style="color:#f85149;display:block">- \${t}</span>\`;
+    return \`<span style="color:#8b949e;display:block">  \${t}</span>\`;
+  }).join('');
+  g('hist-diff-out').innerHTML = colored;
+  g('hist-diff').style.display='block';
 }
 </script>
 </body></html>`;

@@ -47,9 +47,11 @@
 
 ## Phase 26 — Webhook Push Notifications — DONE ✅ (2026-11-20)
 
-## Phase 27 — Candidates
+## Phase 27 — Memory Versioning — DONE ✅ (2026-11-20)
 
-- **Memory versioning**: track content changes over time, diff view in dashboard
-- **Scheduled digests**: daily/weekly summary Slack/email of stale + new memories
-- **Memory templates**: pre-fill the add modal with type-specific field defaults
+## Phase 28 — Candidates
+
+- **Scheduled digests**: daily/weekly summary of stale + new memories (file or stdout)
+- **Memory templates**: pre-fill add modal with type-specific field defaults
 - **Full-text export to Obsidian**: sync memories as markdown vault notes with backlinks
+- **Tag analytics**: tag cloud, co-occurrence matrix, most-used tags dashboard widget

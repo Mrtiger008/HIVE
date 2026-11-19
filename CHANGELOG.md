@@ -1,5 +1,31 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 27 Complete
+
+**Phase 27: Memory Versioning**
+
+`src/db.js`:
+- Schema v8: `memory_versions` table (id, memory_id, title, content, snapshot_at) with index on (memory_id, snapshot_at DESC)
+
+`src/versions.js` (new):
+- `snapshot(memoryId, title, content)` — saves pre-edit snapshot when title or content changes
+- `list(memoryId)` — returns all versions newest-first (id, title, snapshot_at)
+- `get(versionId)` — full version row including content
+- `diff(textA, textB)` — LCS-based line diff returning `[{type:'add'|'del'|'eq', text}]`
+
+`src/server.js`:
+- `handleUpdateMemory`: auto-snapshots before any update that touches title or content
+- `GET /api/memories/:id/versions` — list version history for a memory
+- `GET /api/versions/:id/diff` — returns `{version, diff}` comparing snapshot to current content
+- Dashboard: "⏱ history" button on each memory card → modal with version list + inline coloured diff
+
+`src/hive.js`:
+- `hive versions <memory_id>` — list version history
+- `hive versions <memory_id> --diff <version_id>` — show line diff to current
+
+`tests/test-phase27.js`: 10/10 passing
+Full regression: 180/180 (Phases 10–27)
+
 ## 2026-11-20 — Phase 26 Complete
 
 **Phase 26: Webhook Push Notifications**
