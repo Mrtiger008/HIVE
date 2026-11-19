@@ -53,9 +53,11 @@
 
 ## Phase 29 — Memory Templates — DONE ✅ (2026-11-20)
 
-## Phase 30 — Candidates
+## Phase 30 — Knowledge Stats Dashboard — DONE ✅ (2026-11-20)
 
-- **Knowledge stats dashboard**: total memories, trust/type breakdown, growth over time
+## Phase 31 — Candidates
+
+- **Memory linking**: manually link two memories as related, predecessor, or supersedes
 - **Scheduled digests**: daily/weekly summary of stale + new memories (file or stdout)
 - **Full-text export to Obsidian**: sync memories as markdown vault notes with backlinks
-- **Memory linking**: manually link two memories as related, predecessor, or supersedes
+- **Search bookmarks**: save and name frequently used search queries

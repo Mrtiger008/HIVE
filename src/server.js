@@ -14,6 +14,7 @@ const webhooks         = require('./webhooks');
 const versions         = require('./versions');
 const tags             = require('./tags');
 const templates        = require('./templates');
+const kstats           = require('./stats');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -386,6 +387,7 @@ const ROUTES = {
   'GET /api/apikeys':        handleListKeys,
   'POST /api/apikeys':       handleCreateKey,
   'GET /api/templates':      (req, res) => json(res, templates.list()),
+  'GET /api/stats/full':     (req, res) => json(res, kstats.full()),
   'GET /api/tags/stats':     (req, res) => { const u = new URL(req.url,'http://l'); handleTagStats(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/webhooks':       handleListWebhooks,
   'POST /api/webhooks':      handleAddWebhook,
@@ -538,6 +540,7 @@ input{width:360px}
   <button onclick="show('apikeys',this)">API Keys</button>
   <button onclick="show('webhooks',this)">Webhooks</button>
   <button onclick="show('tagcloud',this)">Tags</button>
+  <button onclick="show('kstats',this)">Stats</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -621,6 +624,11 @@ input{width:360px}
   <div id="whl"><p class="empty">Loading webhooks…</p></div>
 </div>
 
+<div id="kstats" class="tab">
+  <div class="row" style="margin-bottom:16px"><button class="btn" onclick="loadKStats()">↺ Refresh</button></div>
+  <div id="ks-body"><p class="empty">Click Refresh to load stats.</p></div>
+</div>
+
 <div id="tagcloud" class="tab">
   <div class="row" style="margin-bottom:12px;gap:8px">
     <button class="btn" onclick="loadTagCloud()">↺ Refresh</button>
@@ -691,6 +699,7 @@ function show(id, btn) {
   if (id==='apikeys') loadKeys();
   if (id==='webhooks') loadWebhooks();
   if (id==='tagcloud') loadTagCloud();
+  if (id==='kstats') loadKStats();
 }
 
 function confBar(c) {
@@ -1101,6 +1110,60 @@ async function showHistory(memId) {
     <button class="btn" style="font-size:11px;padding:3px 8px" onclick="showDiff(\${v.id})">View diff</button>
   </div>\`).join('');
 }
+async function loadKStats() {
+  const d = await api('/api/stats/full');
+  const bar = (count, max, col) => {
+    const w = max ? Math.round((count/max)*180) : 0;
+    return \`<span style="display:inline-block;height:12px;width:\${w}px;background:\${col};border-radius:2px;vertical-align:middle;margin-right:6px"></span>\`;
+  };
+  const section = (title, rows, col) => {
+    if (!rows.length) return '';
+    const max = rows[0].count;
+    return \`<div style="margin-bottom:20px"><h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">\${title}</h4>
+      \${rows.map(r=>\`<div style="margin:4px 0;font-size:13px">\${bar(r.count,max,col)}<span style="color:#c9d1d9">\${esc(r.label)}</span><span style="color:#8b949e;margin-left:6px">\${r.count}</span></div>\`).join('')}
+    </div>\`;
+  };
+  // Sparkline canvas
+  const sparkId = 'ks-spark-'+Date.now();
+  const maxG = Math.max(...d.growth.map(g=>g.count), 1);
+  const html = \`
+    <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:20px">
+      \${[['Memories',d.total,'#58a6ff'],['Archived',d.archived,'#8b949e'],['Entities',d.entities,'#d2a8ff'],['Projects',d.projects,'#3fb950']].map(([l,v,c])=>\`
+        <div style="text-align:center;min-width:80px"><div style="font-size:28px;font-weight:700;color:\${c}">\${v}</div><div style="font-size:11px;color:#8b949e;margin-top:2px">\${l}</div></div>
+      \`).join('')}
+      <div style="text-align:center;min-width:80px"><div style="font-size:28px;font-weight:700;color:#ffa657">\${d.avgConf}</div><div style="font-size:11px;color:#8b949e;margin-top:2px">Avg confidence</div></div>
+      <div style="text-align:center;min-width:80px"><div style="font-size:28px;font-weight:700;color:#79c0ff">\${d.avgImportance}</div><div style="font-size:11px;color:#8b949e;margin-top:2px">Avg importance</div></div>
+    </div>
+    <div style="margin-bottom:20px">
+      <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Growth — last 30 days</h4>
+      <canvas id="\${sparkId}" width="600" height="60" style="max-width:100%;border:1px solid #21262d;border-radius:6px;background:#0d1117"></canvas>
+    </div>
+    <div style="display:flex;gap:32px;flex-wrap:wrap">
+      <div>\${section('By type',d.byType,'#58a6ff')}</div>
+      <div>\${section('By trust',d.byTrust,'#3fb950')}</div>
+      <div>\${section('By domain',d.byDomain,'#d2a8ff')}</div>
+    </div>\`;
+  g('ks-body').innerHTML = html;
+  // Draw sparkline
+  const cv = document.getElementById(sparkId);
+  if (cv) {
+    const ctx = cv.getContext('2d');
+    const W = cv.width, H = cv.height, pad = 6;
+    const step = (W - pad*2) / (d.growth.length - 1);
+    ctx.strokeStyle = '#58a6ff'; ctx.lineWidth = 1.5; ctx.beginPath();
+    d.growth.forEach((pt, i) => {
+      const x = pad + i * step;
+      const y = H - pad - ((pt.count / maxG) * (H - pad*2));
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    // Fill area under line
+    ctx.lineTo(pad + (d.growth.length-1)*step, H-pad);
+    ctx.lineTo(pad, H-pad); ctx.closePath();
+    ctx.fillStyle = 'rgba(88,166,255,0.12)'; ctx.fill();
+  }
+}
+
 let _tcTimer = null;
 async function loadTagCloud() {
   const d = await api('/api/tags/stats?limit=80');

@@ -724,6 +724,31 @@ const COMMANDS = {
     }
   },
 
+  'stats'() {
+    const s = require('./stats').full();
+    console.log('\n── HIVE Knowledge Stats ─────────────────');
+    console.log(`  Memories:      ${s.total}  (archived: ${s.archived})`);
+    console.log(`  Entities:      ${s.entities}`);
+    console.log(`  Projects:      ${s.projects}`);
+    console.log(`  Avg confidence:  ${s.avgConf}`);
+    console.log(`  Avg importance:  ${s.avgImportance}`);
+    if (s.byType.length) {
+      console.log('\n  By type:');
+      s.byType.forEach(r => console.log(`    ${r.label.padEnd(12)} ${r.count}`));
+    }
+    if (s.byTrust.length) {
+      console.log('\n  By trust:');
+      s.byTrust.forEach(r => console.log(`    ${r.label.padEnd(20)} ${r.count}`));
+    }
+    if (s.byDomain.length) {
+      console.log('\n  By domain:');
+      s.byDomain.forEach(r => console.log(`    ${r.label.padEnd(20)} ${r.count}`));
+    }
+    const added30 = s.growth.reduce((a, g) => a + g.count, 0);
+    console.log(`\n  Added last 30 days: ${added30}`);
+    console.log('──────────────────────────────────────────\n');
+  },
+
   'template'(args) {
     const { positional } = parseArgs(args);
     const t = require('./templates');
@@ -883,6 +908,9 @@ API key management:
   hive apikey list              List all API keys
   hive apikey create <name>     Generate a new Bearer token (shown once)
   hive apikey revoke <name>     Delete a key
+
+Knowledge stats:
+  hive stats                    Full knowledge base breakdown (type/trust/domain/growth)
 
 Memory templates:
   hive template list            List all built-in templates with their defaults

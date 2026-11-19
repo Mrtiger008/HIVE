@@ -1,5 +1,25 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 30 Complete
+
+**Phase 30: Knowledge Stats Dashboard**
+
+`src/stats.js` (new):
+- `full()` — returns `{total, archived, entities, projects, byType, byTrust, byDomain, avgConf, avgImportance, growth}`
+- `byType/byTrust/byDomain` — sorted DESC by count; domain capped at top 10
+- `growth` — 30-entry dense array `[{day, count}]` with zero-fill for days with no additions
+
+`src/server.js`:
+- `GET /api/stats/full` — full knowledge-base stats
+- Dashboard: Stats tab with totals cards (memories/archived/entities/projects/avgConf/avgImportance), 30-day growth sparkline (canvas, fill + stroke), and three CSS bar charts (by type, trust, domain)
+- `loadKStats()` builds and renders all panels on demand
+
+`src/hive.js`:
+- `hive stats` — full CLI breakdown: totals, by-type, by-trust, by-domain, 30-day additions
+
+`tests/test-phase30.js`: 10/10 passing
+Full regression: 210/210 (Phases 10–30)
+
 ## 2026-11-20 — Phase 29 Complete
 
 **Phase 29: Memory Templates**
