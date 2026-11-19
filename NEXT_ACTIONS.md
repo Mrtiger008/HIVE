@@ -11,17 +11,21 @@
 
 ## Phase 7 — Smart Briefings — DONE ✅ (2026-11-19)
 
-## Phase 8 — Entity Extraction / Auto-tagging (candidate)
+## Phase 8 — Entity Extraction / Auto-tagging — DONE ✅ (2026-11-20)
 
-Goal: Automatically extract entities (people, tools, concepts) from memory content on add/update and create graph links without manual `hive entity link` calls.
+## Phase 9 — Web Dashboard (candidate)
 
-Options:
-- Simple regex patterns for common entity types (email → person, URL → tool, `npm install X` → tool)
-- Keyword matching against existing entity names/aliases
-- Deferred: LLM-based extraction (adds latency/cost)
+Goal: Browser-based UI to explore memories, the knowledge graph, briefings, and patterns — no CLI required for daily use.
+
+Candidate features:
+- `/memories` — searchable list with filters (type, project, trust)
+- `/graph` — entity relationship visualization (D3 or plain SVG)
+- `/brief` — load and display last-briefing.md
+- `/patterns` — top keywords chart
+
+Implementation: single `server.js` (Node.js http) + vanilla JS frontend, no framework. Served from `src/server.js` on a local port.
 
 ## Upcoming decisions
 
-- Phase 8 scope: auto-extraction vs manual only (current)
-- UI: web dashboard for browsing memories and graph (Phase 9+ candidate)
-- Export: RSS/Atom feed of important memories for external consumption
+- Phase 9 scope: read-only dashboard vs full CRUD in browser
+- Phase 10: REST API layer for external integrations (Obsidian plugin, Alfred, etc.)

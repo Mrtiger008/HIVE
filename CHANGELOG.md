@@ -1,5 +1,32 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 8 Complete
+
+**Phase 8: Entity Extraction / Auto-tagging**
+
+`src/extract.js`:
+- `detectMentions(text)`: scans all entities (names + aliases), word-boundary regex, skips names < 3 chars, confidence = `min(0.9, 0.3 + name_length × 0.05)`
+- `extractAndLink(memoryId, { title, content })`: persists detected entities to `memory_entity_links`
+- `linkedEntities(memoryId)`: entities linked to a memory, sorted by confidence
+- `linkedMemories(entityId, { limit })`: active memories mentioning an entity
+- `backfill({ limit })`: processes memories without any entity links — safe to re-run (idempotent via `NOT EXISTS` check)
+
+`src/db.js`: schema v4 migration adds `memory_entity_links` table + `idx_mel_entity` index
+
+`src/memory.js`: auto-calls `extractAndLink` inside `add()` after every save — soft dependency (exception caught, never blocks write)
+
+CLI:
+- `hive extract <memory_id>` — detect and show entity mentions for one memory
+- `hive extract --all [--limit N]` — backfill all un-linked memories
+- `hive memory links <memory_id>` — show entities linked to a memory
+- `hive entity links <entity_id>` — show memories mentioning an entity
+
+Tests: 10/10 passing (`tests/test-extract.js`). All suites: 80/80 total. Git: 3f18139
+
+**Next**: Phase 9 candidate — Web dashboard (browse memories, graph, briefings in browser) or REST API layer
+
+---
+
 ## 2026-11-19 — Phase 7 Complete
 
 **Phase 7: Smart Briefings**
