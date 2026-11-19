@@ -43,6 +43,30 @@ function recordQuery(query) {
   } catch {}
 }
 
+function handleActivity(req, res, q) {
+  const limit = +(q.limit) || 50;
+  const rows = getDb().prepare(`
+    SELECT a.id, a.action, a.entity_type, a.entity_id, a.details, a.timestamp,
+           m.title AS memory_title
+    FROM audit_log a
+    LEFT JOIN memories m ON a.entity_id = m.id AND a.entity_type = 'memory'
+    ORDER BY a.timestamp DESC
+    LIMIT ?
+  `).all(limit);
+  const now = Date.now();
+  json(res, rows.map(r => {
+    const secs = Math.floor((now - r.timestamp) / 1000);
+    const time_ago = secs < 60 ? `${secs}s ago`
+      : secs < 3600 ? `${Math.floor(secs/60)}m ago`
+      : secs < 86400 ? `${Math.floor(secs/3600)}h ago`
+      : `${Math.floor(secs/86400)}d ago`;
+    let details_parsed = null;
+    try { details_parsed = JSON.parse(r.details); } catch { details_parsed = r.details; }
+    return { id: r.id, action: r.action, entity_type: r.entity_type, entity_id: r.entity_id,
+             title: r.memory_title || null, details: details_parsed, timestamp: r.timestamp, time_ago };
+  }));
+}
+
 function handleTags(req, res) {
   const rows = getDb().prepare("SELECT tags FROM memories WHERE status='active' AND tags IS NOT NULL AND tags != '[]'").all();
   const counts = {};
@@ -225,6 +249,7 @@ const ROUTES = {
   'GET /api/search':         handleSearch,
   'GET /api/search/history': handleSearchHistory,
   'GET /api/tags':           handleTags,
+  'GET /api/activity':       handleActivity,
   'GET /api/memories':  handleMemories,
   'POST /api/memories': handleAddMemory,
   'GET /api/patterns':  handlePatterns,
@@ -346,6 +371,7 @@ input{width:360px}
   <button onclick="show('graph',this)">Graph</button>
   <button onclick="show('projects',this)">Projects</button>
   <button onclick="show('review',this)">Review</button>
+  <button onclick="show('activity',this)">Activity</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -383,6 +409,7 @@ input{width:360px}
 </div>
 
 <div id="projects" class="tab"><div id="pl"><p class="empty">Loading…</p></div></div>
+<div id="activity" class="tab"><div id="al"><p class="empty">Loading…</p></div></div>
 <div id="review" class="tab"><div class="row"><button class="btn" onclick="loadReview()">Load Review Digest</button></div><div id="rv"><p class="empty">Click "Load Review Digest" to see memories due for review.</p></div></div>
 
 <div id="add-modal" class="modal">
@@ -417,6 +444,7 @@ function show(id, btn) {
   if (id==='graph') loadGraph();
   if (id==='projects') loadProjects();
   if (id==='review') loadReview();
+  if (id==='activity') loadActivity();
 }
 
 function card(m) {
@@ -495,6 +523,22 @@ async function reinforceMem(id, btn) {
   await fetch('/api/memories/'+id+'/reinforce', {method:'POST'});
   btn.textContent='✓';
   btn.disabled=true;
+}
+
+async function loadActivity() {
+  const d = await api('/api/activity?limit=50');
+  if (!d.length) { g('al').innerHTML='<p class="empty">No activity yet.</p>'; return; }
+  const ICONS = {CREATE:'✚',UPDATE:'✎',DELETE:'✕',REINFORCE:'↑',default:'·'};
+  const rows = d.map(e => {
+    const icon = ICONS[e.action] || ICONS.default;
+    const label = e.title ? \`<strong>\${esc(e.title)}</strong>\` : esc(e.entity_type+':'+e.entity_id.slice(0,8));
+    return \`<div class="card" style="display:flex;gap:12px;align-items:flex-start">
+      <span style="font-size:18px;min-width:24px;text-align:center">\${icon}</span>
+      <div style="flex:1"><div>\${label}</div>
+      <div class="cm"><span class="b bt">\${e.action}</span><span class="b br">\${e.entity_type}</span><span style="color:#8b949e;font-size:11px">\${e.time_ago}</span></div></div>
+    </div>\`;
+  });
+  g('al').innerHTML = rows.join('');
 }
 
 async function loadPat() {

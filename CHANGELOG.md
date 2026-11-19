@@ -1,5 +1,17 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 20 Complete
+
+**Phase 20: Activity Feed**
+
+`src/server.js`:
+- `GET /api/activity?limit=N` — reads `audit_log` LEFT JOIN `memories`, returns events newest-first with `action`, `entity_type`, `entity_id`, `title` (for memory events), `details` (parsed JSON), `timestamp`, and `time_ago` (human-readable: "5s ago", "3m ago", "2h ago", "1d ago")
+- Dashboard "Activity" tab: timeline cards with per-action icons (✚ CREATE, ✎ UPDATE, ✕ DELETE, ↑ REINFORCE), memory title linked, action/type badges, relative time
+
+Tests: 10/10 passing (`tests/test-phase20.js`). All suites: **190/190 total**.
+
+---
+
 ## 2026-11-20 — Phase 19 Complete
 
 **Phase 19: Memory Tags UI**
