@@ -1,0 +1,42 @@
+# Never commit
+.env
+*.key
+*.pem
+*.p12
+auth.json
+secrets.*
+credentials.*
+*_token*
+*_secret*
+*.cookie
+
+# Database (binary — keep backups separately)
+database/*.db-shm
+database/*.db-wal
+
+# Logs
+logs/*.log
+
+# Node
+node_modules/
+npm-debug.log*
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Source archive (may be large)
+sources/raw/
+
+# Temp
+*.tmp
+*.bak
+scratchpad/
