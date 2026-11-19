@@ -1,0 +1,153 @@
+'use strict';
+const Database = require('better-sqlite3');
+const path = require('path');
+const fs = require('fs');
+
+const DB_PATH = process.env.HIVE_DB || path.join(__dirname, '..', 'database', 'hive.db');
+const BACKUP_DIR = path.join(__dirname, '..', 'database', 'backups');
+
+let _db = null;
+
+function getDb() {
+  if (_db) return _db;
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+  _db = new Database(DB_PATH);
+  _db.pragma('journal_mode = WAL');
+  _db.pragma('foreign_keys = ON');
+  _initSchema(_db);
+  return _db;
+}
+
+function _initSchema(db) {
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS schema_version (
+      version    INTEGER PRIMARY KEY,
+      applied_at INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS projects (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      objective   TEXT,
+      description TEXT,
+      status      TEXT NOT NULL DEFAULT 'active',
+      domain      TEXT,
+      created_at  INTEGER NOT NULL,
+      updated_at  INTEGER NOT NULL,
+      tags        TEXT NOT NULL DEFAULT '[]'
+    );
+
+    CREATE TABLE IF NOT EXISTS memories (
+      id                   TEXT PRIMARY KEY,
+      title                TEXT NOT NULL,
+      content              TEXT NOT NULL,
+      memory_type          TEXT NOT NULL,
+      domain               TEXT,
+      project_id           TEXT,
+      created_at           INTEGER NOT NULL,
+      updated_at           INTEGER NOT NULL,
+      source               TEXT,
+      source_type          TEXT,
+      source_ref           TEXT,
+      confidence           REAL NOT NULL DEFAULT 0.5,
+      trust_level          TEXT NOT NULL DEFAULT 'OBSERVED',
+      status               TEXT NOT NULL DEFAULT 'active',
+      importance           INTEGER NOT NULL DEFAULT 5,
+      tags                 TEXT NOT NULL DEFAULT '[]',
+      valid_from           INTEGER,
+      valid_until          INTEGER,
+      supersedes           TEXT,
+      superseded_by        TEXT,
+      user_confirmed       INTEGER NOT NULL DEFAULT 0,
+      retrieval_keywords   TEXT,
+      FOREIGN KEY(project_id) REFERENCES projects(id)
+    );
+
+    CREATE TABLE IF NOT EXISTS entities (
+      id          TEXT PRIMARY KEY,
+      name        TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      description TEXT,
+      aliases     TEXT NOT NULL DEFAULT '[]',
+      created_at  INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS relationships (
+      id          TEXT PRIMARY KEY,
+      from_id     TEXT NOT NULL,
+      rel_type    TEXT NOT NULL,
+      to_id       TEXT NOT NULL,
+      valid_from  INTEGER,
+      valid_until INTEGER,
+      confidence  REAL NOT NULL DEFAULT 0.5,
+      notes       TEXT,
+      created_at  INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS sources (
+      id          TEXT PRIMARY KEY,
+      path        TEXT,
+      source_type TEXT,
+      hash        TEXT,
+      description TEXT,
+      created_at  INTEGER NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      action      TEXT NOT NULL,
+      entity_type TEXT NOT NULL,
+      entity_id   TEXT NOT NULL,
+      details     TEXT,
+      timestamp   INTEGER NOT NULL
+    );
+
+    CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
+      id UNINDEXED,
+      title,
+      content,
+      tags,
+      retrieval_keywords,
+      content='memories',
+      content_rowid='rowid',
+      tokenize='porter unicode61'
+    );
+
+    CREATE TRIGGER IF NOT EXISTS memories_ai AFTER INSERT ON memories BEGIN
+      INSERT INTO memories_fts(rowid, id, title, content, tags, retrieval_keywords)
+      VALUES (new.rowid, new.id, new.title, new.content, new.tags, COALESCE(new.retrieval_keywords, ''));
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS memories_ad AFTER DELETE ON memories BEGIN
+      INSERT INTO memories_fts(memories_fts, rowid, id, title, content, tags, retrieval_keywords)
+      VALUES ('delete', old.rowid, old.id, old.title, old.content, old.tags, COALESCE(old.retrieval_keywords, ''));
+    END;
+
+    CREATE TRIGGER IF NOT EXISTS memories_au AFTER UPDATE ON memories BEGIN
+      INSERT INTO memories_fts(memories_fts, rowid, id, title, content, tags, retrieval_keywords)
+      VALUES ('delete', old.rowid, old.id, old.title, old.content, old.tags, COALESCE(old.retrieval_keywords, ''));
+      INSERT INTO memories_fts(rowid, id, title, content, tags, retrieval_keywords)
+      VALUES (new.rowid, new.id, new.title, new.content, new.tags, COALESCE(new.retrieval_keywords, ''));
+    END;
+
+    CREATE INDEX IF NOT EXISTS idx_memories_type    ON memories(memory_type);
+    CREATE INDEX IF NOT EXISTS idx_memories_domain  ON memories(domain);
+    CREATE INDEX IF NOT EXISTS idx_memories_project ON memories(project_id);
+    CREATE INDEX IF NOT EXISTS idx_memories_status  ON memories(status);
+    CREATE INDEX IF NOT EXISTS idx_memories_trust   ON memories(trust_level);
+    CREATE INDEX IF NOT EXISTS idx_memories_updated ON memories(updated_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_rel_from         ON relationships(from_id);
+    CREATE INDEX IF NOT EXISTS idx_rel_to           ON relationships(to_id);
+  `);
+
+  const v = db.prepare('SELECT MAX(version) as v FROM schema_version').get();
+  if (!v.v) {
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (1, ?)').run(Date.now());
+  }
+}
+
+function closeDb() {
+  if (_db) { _db.close(); _db = null; }
+}
+
+module.exports = { getDb, closeDb, DB_PATH, BACKUP_DIR };

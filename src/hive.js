@@ -1,0 +1,270 @@
+#!/usr/bin/env node
+'use strict';
+
+const memory   = require('./memory');
+const projects = require('./projects');
+const { search }    = require('./search');
+const { exportAll, backup } = require('./export');
+
+const [,, cmd, ...rawArgs] = process.argv;
+
+// Parse --flag value pairs and the first bare positional arg
+function parseArgs(args) {
+  const flags = {};
+  let positional = null;
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith('--')) {
+      const key = args[i].slice(2);
+      const next = args[i + 1];
+      if (next && !next.startsWith('--')) { flags[key] = next; i++; }
+      else { flags[key] = true; }
+    } else if (positional === null) {
+      positional = args[i];
+    }
+  }
+  return { flags, positional };
+}
+
+function fmt(m) {
+  const tags = Array.isArray(m.tags) ? m.tags.join(', ') : '';
+  return [
+    `ID:         ${m.id}`,
+    `Title:      ${m.title}`,
+    `Type:       ${m.memory_type}`,
+    `Trust:      ${m.trust_level}  confidence: ${m.confidence}`,
+    `Importance: ${m.importance}/10  status: ${m.status}`,
+    m.domain     ? `Domain:     ${m.domain}`     : null,
+    m.project_id ? `Project:    ${m.project_id}` : null,
+    tags         ? `Tags:       ${tags}`          : null,
+    m.source     ? `Source:     ${m.source}`      : null,
+    `Updated:    ${new Date(m.updated_at).toLocaleString()}`,
+    '',
+    m.content,
+  ].filter(l => l !== null).join('\n');
+}
+
+function fmtProject(p) {
+  return [
+    `ID:         ${p.id}`,
+    `Name:       ${p.name}`,
+    `Status:     ${p.status}`,
+    p.domain    ? `Domain:     ${p.domain}`    : null,
+    p.objective ? `Objective:  ${p.objective}` : null,
+    p.description ? `Description: ${p.description}` : null,
+    `Updated:    ${new Date(p.updated_at).toLocaleString()}`,
+  ].filter(l => l !== null).join('\n');
+}
+
+const COMMANDS = {
+
+  // ── memory ───────────────────────────────────────────────────────────────
+
+  'memory add'(args) {
+    const { flags } = parseArgs(args);
+    if (!flags.title || !flags.content) {
+      die('Usage: hive memory add --title "..." --content "..." [--type semantic] [--domain D] [--project ID] [--trust OBSERVED] [--importance 5] [--tags "t1,t2"] [--source "..."] [--keywords "..."]');
+    }
+    const m = memory.add({
+      title: flags.title,
+      content: flags.content,
+      memory_type: flags.type || 'semantic',
+      domain: flags.domain,
+      project_id: flags.project,
+      trust_level: flags.trust || 'OBSERVED',
+      importance: flags.importance ? +flags.importance : 5,
+      tags: flags.tags ? flags.tags.split(',').map(t => t.trim()).filter(Boolean) : [],
+      source: flags.source,
+      source_type: flags['source-type'],
+      retrieval_keywords: flags.keywords,
+    });
+    console.log('Memory created:\n');
+    console.log(fmt(m));
+  },
+
+  'memory get'(args) {
+    const { positional } = parseArgs(args);
+    if (!positional) die('Usage: hive memory get <id>');
+    const m = memory.get(positional);
+    if (!m) die(`Memory not found: ${positional}`);
+    console.log(fmt(m));
+  },
+
+  'memory update'(args) {
+    const { positional, flags } = parseArgs(args);
+    if (!positional) die('Usage: hive memory update <id> [--title] [--content] [--trust] [--importance] [--status] [--tags]');
+    const updates = {};
+    if (flags.title)      updates.title      = flags.title;
+    if (flags.content)    updates.content    = flags.content;
+    if (flags.trust)      updates.trust_level = flags.trust;
+    if (flags.importance) updates.importance = +flags.importance;
+    if (flags.status)     updates.status     = flags.status;
+    if (flags.domain)     updates.domain     = flags.domain;
+    if (flags.tags)       updates.tags       = flags.tags.split(',').map(t => t.trim()).filter(Boolean);
+    if (flags.keywords)   updates.retrieval_keywords = flags.keywords;
+    const m = memory.update(positional, updates);
+    console.log('Memory updated:\n');
+    console.log(fmt(m));
+  },
+
+  'memory delete'(args) {
+    const { positional } = parseArgs(args);
+    if (!positional) die('Usage: hive memory delete <id>');
+    const rl = require('readline').createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(`Delete memory ${positional}? (yes/no): `, ans => {
+      rl.close();
+      if (ans.trim().toLowerCase() === 'yes') {
+        memory.remove(positional);
+        console.log('Deleted.');
+      } else {
+        console.log('Cancelled.');
+      }
+    });
+  },
+
+  'memory list'(args) {
+    const { flags } = parseArgs(args);
+    const list = memory.list({
+      type: flags.type, domain: flags.domain, project_id: flags.project,
+      trust_level: flags.trust, status: flags.status,
+      limit: flags.limit ? +flags.limit : 20,
+    });
+    if (!list.length) { console.log('No memories found.'); return; }
+    for (const m of list) {
+      console.log(`[${m.id.slice(0,8)}] [${m.memory_type.padEnd(9)}] [${m.trust_level.padEnd(16)}] i=${m.importance} ${m.title}`);
+    }
+    console.log(`\n${list.length} result(s)`);
+  },
+
+  // ── search ────────────────────────────────────────────────────────────────
+
+  'search'(args) {
+    const { positional, flags } = parseArgs(args);
+    if (!positional) die('Usage: hive search "<query>" [--domain D] [--project ID] [--type T] [--limit 10]');
+    const results = search(positional, {
+      domain: flags.domain, project_id: flags.project,
+      type: flags.type, limit: flags.limit ? +flags.limit : 10,
+    });
+    if (!results.length) { console.log('No results.'); return; }
+    for (const m of results) {
+      const preview = m.content.replace(/\n/g, ' ').substring(0, 160);
+      console.log(`\n[${m.id.slice(0,8)}] [${m.memory_type}] [${m.trust_level}] ${m.title}`);
+      console.log(`  ${preview}${m.content.length > 160 ? '…' : ''}`);
+    }
+    console.log(`\n${results.length} result(s)`);
+  },
+
+  // ── project ───────────────────────────────────────────────────────────────
+
+  'project create'(args) {
+    const { flags } = parseArgs(args);
+    if (!flags.name) die('Usage: hive project create --name "..." [--objective "..."] [--domain "..."] [--description "..."]');
+    const p = projects.create({
+      name: flags.name, objective: flags.objective,
+      description: flags.description, domain: flags.domain,
+    });
+    console.log('Project created:\n');
+    console.log(fmtProject(p));
+  },
+
+  'project list'(args) {
+    const { flags } = parseArgs(args);
+    const list = projects.list({ status: flags.status, domain: flags.domain });
+    if (!list.length) { console.log('No projects found.'); return; }
+    for (const p of list) {
+      console.log(`[${p.id.slice(0,8)}] [${p.status.padEnd(10)}] ${p.name}${p.domain ? `  (${p.domain})` : ''}`);
+    }
+  },
+
+  'project get'(args) {
+    const { positional } = parseArgs(args);
+    if (!positional) die('Usage: hive project get <id>');
+    const p = projects.get(positional);
+    if (!p) die(`Project not found: ${positional}`);
+    console.log(fmtProject(p));
+    const mems = memory.list({ project_id: p.id, limit: 5 });
+    if (mems.length) {
+      console.log('\nRecent memories:');
+      for (const m of mems) console.log(`  [${m.id.slice(0,8)}] [i=${m.importance}] ${m.title}`);
+    }
+  },
+
+  'project update'(args) {
+    const { positional, flags } = parseArgs(args);
+    if (!positional) die('Usage: hive project update <id> [--name] [--status active|paused|completed|archived] [--objective] [--domain]');
+    const updates = {};
+    if (flags.name)        updates.name        = flags.name;
+    if (flags.status)      updates.status      = flags.status;
+    if (flags.objective)   updates.objective   = flags.objective;
+    if (flags.description) updates.description = flags.description;
+    if (flags.domain)      updates.domain      = flags.domain;
+    const p = projects.update(positional, updates);
+    console.log('Project updated:\n');
+    console.log(fmtProject(p));
+  },
+
+  // ── utility ───────────────────────────────────────────────────────────────
+
+  'export'() {
+    console.log('Exporting all active memories to Markdown…');
+    const count = exportAll();
+    console.log(`Done — ${count} memories written to memory/`);
+  },
+
+  'backup'() {
+    console.log('Creating backup…');
+    const dest = backup();
+    console.log(`Backup saved: ${dest}`);
+  },
+
+  'help'() {
+    console.log(`
+HIVE — Personal AI Knowledge & Memory System
+
+Memory commands:
+  hive memory add     --title "…" --content "…" [--type TYPE] [--domain D] [--project ID]
+                      [--trust LEVEL] [--importance N] [--tags "t1,t2"] [--source "…"] [--keywords "…"]
+  hive memory get     <id>
+  hive memory update  <id>  [--title] [--content] [--trust] [--importance] [--status] [--tags] [--domain] [--keywords]
+  hive memory delete  <id>
+  hive memory list    [--type TYPE] [--domain D] [--project ID] [--trust LEVEL] [--status S] [--limit N]
+
+Search:
+  hive search "<query>"  [--domain D] [--project ID] [--type T] [--limit N]
+
+Project commands:
+  hive project create --name "…" [--objective "…"] [--domain "…"] [--description "…"]
+  hive project list   [--status active|paused|completed|archived] [--domain D]
+  hive project get    <id>
+  hive project update <id>  [--name] [--status] [--objective] [--description] [--domain]
+
+Utility:
+  hive export    Export all active memories to Markdown files
+  hive backup    Create a timestamped SQLite backup
+  hive help      Show this help
+
+Memory types:  core | domain | project | episodic | semantic | skill
+Trust levels:  USER_CONFIRMED | SOURCE_VERIFIED | OBSERVED | INFERRED | AI_HYPOTHESIS | CONFLICTED | OUTDATED | UNKNOWN
+`);
+  },
+};
+
+function die(msg) {
+  console.error(msg);
+  process.exit(1);
+}
+
+// Dispatch: try two-word command first, then single-word
+function main() {
+  if (!cmd) { COMMANDS.help(); return; }
+  const twoWord = `${cmd} ${rawArgs[0]}`;
+  if (COMMANDS[twoWord]) { COMMANDS[twoWord](rawArgs.slice(1)); return; }
+  if (COMMANDS[cmd])     { COMMANDS[cmd](rawArgs); return; }
+  die(`Unknown command: ${cmd}\nRun "hive help" for available commands.`);
+}
+
+try {
+  main();
+} catch (err) {
+  console.error(`Error: ${err.message}`);
+  process.exit(1);
+}

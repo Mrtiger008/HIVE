@@ -1,0 +1,21 @@
+{
+  "name": "hive",
+  "version": "0.1.0",
+  "description": "Personal AI Knowledge, Memory & Learning System",
+  "main": "src/hive.js",
+  "bin": {
+    "hive": "./src/hive.js"
+  },
+  "scripts": {
+    "test": "node tests/test.js",
+    "backup": "node src/hive.js backup",
+    "export": "node src/hive.js export"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "UNLICENSED"
+}
