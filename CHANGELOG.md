@@ -1,5 +1,30 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 25 Complete
+
+**Phase 25: Duplicate Detection**
+
+`src/dedupe.js` (new):
+- `tokenize(text)` — lowercases and extracts ≥3-char word tokens into a Set
+- `jaccard(a, b)` — intersection / union on two word-token Sets
+- `similarity(titleA, contentA, titleB, contentB)` — weighted score: title 60%, content 40%
+- `findSimilar(title, content, {threshold=0.25, limit=5})` — compares against all active memories via `memory.list`, returns matches sorted by `_score` descending
+
+`src/server.js`:
+- `GET /api/memories/similar?title=...&content=...&threshold=0.25&limit=5` — returns `[{id, title, memory_type, score}]`; empty string → `[]`; registered in ROUTES before dynamic `:id` regex
+- Dashboard add modal: duplicate warning panel (`id="nm-dup"`) with match list and purple border; appears if any match ≥ threshold before saving
+- `submitAdd()` split into `_buildPayload()` + `_doSave()` + `saveAnyway()` — dedup check only on new memories (not edits)
+- `saveAnyway()` skips dedup check and saves directly
+- `closeAdd()` also hides the dup panel on cancel
+
+`src/hive.js` — `hive memory add`:
+- Checks `findSimilar` before inserting (threshold 0.25); prints warning with score + title + id prefix
+- Exits 1 if duplicates found unless `--force` flag is passed
+
+Tests: 10/10 passing (`tests/test-phase25.js`). All suites: **250/250 total**.
+
+---
+
 ## 2026-11-20 — Phase 24 Complete
 
 **Phase 24: Enhanced Graph Visualization**

@@ -82,7 +82,17 @@ const COMMANDS = {
   'memory add'(args) {
     const { flags } = parseArgs(args);
     if (!flags.title || !flags.content) {
-      die('Usage: hive memory add --title "..." --content "..." [--type semantic] [--domain D] [--project ID] [--trust OBSERVED] [--importance 5] [--tags "t1,t2"] [--source "..."] [--keywords "..."]');
+      die('Usage: hive memory add --title "..." --content "..." [--type semantic] [--domain D] [--project ID] [--trust OBSERVED] [--importance 5] [--tags "t1,t2"] [--source "..."] [--keywords "..."] [--force]');
+    }
+    if (!flags.force) {
+      const { findSimilar } = require('./dedupe');
+      const dups = findSimilar(flags.title, flags.content, { threshold: 0.25, limit: 3 });
+      if (dups.length) {
+        console.warn('\n⚠  Similar memories found (use --force to save anyway):\n');
+        dups.forEach(d => console.warn(`  ${Math.round(d._score * 100)}%  [${d.memory_type}] ${d.title}  (${d.id.slice(0, 8)})`));
+        console.warn('');
+        process.exit(1);
+      }
     }
     const m = memory.add({
       title: flags.title,

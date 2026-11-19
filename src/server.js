@@ -271,6 +271,17 @@ async function handleBulk(req, res) {
   json(res, { count });
 }
 
+function handleSimilar(req, res, q) {
+  const { findSimilar } = require('./dedupe');
+  const title     = q.title   || '';
+  const content   = q.content || '';
+  const threshold = q.threshold != null ? +q.threshold : 0.25;
+  const limit     = +(q.limit) || 5;
+  if (!title.trim() && !content.trim()) { json(res, []); return; }
+  json(res, findSimilar(title, content, { threshold, limit })
+    .map(m => ({ id: m.id, title: m.title, memory_type: m.memory_type, score: +m._score.toFixed(3) })));
+}
+
 function handleListKeys(req, res) {
   json(res, apikeys.list().map(k => ({
     id: k.id, name: k.name,
@@ -307,9 +318,10 @@ const ROUTES = {
   'GET /api/search/history': handleSearchHistory,
   'GET /api/tags':           handleTags,
   'GET /api/activity':       handleActivity,
-  'GET /api/memories':       handleMemories,
-  'POST /api/memories':      handleAddMemory,
-  'POST /api/memories/bulk': handleBulk,
+  'GET /api/memories':         handleMemories,
+  'GET /api/memories/similar': handleSimilar,
+  'POST /api/memories':        handleAddMemory,
+  'POST /api/memories/bulk':   handleBulk,
   'GET /api/patterns':       handlePatterns,
   'GET /api/graph':          handleGraph,
   'GET /api/entities':       handleEntities,
@@ -539,6 +551,14 @@ input{width:360px}
     <div class="f"><label>Confidence (0–1) <span style="font-weight:normal;color:#8b949e">how certain this is</span></label><input id="nm-cf" type="number" min="0" max="1" step="0.05" value="0.5" style="width:88px"></div>
     <div class="f"><label>Tags <span style="font-weight:normal;color:#8b949e">(comma-separated)</span></label><input id="nm-tg" style="width:100%" placeholder="e.g. javascript, async, todo"></div>
     <p id="nm-err" class="merr"></p>
+    <div id="nm-dup" style="display:none;margin:8px 0;padding:10px;background:#2d1f0a;border:1px solid #d2a8ff44;border-radius:6px;font-size:12px">
+      <strong style="color:#d2a8ff">⚠ Similar memories found:</strong>
+      <div id="nm-dup-list" style="margin-top:6px;color:#8b949e"></div>
+      <div style="margin-top:8px;display:flex;gap:8px">
+        <button class="btn" style="font-size:12px;padding:4px 10px" onclick="saveAnyway()">Save anyway</button>
+        <button class="btn" style="font-size:12px;padding:4px 10px" onclick="g('nm-dup').style.display='none'">Review first</button>
+      </div>
+    </div>
     <div class="mbtns">
       <button class="btn" onclick="closeAdd()">Cancel</button>
       <button class="btn" onclick="submitAdd()">Save</button>
@@ -841,19 +861,32 @@ function refreshStats() { api('/api/stats').then(d => g('stats').textContent = \
 let _editId = null;
 function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-cf').value='0.5'; g('nm-tg').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
 async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-cf').value=d.confidence!=null?d.confidence:0.5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
-function closeAdd() { g('add-modal').classList.remove('on'); }
-async function submitAdd() {
-  const title = g('nm-t').value.trim(), content = g('nm-c').value.trim();
-  if (!title || !content) { g('nm-err').textContent = 'Title and content are required.'; return; }
-  g('nm-err').textContent = '';
+function closeAdd() { g('add-modal').classList.remove('on'); g('nm-dup').style.display='none'; }
+function _buildPayload() {
   const rawTags = g('nm-tg').value.split(',').map(t=>t.trim()).filter(Boolean);
-  const payload = { title, content, memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value, confidence: +g('nm-cf').value, tags: rawTags };
+  return { title: g('nm-t').value.trim(), content: g('nm-c').value.trim(), memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value, confidence: +g('nm-cf').value, tags: rawTags };
+}
+async function _doSave(payload) {
   const r = _editId
     ? await fetch('/api/memories/'+_editId, { method:'PUT',  headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
     : await fetch('/api/memories',           { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
-  if (!r.ok) { const e = await r.json(); g('nm-err').textContent = e.error || 'Save failed.'; return; }
-  g('nm-t').value = ''; g('nm-c').value = '';
-  closeAdd(); loadMem(); refreshStats(); loadTagSelect();
+  if (!r.ok) { const e = await r.json(); g('nm-err').textContent = e.error || 'Save failed.'; return false; }
+  closeAdd(); loadMem(); refreshStats(); loadTagSelect(); return true;
+}
+async function saveAnyway() { await _doSave(_buildPayload()); }
+async function submitAdd() {
+  const payload = _buildPayload();
+  if (!payload.title || !payload.content) { g('nm-err').textContent = 'Title and content are required.'; return; }
+  g('nm-err').textContent = ''; g('nm-dup').style.display='none';
+  // Only check duplicates on new memories, not edits
+  if (!_editId) {
+    const dups = await fetch('/api/memories/similar?title='+encodeURIComponent(payload.title)+'&content='+encodeURIComponent(payload.content.slice(0,500))).then(r=>r.json());
+    if (dups.length) {
+      g('nm-dup-list').innerHTML = dups.map(d=>\`<div>· <strong>\${esc(d.title)}</strong> <span style="color:#d2a8ff">\${Math.round(d.score*100)}% similar</span></div>\`).join('');
+      g('nm-dup').style.display='block'; return;
+    }
+  }
+  await _doSave(payload);
 }
 async function archiveMem(id, btn) {
   btn.textContent = '…';
