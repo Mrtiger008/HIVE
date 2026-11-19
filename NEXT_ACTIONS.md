@@ -2,25 +2,27 @@
 
 ## Phase 1 — DONE ✅
 ## Phase 2 — DONE ✅ (2026-11-19)
+## Phase 3 — DONE ✅ (2026-11-19)
 
-## Phase 3 — Knowledge Graph (next)
+## Phase 4 — Session Capture (next)
 
-Goal: Entities, relationships, and provenance graph over memories.
+Goal: Automatically capture useful knowledge from Claude Code sessions into HIVE.
 
 Key tasks:
-1. `src/entities.js` — CRUD for the `entities` table (name, type, attributes)
-2. `src/relationships.js` — CRUD for `relationships` table (subject, predicate, object)
-3. Entity extraction from memory content (simple rule-based, no LLM required for MVP)
-4. Graph traversal: given an entity, fetch related memories and connected entities
-5. `hive entity list/get`, `hive relationship list` CLI commands
-6. Tests: entity creation, relationship traversal, entity extraction
+1. Research Claude Code hook capabilities (PostToolUse, Stop events)
+2. Hook script: `hooks/session-capture.js` — write session events to `logs/sessions/`
+3. Session metadata indexer: parse session logs, extract decisions/corrections/state changes
+4. Memory extraction: auto-propose memories from session content (user confirms before storing)
+5. `hive session import <log-path>` — manual import command
+6. claude-mem ingestion: `hive ingest` reads claude-mem observations, converts to HIVE memories
+7. Project state auto-update at session end
+8. Tests: session capture, memory extraction, dedup against existing memories
 
 ## Upcoming decisions
 
-- Semantic/vector search: transformers.js (~80MB pure JS) or Python-based — still deferred
-- Whether to backfill claude-mem observations into HIVE (Phase 4 integration)
-- Entity extraction: rule-based regex patterns vs NLP library vs LLM-assisted
+- Semantic/vector search: transformers.js (~80MB pure JS) vs Python-based bridge — still deferred
+- Entity extraction: auto-extract entities from memory content (Phase 5 candidate)
 
 ## Blocked on
 
-Nothing. Phase 3 can start immediately.
+Nothing. Phase 4 can start immediately.

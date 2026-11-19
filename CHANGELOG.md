@@ -1,5 +1,27 @@
 # CHANGELOG.md
 
+## 2026-11-19 — Phase 3 Complete
+
+**Phase 3: Knowledge Graph**
+
+`src/entities.js` — entity CRUD:
+- 8 entity types: person, tool, org, concept, project, file, domain, other
+- `findByName()`: case-insensitive fuzzy search on name + JSON aliases array; exact name ranks first
+- `merge(keepId, dropId)`: reroutes all relationships from dropped entity to kept entity, then deletes it
+
+`src/graph.js` — relationship CRUD + traversal:
+- `link({ from_id, rel_type, to_id, ... })`: creates typed directed relationship (validates both endpoints)
+- `neighbors(entityId, { direction, relType, limit })`: adjacent entities with rel metadata; supports out/in/both + relType filter
+- `relatedMemories(entityId)`: FTS5 search across all memories using entity name and aliases
+
+`hive entity add/get/list/find/link/merge`, `hive graph neighbors/related` — new CLI commands
+
+Tests: 10/10 passing (`tests/test-graph.js`). All suites: 30/30 total. Git: 183f7be
+
+**Next**: Phase 4 — Session Capture (hook-based capture, claude-mem ingestion)
+
+---
+
 ## 2026-11-19 — Phase 2 Complete
 
 **Phase 2: Retrieval Engine / Context Router**
