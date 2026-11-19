@@ -1,5 +1,21 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 11 Complete
+
+**Phase 11: Graph Visualization**
+
+`src/server.js`:
+- `GET /api/graph?limit=N` — returns `{ nodes: [...], edges: [...] }` from the entities + relationships tables; edges filtered to only reference returned nodes
+- Dashboard "**Graph**" tab: pure-canvas force-directed graph, no CDN dependency
+  - Spring physics: node repulsion (3000/d²) + edge attraction (rest length 120) + center gravity
+  - Color-coded by entity type (8 types), legend auto-built from returned data
+  - Drag nodes to reposition; `requestAnimationFrame` loop stopped when leaving tab
+  - Label truncation at 18 chars; empty-state message when no entities exist
+
+Tests: 10/10 passing (`tests/test-phase11.js`). All suites: **110/110 total**.
+
+---
+
 ## 2026-11-20 — Phase 10 Complete
 
 **Phase 10: Write API + Auto-embed**

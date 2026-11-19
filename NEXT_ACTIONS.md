@@ -17,7 +17,9 @@
 
 ## Phase 10 — Write API + Auto-embed — DONE ✅ (2026-11-20)
 
-## Phase 11 — Candidates
+## Phase 11 — Graph Visualization — DONE ✅ (2026-11-20)
+
+## Phase 12 — Candidates
 
 - **REST API + integrations**: Obsidian plugin, Alfred workflow, Raycast extension
 - **Graph visualization**: D3 force-directed entity relationship graph in the dashboard

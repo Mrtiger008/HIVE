@@ -65,6 +65,16 @@ function handleEntities(req, res, q) {
   json(res, rows.map(e => ({ ...e, aliases: JSON.parse(e.aliases || '[]') })));
 }
 
+function handleGraph(req, res, q) {
+  const db = getDb();
+  const limit = +(q.limit) || 100;
+  const nodes = db.prepare('SELECT id, name, entity_type FROM entities ORDER BY created_at DESC LIMIT ?').all(limit);
+  const nodeIds = new Set(nodes.map(n => n.id));
+  const edges = db.prepare('SELECT from_id, to_id, rel_type, confidence FROM relationships').all()
+    .filter(r => nodeIds.has(r.from_id) && nodeIds.has(r.to_id));
+  json(res, { nodes, edges });
+}
+
 function handleProjects(req, res) {
   json(res, projects.list({ status: 'active', limit: 50 }));
 }
@@ -113,6 +123,7 @@ const ROUTES = {
   'GET /api/memories':  handleMemories,
   'POST /api/memories': handleAddMemory,
   'GET /api/patterns':  handlePatterns,
+  'GET /api/graph':     handleGraph,
   'GET /api/entities':  handleEntities,
   'GET /api/projects':  handleProjects,
   'GET /api/brief':     handleBrief,
@@ -197,6 +208,10 @@ input{width:360px}
 .merr{color:#f85149;font-size:12px;margin:4px 0 0}
 .arch{background:none;border:none;color:#484f58;cursor:pointer;font-size:11px;float:right;padding:0}
 .arch:hover{color:#f85149}
+#gc{display:block;background:#0d1117;border-radius:8px;cursor:grab}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.lk{display:flex;align-items:center;gap:5px;font-size:12px;color:#8b949e}
+.lc{width:10px;height:10px;border-radius:50%;flex-shrink:0}
 </style></head>
 <body>
 <header><h1>&#x1F9E0; HIVE</h1><span id="stats">loading…</span></header>
@@ -206,6 +221,7 @@ input{width:360px}
   <button onclick="show('briefing',this)">Briefing</button>
   <button onclick="show('patterns',this)">Patterns</button>
   <button onclick="show('entities',this)">Entities</button>
+  <button onclick="show('graph',this)">Graph</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -233,6 +249,11 @@ input{width:360px}
 
 <div id="patterns" class="tab"><div id="pc"></div></div>
 <div id="entities" class="tab"><div id="el"></div></div>
+<div id="graph" class="tab">
+  <div id="gleg" class="legend"></div>
+  <canvas id="gc"></canvas>
+  <p id="gmt" class="empty" style="display:none">No entities yet — add some via the CLI or the Memories tab.</p>
+</div>
 
 <div id="add-modal" class="modal">
   <div class="mbox">
@@ -262,6 +283,7 @@ function show(id, btn) {
   if (id==='patterns') loadPat();
   if (id==='entities') loadEnt();
   if (id==='memories') loadMem();
+  if (id==='graph') loadGraph();
 }
 
 function card(m) {
@@ -308,6 +330,43 @@ async function loadEnt() {
   const d = await api('/api/entities?limit=100');
   if (!d.length) { g('el').innerHTML='<p class="empty">No entities yet.</p>'; return; }
   g('el').innerHTML = d.map(e=>\`<div class="card"><div class="ct">\${esc(e.name)}</div><div class="cm"><span class="b bt">\${e.entity_type}</span>\${e.aliases.length?' · '+e.aliases.join(', '):''}</div>\${e.description?\`<div class="cc">\${esc(e.description)}</div>\`:''}</div>\`).join('');
+}
+
+let gStop = null;
+async function loadGraph() {
+  if (gStop) { gStop(); gStop = null; }
+  const data = await api('/api/graph?limit=100');
+  const gc = g('gc'), gmt = g('gmt');
+  if (!data.nodes.length) { gmt.style.display='block'; gc.style.display='none'; return; }
+  gmt.style.display='none'; gc.style.display='block';
+  const C = {person:'#58a6ff',tool:'#3fb950',org:'#d2a8ff',concept:'#f0883e',project:'#79c0ff',file:'#ffa657',domain:'#ff7b72',other:'#8b949e'};
+  const types = [...new Set(data.nodes.map(n=>n.entity_type))];
+  g('gleg').innerHTML = types.map(t=>'<div class="lk"><div class="lc" style="background:'+(C[t]||'#8b949e')+'"></div>'+esc(t)+'</div>').join('');
+  const W = gc.width = gc.parentElement.clientWidth - 48 || 800;
+  const H = gc.height = 500;
+  const ctx = gc.getContext('2d');
+  const ns = data.nodes.map(n=>({...n,x:W/2+(Math.random()-.5)*300,y:H/2+(Math.random()-.5)*300,vx:0,vy:0}));
+  const nm = {};
+  ns.forEach(n=>{nm[n.id]=n;});
+  const es = data.edges.filter(e=>nm[e.from_id]&&nm[e.to_id]);
+  let drag = null;
+  gc.onmousedown=e=>{const r=gc.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;drag=ns.find(n=>Math.hypot(n.x-mx,n.y-my)<10)||null;if(drag)drag.fixed=true;};
+  gc.onmousemove=e=>{if(!drag)return;const r=gc.getBoundingClientRect();drag.x=e.clientX-r.left;drag.y=e.clientY-r.top;};
+  gc.onmouseup=()=>{if(drag){drag.fixed=false;drag=null;}};
+  let raf;
+  function tick(){
+    for(let i=0;i<ns.length;i++)for(let j=i+1;j<ns.length;j++){const a=ns[i],b=ns[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=3000/(d*d);a.vx-=dx/d*f;a.vy-=dy/d*f;b.vx+=dx/d*f;b.vy+=dy/d*f;}
+    for(const e of es){const a=nm[e.from_id],b=nm[e.to_id],dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=(d-120)*.03;a.vx+=dx/d*f;a.vy+=dy/d*f;b.vx-=dx/d*f;b.vy-=dy/d*f;}
+    for(const n of ns){n.vx+=(W/2-n.x)*.002;n.vy+=(H/2-n.y)*.002;}
+    for(const n of ns){if(n.fixed)continue;n.vx*=.85;n.vy*=.85;n.x=Math.max(20,Math.min(W-20,n.x+n.vx));n.y=Math.max(20,Math.min(H-20,n.y+n.vy));}
+    ctx.clearRect(0,0,W,H);
+    ctx.strokeStyle='#30363d';ctx.lineWidth=1;
+    for(const e of es){const a=nm[e.from_id],b=nm[e.to_id];ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
+    for(const n of ns){ctx.fillStyle=C[n.entity_type]||'#8b949e';ctx.beginPath();ctx.arc(n.x,n.y,8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#c9d1d9';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.fillText(n.name.length>18?n.name.slice(0,17)+'...':n.name,n.x,n.y+20);}
+    raf=requestAnimationFrame(tick);
+  }
+  tick();
+  gStop=()=>cancelAnimationFrame(raf);
 }
 
 function refreshStats() { api('/api/stats').then(d => g('stats').textContent = \`\${d.memories} memories · \${d.entities} entities · \${d.projects} projects\`); }
