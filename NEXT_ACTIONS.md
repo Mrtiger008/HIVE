@@ -41,9 +41,11 @@
 
 ## Phase 23 — Memory Confidence Scores — DONE ✅ (2026-11-20)
 
-## Phase 24 — Candidates
+## Phase 24 — Enhanced Graph Visualization — DONE ✅ (2026-11-20)
 
-- **Graph visualization**: D3 force-directed entity relationship graph in dashboard (replace canvas stub)
+## Phase 25 — Candidates
+
 - **Webhook / push notifications**: POST to a configured URL when memories are added/updated
 - **Memory versioning**: track content changes over time, diff view in dashboard
 - **Duplicate detection**: warn before adding a memory too similar to an existing one
+- **Scheduled digests**: daily/weekly summary email or Slack of stale + new memories

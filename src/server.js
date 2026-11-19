@@ -133,11 +133,23 @@ function handleEntities(req, res, q) {
 function handleGraph(req, res, q) {
   const db = getDb();
   const limit = +(q.limit) || 100;
-  const nodes = db.prepare('SELECT id, name, entity_type FROM entities ORDER BY created_at DESC LIMIT ?').all(limit);
+  let sql = 'SELECT id, name, entity_type FROM entities WHERE 1=1';
+  const params = [];
+  if (q.type)   { sql += ' AND entity_type = ?'; params.push(q.type); }
+  if (q.search) { sql += ' AND name LIKE ?';     params.push(`%${q.search}%`); }
+  sql += ' ORDER BY created_at DESC LIMIT ?';
+  params.push(limit);
+  const nodes = db.prepare(sql).all(...params);
   const nodeIds = new Set(nodes.map(n => n.id));
   const edges = db.prepare('SELECT from_id, to_id, rel_type, confidence FROM relationships').all()
     .filter(r => nodeIds.has(r.from_id) && nodeIds.has(r.to_id));
-  json(res, { nodes, edges });
+  // attach degree count so frontend can size nodes
+  const degree = {};
+  for (const e of edges) {
+    degree[e.from_id] = (degree[e.from_id] || 0) + 1;
+    degree[e.to_id]   = (degree[e.to_id]   || 0) + 1;
+  }
+  json(res, { nodes: nodes.map(n => ({ ...n, degree: degree[n.id] || 0 })), edges });
 }
 
 function handleProjects(req, res) {
@@ -483,8 +495,19 @@ input{width:360px}
 <div id="patterns" class="tab"><div id="pc"></div></div>
 <div id="entities" class="tab"><div id="el"></div></div>
 <div id="graph" class="tab">
+  <div class="row" style="margin-bottom:12px;gap:8px">
+    <input id="g-search" placeholder="Filter by name…" style="width:200px" oninput="loadGraph()">
+    <select id="g-type" onchange="loadGraph()"><option value="">All types</option><option>person</option><option>tool</option><option>org</option><option>concept</option><option>project</option><option>file</option><option>domain</option><option>other</option></select>
+    <button class="btn" onclick="loadGraph()">↺ Refresh</button>
+    <button class="btn" onclick="fitGraph()">⤢ Fit</button>
+    <span id="g-count" style="font-size:12px;color:#8b949e;margin-left:4px"></span>
+  </div>
   <div id="gleg" class="legend"></div>
-  <canvas id="gc"></canvas>
+  <div style="position:relative">
+    <canvas id="gc"></canvas>
+    <div id="g-tip" style="display:none;position:absolute;background:#161b22;border:1px solid #30363d;border-radius:6px;padding:8px 12px;font-size:12px;pointer-events:none;white-space:nowrap;z-index:10"></div>
+  </div>
+  <div id="g-info" style="display:none;padding:12px;background:#161b22;border:1px solid #21262d;border-radius:6px;margin-top:8px;font-size:13px"></div>
   <p id="gmt" class="empty" style="display:none">No entities yet — add some via the CLI or the Memories tab.</p>
 </div>
 
@@ -686,37 +709,128 @@ async function loadEnt() {
   g('el').innerHTML = d.map(e=>\`<div class="card"><div class="ct">\${esc(e.name)}</div><div class="cm"><span class="b bt">\${e.entity_type}</span>\${e.aliases.length?' · '+e.aliases.join(', '):''}</div>\${e.description?\`<div class="cc">\${esc(e.description)}</div>\`:''}</div>\`).join('');
 }
 
-let gStop = null;
+let gStop = null, gNodes = [], gOffset = {x:0,y:0}, gScale = 1;
+function fitGraph() {
+  if (!gNodes.length) return;
+  const xs = gNodes.map(n=>n.x), ys = gNodes.map(n=>n.y);
+  const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+  const gc = g('gc');
+  const W=gc.width, H=gc.height;
+  const pad=40, sw=(W-pad*2)/(maxX-minX||1), sh=(H-pad*2)/(maxY-minY||1);
+  gScale=Math.min(sw,sh,.95);
+  gOffset.x=W/2-((minX+maxX)/2)*gScale;
+  gOffset.y=H/2-((minY+maxY)/2)*gScale;
+}
 async function loadGraph() {
   if (gStop) { gStop(); gStop = null; }
-  const data = await api('/api/graph?limit=100');
-  const gc = g('gc'), gmt = g('gmt');
-  if (!data.nodes.length) { gmt.style.display='block'; gc.style.display='none'; return; }
+  let url = '/api/graph?limit=120';
+  const sr=g('g-search').value.trim(), ty=g('g-type').value;
+  if (sr) url += '&search='+encodeURIComponent(sr);
+  if (ty) url += '&type='+ty;
+  const data = await api(url);
+  const gc = g('gc'), gmt = g('gmt'), tip = g('g-tip'), info = g('g-info');
+  if (!data.nodes.length) { gmt.style.display='block'; gc.style.display='none'; info.style.display='none'; g('g-count').textContent=''; return; }
   gmt.style.display='none'; gc.style.display='block';
+  g('g-count').textContent = data.nodes.length+' nodes · '+data.edges.length+' edges';
   const C = {person:'#58a6ff',tool:'#3fb950',org:'#d2a8ff',concept:'#f0883e',project:'#79c0ff',file:'#ffa657',domain:'#ff7b72',other:'#8b949e'};
   const types = [...new Set(data.nodes.map(n=>n.entity_type))];
   g('gleg').innerHTML = types.map(t=>'<div class="lk"><div class="lc" style="background:'+(C[t]||'#8b949e')+'"></div>'+esc(t)+'</div>').join('');
-  const W = gc.width = gc.parentElement.clientWidth - 48 || 800;
-  const H = gc.height = 500;
+  const W = gc.width = gc.parentElement.clientWidth - 2 || 800;
+  const H = gc.height = 520;
   const ctx = gc.getContext('2d');
-  const ns = data.nodes.map(n=>({...n,x:W/2+(Math.random()-.5)*300,y:H/2+(Math.random()-.5)*300,vx:0,vy:0}));
-  const nm = {};
-  ns.forEach(n=>{nm[n.id]=n;});
+  gScale=1; gOffset={x:0,y:0};
+  const ns = data.nodes.map(n=>({...n,x:W/2+(Math.random()-.5)*300,y:H/2+(Math.random()-.5)*300,vx:0,vy:0,r:8+Math.min((n.degree||0)*2,10)}));
+  gNodes = ns;
+  const nm = {}; ns.forEach(n=>{nm[n.id]=n;});
   const es = data.edges.filter(e=>nm[e.from_id]&&nm[e.to_id]);
-  let drag = null;
-  gc.onmousedown=e=>{const r=gc.getBoundingClientRect(),mx=e.clientX-r.left,my=e.clientY-r.top;drag=ns.find(n=>Math.hypot(n.x-mx,n.y-my)<10)||null;if(drag)drag.fixed=true;};
-  gc.onmousemove=e=>{if(!drag)return;const r=gc.getBoundingClientRect();drag.x=e.clientX-r.left;drag.y=e.clientY-r.top;};
-  gc.onmouseup=()=>{if(drag){drag.fixed=false;drag=null;}};
-  let raf;
+  let drag=null, selId=null;
+  const neighOf = id => new Set(es.flatMap(e=>e.from_id===id?[e.to_id]:e.to_id===id?[e.from_id]:[]));
+
+  function toWorld(cx,cy){return{x:(cx-gOffset.x)/gScale,y:(cy-gOffset.y)/gScale};}
+  function hitNode(wx,wy){return ns.find(n=>Math.hypot(n.x-wx,n.y-wy)<n.r+4)||null;}
+
+  gc.onwheel=e=>{e.preventDefault();const f=e.deltaY<0?1.1:.91;const r=gc.getBoundingClientRect(),cx=e.clientX-r.left,cy=e.clientY-r.top;gOffset.x=cx-(cx-gOffset.x)*f;gOffset.y=cy-(cy-gOffset.y)*f;gScale*=f;};
+  gc.onmousedown=e=>{
+    const r=gc.getBoundingClientRect(),{x,y}=toWorld(e.clientX-r.left,e.clientY-r.top);
+    drag=hitNode(x,y);
+    if(drag){drag.fixed=true;}
+  };
+  gc.onmousemove=e=>{
+    const r=gc.getBoundingClientRect(),cx=e.clientX-r.left,cy=e.clientY-r.top,{x,y}=toWorld(cx,cy);
+    if(drag){drag.x=x;drag.y=y;return;}
+    const hn=hitNode(x,y);
+    if(hn){
+      tip.style.display='block';tip.style.left=(cx+12)+'px';tip.style.top=(cy-8)+'px';
+      tip.textContent=hn.name+' ['+hn.entity_type+'] · '+hn.degree+' connection'+(hn.degree===1?'':'s');
+      gc.style.cursor='pointer';
+    } else {tip.style.display='none';gc.style.cursor='default';}
+  };
+  gc.onmouseup=e=>{
+    if(drag){
+      const r=gc.getBoundingClientRect(),{x,y}=toWorld(e.clientX-r.left,e.clientY-r.top);
+      if(Math.hypot(drag.x-x,drag.y-y)<4){
+        selId=selId===drag.id?null:drag.id;
+        if(selId){
+          const nb=neighOf(selId);
+          const edgesOut=es.filter(e=>e.from_id===selId||e.to_id===selId);
+          info.style.display='block';
+          info.innerHTML='<strong style="color:#e6edf3">'+esc(drag.name)+'</strong> <span style="color:#8b949e">['+drag.entity_type+']</span> · '+drag.degree+' connection'+(drag.degree===1?'':'s')+
+            (edgesOut.length?'<br><span style="color:#8b949e;font-size:11px">→ '+edgesOut.map(e=>{const o=nm[e.from_id===selId?e.to_id:e.from_id];return'<b>'+esc(e.rel_type)+'</b> '+esc(o.name);}).join(' &nbsp;·&nbsp; ')+'</span>':'');
+        } else { info.style.display='none'; }
+      }
+      drag.fixed=false; drag=null;
+    }
+  };
+  gc.onmouseleave=()=>{tip.style.display='none';};
+
+  let raf, t=0;
   function tick(){
-    for(let i=0;i<ns.length;i++)for(let j=i+1;j<ns.length;j++){const a=ns[i],b=ns[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=3000/(d*d);a.vx-=dx/d*f;a.vy-=dy/d*f;b.vx+=dx/d*f;b.vy+=dy/d*f;}
-    for(const e of es){const a=nm[e.from_id],b=nm[e.to_id],dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1,f=(d-120)*.03;a.vx+=dx/d*f;a.vy+=dy/d*f;b.vx-=dx/d*f;b.vy-=dy/d*f;}
-    for(const n of ns){n.vx+=(W/2-n.x)*.002;n.vy+=(H/2-n.y)*.002;}
-    for(const n of ns){if(n.fixed)continue;n.vx*=.85;n.vy*=.85;n.x=Math.max(20,Math.min(W-20,n.x+n.vx));n.y=Math.max(20,Math.min(H-20,n.y+n.vy));}
+    t++;
+    const cool=Math.max(.3,1-t/300);
+    for(let i=0;i<ns.length;i++)for(let j=i+1;j<ns.length;j++){
+      const a=ns[i],b=ns[j],dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1;
+      const f=4000/(d*d)*cool;
+      a.vx-=dx/d*f;a.vy-=dy/d*f;b.vx+=dx/d*f;b.vy+=dy/d*f;
+    }
+    for(const e of es){
+      const a=nm[e.from_id],b=nm[e.to_id],dx=b.x-a.x,dy=b.y-a.y,d=Math.sqrt(dx*dx+dy*dy)||1;
+      const ideal=100+(a.r+b.r),f=(d-ideal)*.04;
+      a.vx+=dx/d*f;a.vy+=dy/d*f;b.vx-=dx/d*f;b.vy-=dy/d*f;
+    }
+    const cx=W/2,cy=H/2;
+    for(const n of ns){n.vx+=(cx-n.x)*.001;n.vy+=(cy-n.y)*.001;}
+    for(const n of ns){if(n.fixed)continue;n.vx*=.82;n.vy*=.82;n.x+=n.vx;n.y+=n.vy;}
+
+    const nb=selId?neighOf(selId):null;
     ctx.clearRect(0,0,W,H);
-    ctx.strokeStyle='#30363d';ctx.lineWidth=1;
-    for(const e of es){const a=nm[e.from_id],b=nm[e.to_id];ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();}
-    for(const n of ns){ctx.fillStyle=C[n.entity_type]||'#8b949e';ctx.beginPath();ctx.arc(n.x,n.y,8,0,Math.PI*2);ctx.fill();ctx.fillStyle='#c9d1d9';ctx.font='11px sans-serif';ctx.textAlign='center';ctx.fillText(n.name.length>18?n.name.slice(0,17)+'...':n.name,n.x,n.y+20);}
+    ctx.save();ctx.translate(gOffset.x,gOffset.y);ctx.scale(gScale,gScale);
+
+    // edges
+    for(const e of es){
+      const a=nm[e.from_id],b=nm[e.to_id];
+      const dim=selId&&!nb.has(e.from_id)&&!nb.has(e.to_id)&&e.from_id!==selId&&e.to_id!==selId;
+      ctx.globalAlpha=dim?.12:.7;
+      ctx.strokeStyle=selId&&(e.from_id===selId||e.to_id===selId)?'#58a6ff':'#30363d';
+      ctx.lineWidth=(selId&&(e.from_id===selId||e.to_id===selId)?2:1)/gScale;
+      ctx.beginPath();ctx.moveTo(a.x,a.y);ctx.lineTo(b.x,b.y);ctx.stroke();
+      // edge label at midpoint
+      if(gScale>.7){
+        ctx.globalAlpha=dim?.08:.45;ctx.fillStyle='#8b949e';ctx.font=(10/gScale)+'px sans-serif';ctx.textAlign='center';
+        ctx.fillText(e.rel_type,(a.x+b.x)/2,(a.y+b.y)/2-4/gScale);
+      }
+    }
+    // nodes
+    for(const n of ns){
+      const dim=selId&&n.id!==selId&&!nb.has(n.id);
+      ctx.globalAlpha=dim?.2:1;
+      ctx.fillStyle=n.id===selId?'#fff':(C[n.entity_type]||'#8b949e');
+      ctx.beginPath();ctx.arc(n.x,n.y,n.r,0,Math.PI*2);ctx.fill();
+      ctx.globalAlpha=dim?.1:.85;
+      ctx.fillStyle='#c9d1d9';ctx.font=(11/gScale)+'px sans-serif';ctx.textAlign='center';
+      const lbl=n.name.length>20?n.name.slice(0,19)+'…':n.name;
+      ctx.fillText(lbl,n.x,n.y+n.r+13/gScale);
+    }
+    ctx.restore();ctx.globalAlpha=1;
     raf=requestAnimationFrame(tick);
   }
   tick();

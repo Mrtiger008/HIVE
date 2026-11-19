@@ -1,5 +1,31 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 24 Complete
+
+**Phase 24: Enhanced Graph Visualization**
+
+`src/server.js` — `handleGraph`:
+- `GET /api/graph?type=X` — filter nodes by entity_type
+- `GET /api/graph?search=term` — filter nodes by name substring (case-insensitive LIKE)
+- `type` + `search` can be combined
+- Each node now includes `degree` (count of edges touching it); edges auto-excluded if endpoint filtered out
+
+`src/server.js` — `loadGraph()` replacement (canvas, no external deps):
+- **Degree-based node radius**: `r = 8 + min(degree×2, 10)` — hub entities appear larger
+- **Scroll-wheel zoom + pan**: `gScale`/`gOffset` applied via canvas `save/translate/scale`
+- **`fitGraph()`** button: resets scale to fit all nodes in view
+- **Hover tooltip** (`id="g-tip"`): absolute-positioned div shows name, type, connection count on mousemove
+- **Click to select / highlight subgraph**: selected node + its neighbours at full opacity; others dimmed to 20%; click again to deselect
+- **Node info panel** (`id="g-info"`): shows selected node's name, type, degree, and all outgoing edges with rel_type + neighbour name
+- **Edge labels**: rel_type drawn at edge midpoints when zoom ≥ 0.7
+- **Selected edge highlight**: edges touching the selected node drawn in `#58a6ff`, 2px
+- **Cooling factor**: simulation slows after ~300 ticks for a stable layout
+- **Graph controls bar**: search input (`id="g-search"`), type filter (`id="g-type"`), Refresh, Fit, node/edge count (`id="g-count"`)
+
+Tests: 10/10 passing (`tests/test-phase24.js`). All suites: **240/240 total**.
+
+---
+
 ## 2026-11-20 — Phase 23 Complete
 
 **Phase 23: Memory Confidence Scores**
