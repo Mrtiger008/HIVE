@@ -1,5 +1,24 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 21 Complete
+
+**Phase 21: Bulk Operations**
+
+`src/server.js`:
+- `POST /api/memories/bulk` — accepts `{ids, action, updates}`; supports `action:'archive'` (sets status=archived) and `action:'update'` (applies `updates` fields to all ids); returns `{count}` of successful ops; silently skips missing ids; validates ids array and action present (400 on failure)
+- Route added to exact-match ROUTES table (before dynamic regex) to prevent collision with `/api/memories/:id`
+- Dashboard Memories tab: bulk-select toolbar (`id="bulk-bar"`, hidden until selection) with selected-count badge, Archive button, memory-type dropdown, Apply type button, Clear button
+- Each memory card gets a checkbox (`onchange="toggleSel(id, checked)"`); toolbar appears/hides with selection size
+- `toggleSel(id, on)`: adds/removes from `_sel` Set, updates toolbar visibility and count
+- `clearSelection()`: clears `_sel`, unchecks all card checkboxes, hides toolbar
+- `bulkArchive()`: POSTs archive action for all selected ids, refreshes list and stats
+- `bulkRetype()`: POSTs update action with `{memory_type}` for all selected ids, refreshes list
+- `loadMem()` clears selection on each load
+
+Tests: 10/10 passing (`tests/test-phase21.js`). All suites: **210/210 total**.
+
+---
+
 ## 2026-11-20 — Phase 20 Complete
 
 **Phase 20: Activity Feed**

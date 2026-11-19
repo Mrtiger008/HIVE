@@ -239,6 +239,21 @@ async function handleDeleteMemory(req, res, id) {
   json(res, { ok: true });
 }
 
+async function handleBulk(req, res) {
+  const body = await readBody(req);
+  const { ids, action, updates } = body;
+  if (!Array.isArray(ids) || !ids.length) { json(res, { error: 'ids array required' }, 400); return; }
+  if (!action) { json(res, { error: 'action required' }, 400); return; }
+  let count = 0;
+  for (const id of ids) {
+    try {
+      if (action === 'archive') { memory.update(id, { status: 'archived' }); count++; }
+      else if (action === 'update' && updates) { memory.update(id, updates); count++; }
+    } catch {}
+  }
+  json(res, { count });
+}
+
 function handleIndex(req, res) {
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(HTML);
@@ -251,7 +266,8 @@ const ROUTES = {
   'GET /api/tags':           handleTags,
   'GET /api/activity':       handleActivity,
   'GET /api/memories':  handleMemories,
-  'POST /api/memories': handleAddMemory,
+  'POST /api/memories':      handleAddMemory,
+  'POST /api/memories/bulk': handleBulk,
   'GET /api/patterns':  handlePatterns,
   'GET /api/graph':     handleGraph,
   'GET /api/entities':  handleEntities,
@@ -392,6 +408,15 @@ input{width:360px}
     <select id="mtag" onchange="loadMem()"><option value="">All tags</option></select>
     <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
   </div>
+  <div id="bulk-bar" style="display:none;padding:8px 0;display:none;gap:10px;align-items:center;border-bottom:1px solid #30363d;margin-bottom:8px">
+    <span id="bulk-count" style="color:#8b949e;font-size:13px"></span>
+    <button class="btn" onclick="bulkArchive()">Archive selected</button>
+    <select id="bulk-type" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:4px 8px">
+      <option value="">Change type…</option><option>core</option><option>domain</option><option>project</option><option>episodic</option><option>semantic</option><option>skill</option>
+    </select>
+    <button class="btn" onclick="bulkRetype()">Apply type</button>
+    <button class="arch" onclick="clearSelection()" style="margin-left:auto">✕ clear</button>
+  </div>
   <div id="ml"></div>
 </div>
 
@@ -451,7 +476,7 @@ function card(m) {
   const preview = (m.content||'').replace(/\\n/g,' ').slice(0,280);
   const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
   return \`<div class="card" data-id="\${m.id}">
-    <div class="ct">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button></div>
+    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button></div>
     <div class="cm"><span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
     <div class="cc">\${esc(preview)}\${m.content.length>280?'…':''}</div>
   </div>\`;
@@ -466,7 +491,35 @@ async function doSearch() {
   loadHistory();
 }
 
+let _sel = new Set();
+function toggleSel(id, on) {
+  on ? _sel.add(id) : _sel.delete(id);
+  const bar = g('bulk-bar');
+  if (_sel.size) { bar.style.display='flex'; g('bulk-count').textContent=_sel.size+' selected'; }
+  else { bar.style.display='none'; }
+}
+function clearSelection() {
+  _sel.clear();
+  g('bulk-bar').style.display='none';
+  document.querySelectorAll('#ml input[type=checkbox]').forEach(cb => cb.checked=false);
+}
+async function bulkArchive() {
+  if (!_sel.size) return;
+  const r = await fetch('/api/memories/bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[..._sel],action:'archive'})});
+  const d = await r.json();
+  _sel.clear(); loadMem(); refreshStats();
+  g('bulk-bar').style.display='none';
+}
+async function bulkRetype() {
+  const ty = g('bulk-type').value;
+  if (!ty || !_sel.size) return;
+  await fetch('/api/memories/bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[..._sel],action:'update',updates:{memory_type:ty}})});
+  _sel.clear(); loadMem();
+  g('bulk-bar').style.display='none'; g('bulk-type').value='';
+}
+
 async function loadMem() {
+  _sel.clear(); g('bulk-bar').style.display='none';
   let u = '/api/memories?limit=50';
   const t = g('mtype').value, r = g('mtrust').value, p = g('mproj').value, tg = g('mtag').value;
   if (t) u += '&type='+t; if (r) u += '&trust='+r; if (p) u += '&project='+p; if (tg) u += '&tag='+encodeURIComponent(tg);

@@ -35,14 +35,11 @@
 
 ## Phase 20 — Activity Feed — DONE ✅ (2026-11-20)
 
-## Phase 21 — Candidates
+## Phase 21 — Bulk Operations — DONE ✅ (2026-11-20)
 
-- **REST API + integrations**: JSON API for external tools (Obsidian plugin, Alfred, etc.)
-- **Dashboard search improvements**: semantic search toggle in the Search tab
-- **Memory editing**: click a card in the dashboard to edit title/content in-place
-- **Scheduled review**: weekly digest email/Slack of stale memories due for review
+## Phase 22 — Candidates
 
-- **REST API + integrations**: Obsidian plugin, Alfred workflow, Raycast extension
+- **REST API key authentication**: Bearer token auth for Obsidian/Alfred/Raycast plugin access
+- **Memory confidence scores**: visual indicators, filter by confidence range
 - **Graph visualization**: D3 force-directed entity relationship graph in the dashboard
-- **Write actions in dashboard**: add/edit memories, entities, projects from browser
 - **Embedding pipeline improvements**: auto-embed on `memory.add()` (Phase 6 backfill is manual today)
