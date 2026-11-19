@@ -10,7 +10,8 @@ Phase 2 — Retrieval Engine — COMPLETE (2026-11-19)
 Phase 3 — Knowledge Graph — COMPLETE (2026-11-19)  
 Phase 4 — Session Capture — COMPLETE (2026-11-19)
 Phase 5 — Learning System — COMPLETE (2026-11-19)
-Phase 6 — Semantic Search — NOT STARTED
+Phase 6 — Semantic Search — COMPLETE (2026-11-19)
+Phase 7 — Smart Briefings — NOT STARTED
 
 ## Architecture (decided)
 

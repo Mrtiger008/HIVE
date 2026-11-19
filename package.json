@@ -12,7 +12,8 @@
     "export": "node src/hive.js export"
   },
   "dependencies": {
-    "better-sqlite3": "^11.10.0"
+    "@huggingface/transformers": "^4.3.2",
+    "better-sqlite3": "^12.1.0"
   },
   "engines": {
     "node": ">=20.0.0"

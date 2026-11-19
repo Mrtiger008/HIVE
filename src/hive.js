@@ -11,6 +11,7 @@ const ingest   = require('./ingest');
 const { decayScore, sweep, stalest } = require('./decay');
 const { reinforce }  = require('./reinforce');
 const { topKeywords } = require('./patterns');
+const semantic = require('./semantic');
 
 const [,, cmd, ...rawArgs] = process.argv;
 
@@ -369,6 +370,36 @@ const COMMANDS = {
     }
   },
 
+  // ── semantic search ───────────────────────────────────────────────────────
+
+  'semantic'(args) {
+    const { positional, flags } = parseArgs(args);
+    if (!positional) die('Usage: hive semantic "<query>" [--limit N] [--project <id>] [--hybrid]');
+    const hybrid = flags.hybrid === true || flags.hybrid === 'true';
+    const limit  = flags.limit ? +flags.limit : 10;
+    semantic.search(positional, { limit, projectId: flags.project || null, hybrid })
+      .then(results => {
+        if (!results.length) { console.log('No semantic matches found.\n(Run "hive embed backfill" to index memories.)'); return; }
+        const scoreKey = hybrid ? '_hybrid' : '_sim';
+        for (const m of results) {
+          const score = (m[scoreKey] * 100).toFixed(0);
+          const preview = m.content.replace(/\n/g, ' ').substring(0, 140);
+          console.log(`\n[${m.id.slice(0,8)}] [${m.memory_type}] [sim=${score}%] ${m.title}`);
+          console.log(`  ${preview}${m.content.length > 140 ? '…' : ''}`);
+        }
+        console.log(`\n${results.length} result(s)`);
+      })
+      .catch(err => { console.error(`Error: ${err.message}`); process.exit(1); });
+  },
+
+  'embed backfill'(args) {
+    const { flags } = parseArgs(args);
+    console.log('Embedding memories… (downloads ~23 MB model on first run)');
+    semantic.backfill({ limit: flags.limit ? +flags.limit : 500 })
+      .then(count => console.log(`Done — ${count} memories embedded.`))
+      .catch(err => { console.error(`Error: ${err.message}`); process.exit(1); });
+  },
+
   // ── learning system ───────────────────────────────────────────────────────
 
   'suggest'(args) {
@@ -506,6 +537,10 @@ const COMMANDS = {
   'help'() {
     console.log(`
 HIVE — Personal AI Knowledge & Memory System
+
+Semantic search:
+  hive semantic "<query>"  [--limit N] [--project <id>] [--hybrid]
+  hive embed backfill      [--limit N]   Index memories (downloads model on first run)
 
 Learning system:
   hive suggest      [--project <id>] [--limit N]       Stale memories ranked by decay score

@@ -151,6 +151,11 @@ function _initSchema(db) {
     try { db.exec('ALTER TABLE memories ADD COLUMN last_accessed_at INTEGER'); } catch {}
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (2, ?)').run(Date.now());
   }
+  // v3: embedding TEXT for semantic search (384-dim float array stored as JSON)
+  if (sv < 3) {
+    try { db.exec('ALTER TABLE memories ADD COLUMN embedding TEXT'); } catch {}
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (3, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {

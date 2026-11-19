@@ -1,5 +1,33 @@
 # CHANGELOG.md
 
+## 2026-11-19 — Phase 6 Complete
+
+**Phase 6: Semantic Search**
+
+`src/embeddings.js` — model wrapper:
+- Model: `Xenova/all-MiniLM-L6-v2` via `@huggingface/transformers` v4 (pure JS/WASM, ~23 MB, downloads once)
+- Disk cache: `database/embeddings/<hash>.json` — avoids re-embedding unchanged content
+- `embed(text)` — raw model call; `embedCached(text)` — cache-first; `embedMemory(m)` — stores in DB
+
+`src/semantic.js` — vector search:
+- `cosine(a, b)` — cosine similarity; zero-safe, handles unit-normalized vectors
+- `search(query, { limit, projectId, hybrid, embedFn })` — similarity-ranked results; `hybrid` blends 60% cosine + 40% normalised importance
+- `backfill({ embedFn, limit })` — batch-embeds all memories missing an embedding
+
+`src/db.js` — schema v3 migration: `embedding TEXT` column on memories (JSON-encoded float array)
+
+CLI:
+- `hive semantic "<query>"` — semantic similarity search
+- `hive embed backfill` — index all memories (downloads model on first run)
+
+Dependency upgrade: `better-sqlite3` bumped from `^11.10.0` to `^12.1.0` (v12.1.0 is first release with prebuilt binaries for Node.js 24 / ABI 137)
+
+Tests: 10/10 passing (`tests/test-semantic.js`) using deterministic 4-dim mock embeddings. All suites: 60/60 total.
+
+**Next**: Phase 7 — Smart Briefings (session-start context pack, proactive surfacing of relevant memories)
+
+---
+
 ## 2026-11-19 — Phase 5 Complete
 
 **Phase 5: Learning System**
