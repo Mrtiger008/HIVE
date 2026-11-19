@@ -1,5 +1,23 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 19 Complete
+
+**Phase 19: Memory Tags UI**
+
+`src/server.js`:
+- `GET /api/tags` — all unique tags across active memories with per-tag counts, sorted by count desc
+- `GET /api/memories?tag=X` — filters results to memories containing that tag
+- `POST /api/memories` — tags array already accepted; now surfaced in modal
+- `PUT /api/memories/:id` — tags now included in updatable fields
+- Dashboard Memories tab: `<select id="mtag">` tag filter populated by `loadTagSelect()`; refreshed after add/edit
+- Dashboard Add/Edit modal: Tags field (comma-separated input `nm-tg`), pre-filled on edit
+- Memory cards: tags rendered as clickable `#tag` chips — clicking calls `filterTag()` to switch to Memories tab filtered by that tag
+- `filterTag(tag)`: sets mtag and switches to Memories tab
+
+Tests: 10/10 passing (`tests/test-phase19.js`). All suites: **180/180 total**.
+
+---
+
 ## 2026-11-20 — Phase 18 Complete
 
 **Phase 18: Search History**

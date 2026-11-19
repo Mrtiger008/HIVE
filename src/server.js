@@ -43,6 +43,17 @@ function recordQuery(query) {
   } catch {}
 }
 
+function handleTags(req, res) {
+  const rows = getDb().prepare("SELECT tags FROM memories WHERE status='active' AND tags IS NOT NULL AND tags != '[]'").all();
+  const counts = {};
+  for (const { tags } of rows) {
+    for (const t of JSON.parse(tags || '[]')) {
+      counts[t] = (counts[t] || 0) + 1;
+    }
+  }
+  json(res, Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([tag, count]) => ({ tag, count })));
+}
+
 function handleSearchHistory(req, res, q) {
   const limit = +(q.limit) || 20;
   const rows = getDb().prepare(
@@ -71,12 +82,14 @@ function handleSearch(req, res, q) {
 }
 
 function handleMemories(req, res, q) {
-  json(res, memory.list({
-    type:       q.type       || undefined,
-    trust_level: q.trust     || undefined,
-    project_id: q.project    || undefined,
-    limit:      +(q.limit)   || 50,
-  }));
+  let results = memory.list({
+    type:       q.type    || undefined,
+    trust_level: q.trust  || undefined,
+    project_id: q.project || undefined,
+    limit:      +(q.limit) || 50,
+  });
+  if (q.tag) results = results.filter(m => (m.tags || []).includes(q.tag));
+  json(res, results);
 }
 
 function handlePatterns(req, res, q) {
@@ -190,6 +203,7 @@ async function handleUpdateMemory(req, res, id) {
   if (body.memory_type !== undefined) updates.memory_type = body.memory_type;
   if (body.trust_level !== undefined) updates.trust_level = body.trust_level;
   if (body.importance  !== undefined) updates.importance  = +body.importance;
+  if (body.tags        !== undefined) updates.tags        = body.tags;
   if (!Object.keys(updates).length) { json(res, { error: 'no fields to update' }, 400); return; }
   json(res, memory.update(id, updates));
 }
@@ -210,6 +224,7 @@ const ROUTES = {
   'GET /api/stats':     handleStats,
   'GET /api/search':         handleSearch,
   'GET /api/search/history': handleSearchHistory,
+  'GET /api/tags':           handleTags,
   'GET /api/memories':  handleMemories,
   'POST /api/memories': handleAddMemory,
   'GET /api/patterns':  handlePatterns,
@@ -348,6 +363,7 @@ input{width:360px}
     <select id="mtype" onchange="loadMem()"><option value="">All types</option><option>core</option><option>domain</option><option>project</option><option>episodic</option><option>semantic</option><option>skill</option></select>
     <select id="mtrust" onchange="loadMem()"><option value="">All trust</option><option>USER_CONFIRMED</option><option>SOURCE_VERIFIED</option><option>OBSERVED</option><option>INFERRED</option></select>
     <select id="mproj" onchange="loadMem()"><option value="">All projects</option></select>
+    <select id="mtag" onchange="loadMem()"><option value="">All tags</option></select>
     <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
   </div>
   <div id="ml"></div>
@@ -377,6 +393,7 @@ input{width:360px}
     <div class="f"><label>Type</label><select id="nm-ty"><option>semantic</option><option>core</option><option>domain</option><option>project</option><option>episodic</option><option>skill</option></select></div>
     <div class="f"><label>Trust</label><select id="nm-tr"><option>OBSERVED</option><option>USER_CONFIRMED</option><option>SOURCE_VERIFIED</option><option>INFERRED</option></select></div>
     <div class="f"><label>Importance (1–10)</label><input id="nm-i" type="number" min="1" max="10" value="5"></div>
+    <div class="f"><label>Tags <span style="font-weight:normal;color:#8b949e">(comma-separated)</span></label><input id="nm-tg" style="width:100%" placeholder="e.g. javascript, async, todo"></div>
     <p id="nm-err" class="merr"></p>
     <div class="mbtns">
       <button class="btn" onclick="closeAdd()">Cancel</button>
@@ -404,9 +421,10 @@ function show(id, btn) {
 
 function card(m) {
   const preview = (m.content||'').replace(/\\n/g,' ').slice(0,280);
+  const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
   return \`<div class="card" data-id="\${m.id}">
     <div class="ct">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button></div>
-    <div class="cm"><span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span></div>
+    <div class="cm"><span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
     <div class="cc">\${esc(preview)}\${m.content.length>280?'…':''}</div>
   </div>\`;
 }
@@ -422,8 +440,8 @@ async function doSearch() {
 
 async function loadMem() {
   let u = '/api/memories?limit=50';
-  const t = g('mtype').value, r = g('mtrust').value, p = g('mproj').value;
-  if (t) u += '&type='+t; if (r) u += '&trust='+r; if (p) u += '&project='+p;
+  const t = g('mtype').value, r = g('mtrust').value, p = g('mproj').value, tg = g('mtag').value;
+  if (t) u += '&type='+t; if (r) u += '&trust='+r; if (p) u += '&project='+p; if (tg) u += '&tag='+encodeURIComponent(tg);
   const d = await api(u);
   g('ml').innerHTML = d.length ? d.map(card).join('') : '<p class="empty">No memories.</p>';
 }
@@ -531,20 +549,21 @@ async function loadGraph() {
 
 function refreshStats() { api('/api/stats').then(d => g('stats').textContent = \`\${d.memories} memories · \${d.entities} entities · \${d.projects} projects\`); }
 let _editId = null;
-function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
-async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
+function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-tg').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
+async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
 function closeAdd() { g('add-modal').classList.remove('on'); }
 async function submitAdd() {
   const title = g('nm-t').value.trim(), content = g('nm-c').value.trim();
   if (!title || !content) { g('nm-err').textContent = 'Title and content are required.'; return; }
   g('nm-err').textContent = '';
-  const payload = { title, content, memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value };
+  const rawTags = g('nm-tg').value.split(',').map(t=>t.trim()).filter(Boolean);
+  const payload = { title, content, memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value, tags: rawTags };
   const r = _editId
     ? await fetch('/api/memories/'+_editId, { method:'PUT',  headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
     : await fetch('/api/memories',           { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
   if (!r.ok) { const e = await r.json(); g('nm-err').textContent = e.error || 'Save failed.'; return; }
   g('nm-t').value = ''; g('nm-c').value = '';
-  closeAdd(); loadMem(); refreshStats();
+  closeAdd(); loadMem(); refreshStats(); loadTagSelect();
 }
 async function archiveMem(id, btn) {
   btn.textContent = '…';
@@ -552,8 +571,11 @@ async function archiveMem(id, btn) {
   if (r.ok) { btn.closest('.card').remove(); refreshStats(); }
   else btn.textContent = '× archive';
 }
+function filterTag(tag) { const sel=g('mtag'); sel.value=tag; document.querySelectorAll('nav button').forEach(b=>{if(b.textContent==='Memories')b.click();}); }
+function loadTagSelect() { api('/api/tags').then(ts => { const sel=g('mtag'); sel.innerHTML='<option value="">All tags</option>'; ts.forEach(({tag,count})=>{const o=document.createElement('option');o.value=tag;o.textContent=tag+' ('+count+')';sel.appendChild(o);}); }); }
 refreshStats();
 api('/api/projects').then(ps => { const sel=g('mproj'); ps.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);}); });
+loadTagSelect();
 function loadHistory() { api('/api/search/history?limit=30').then(hs => { const dl=g('q-history'); dl.innerHTML=''; hs.forEach(h=>{const o=document.createElement('option');o.value=h.query;dl.appendChild(o);}); }); }
 loadHistory();
 </script>

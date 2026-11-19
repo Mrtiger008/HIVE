@@ -31,7 +31,9 @@
 
 ## Phase 18 — Search History — DONE ✅ (2026-11-20)
 
-## Phase 19 — Candidates
+## Phase 19 — Memory Tags UI — DONE ✅ (2026-11-20)
+
+## Phase 20 — Candidates
 
 - **REST API + integrations**: JSON API for external tools (Obsidian plugin, Alfred, etc.)
 - **Dashboard search improvements**: semantic search toggle in the Search tab
