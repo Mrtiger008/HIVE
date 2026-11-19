@@ -9,6 +9,7 @@ const { topKeywords }  = require('./patterns');
 const memory           = require('./memory');
 const entities         = require('./entities');
 const projects         = require('./projects');
+const apikeys          = require('./apikeys');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -254,29 +255,67 @@ async function handleBulk(req, res) {
   json(res, { count });
 }
 
+function handleListKeys(req, res) {
+  json(res, apikeys.list().map(k => ({
+    id: k.id, name: k.name,
+    created_at: k.created_at,
+    last_used_at: k.last_used_at || null,
+  })));
+}
+
+async function handleCreateKey(req, res) {
+  const body = await readBody(req);
+  if (!body.name || !body.name.trim()) { json(res, { error: 'name required' }, 400); return; }
+  try {
+    const key = apikeys.generate(body.name.trim());
+    json(res, { key }, 201); // returned once only
+  } catch (e) {
+    json(res, { error: e.message.includes('UNIQUE') ? 'name already exists' : e.message }, 409);
+  }
+}
+
+async function handleRevokeKey(req, res, name) {
+  const changes = apikeys.revoke(decodeURIComponent(name));
+  if (!changes) { json(res, { error: 'not found' }, 404); return; }
+  json(res, { ok: true });
+}
+
 function handleIndex(req, res) {
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
   res.end(HTML);
 }
 
 const ROUTES = {
-  'GET /api/stats':     handleStats,
+  'GET /api/stats':          handleStats,
   'GET /api/search':         handleSearch,
   'GET /api/search/history': handleSearchHistory,
   'GET /api/tags':           handleTags,
   'GET /api/activity':       handleActivity,
-  'GET /api/memories':  handleMemories,
+  'GET /api/memories':       handleMemories,
   'POST /api/memories':      handleAddMemory,
   'POST /api/memories/bulk': handleBulk,
-  'GET /api/patterns':  handlePatterns,
-  'GET /api/graph':     handleGraph,
-  'GET /api/entities':  handleEntities,
-  'GET /api/projects':  handleProjects,
-  'GET /api/export':    handleExport,
-  'GET /api/review':    handleReview,
-  'GET /api/brief':     handleBrief,
-  'GET /':              handleIndex,
+  'GET /api/patterns':       handlePatterns,
+  'GET /api/graph':          handleGraph,
+  'GET /api/entities':       handleEntities,
+  'GET /api/projects':       handleProjects,
+  'GET /api/export':         handleExport,
+  'GET /api/review':         handleReview,
+  'GET /api/brief':          handleBrief,
+  'GET /api/apikeys':        handleListKeys,
+  'POST /api/apikeys':       handleCreateKey,
+  'GET /':                   handleIndex,
 };
+
+// Auth middleware: if any keys exist, require Bearer token on /api/* routes.
+// Requests with X-Hive-Local: 1 header bypass auth (dashboard fetches).
+function checkAuth(req, pathname) {
+  if (!pathname.startsWith('/api/')) return true;
+  if (!apikeys.hasAny()) return true; // open mode — no keys configured
+  if (req.headers['x-hive-local'] === '1') return true;
+  const auth = req.headers['authorization'] || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : '';
+  return apikeys.verify(token);
+}
 
 // ── Server factory ────────────────────────────────────────────────────────────
 
@@ -304,8 +343,17 @@ function createServer() {
         const id = rf[1];
         handler = (req, res) => handleReinforce(req, res, id);
       }
+      const ak = pathname.match(/^\/api\/apikeys\/(.+)$/);
+      if (ak && req.method === 'DELETE') {
+        const name = ak[1];
+        handler = (req, res) => handleRevokeKey(req, res, name);
+      }
     }
     if (!handler) { res.writeHead(404); res.end('Not Found'); return; }
+    if (!checkAuth(req, pathname)) {
+      json(res, { error: 'Unauthorized — provide Authorization: Bearer <key>' }, 401);
+      return;
+    }
     Promise.resolve(handler(req, res, query)).catch(err => {
       if (!res.headersSent) { res.writeHead(500); res.end(err.message); }
     });
@@ -388,6 +436,7 @@ input{width:360px}
   <button onclick="show('projects',this)">Projects</button>
   <button onclick="show('review',this)">Review</button>
   <button onclick="show('activity',this)">Activity</button>
+  <button onclick="show('apikeys',this)">API Keys</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -437,6 +486,19 @@ input{width:360px}
 <div id="activity" class="tab"><div id="al"><p class="empty">Loading…</p></div></div>
 <div id="review" class="tab"><div class="row"><button class="btn" onclick="loadReview()">Load Review Digest</button></div><div id="rv"><p class="empty">Click "Load Review Digest" to see memories due for review.</p></div></div>
 
+<div id="apikeys" class="tab">
+  <div class="row" style="margin-bottom:16px">
+    <input id="ak-name" placeholder="Key name (e.g. obsidian)" style="width:220px">
+    <button class="btn" onclick="createKey()">Generate Key</button>
+  </div>
+  <div id="ak-new" style="display:none;padding:12px;background:#0d1117;border:1px solid #238636;border-radius:6px;margin-bottom:16px;font-family:monospace;font-size:13px;color:#3fb950">
+    <strong>Copy this key — it will not be shown again:</strong><br>
+    <span id="ak-val"></span>
+    <button class="btn" style="margin-left:12px;font-size:11px;padding:4px 8px" onclick="copyKey()">Copy</button>
+  </div>
+  <div id="akl"><p class="empty">Loading keys…</p></div>
+</div>
+
 <div id="add-modal" class="modal">
   <div class="mbox">
     <h3 id="nm-h">Add Memory</h3>
@@ -470,6 +532,7 @@ function show(id, btn) {
   if (id==='projects') loadProjects();
   if (id==='review') loadReview();
   if (id==='activity') loadActivity();
+  if (id==='apikeys') loadKeys();
 }
 
 function card(m) {
@@ -675,5 +738,39 @@ api('/api/projects').then(ps => { const sel=g('mproj'); ps.forEach(p=>{const o=d
 loadTagSelect();
 function loadHistory() { api('/api/search/history?limit=30').then(hs => { const dl=g('q-history'); dl.innerHTML=''; hs.forEach(h=>{const o=document.createElement('option');o.value=h.query;dl.appendChild(o);}); }); }
 loadHistory();
+
+function localFetch(url, opts={}) {
+  opts.headers = Object.assign({'X-Hive-Local':'1'}, opts.headers||{});
+  return fetch(url, opts);
+}
+async function loadKeys() {
+  const ks = await localFetch('/api/apikeys').then(r=>r.json());
+  const el = g('akl');
+  if (!ks.length) { el.innerHTML='<p class="empty">No API keys yet. Generate one above.</p>'; return; }
+  const fmt = ts => ts ? new Date(ts).toLocaleString() : 'never';
+  el.innerHTML = ks.map(k=>\`<div class="card" style="display:flex;align-items:center;gap:12px">
+    <span style="flex:1;font-weight:600;color:#e6edf3">\${esc(k.name)}</span>
+    <span style="font-size:12px;color:#8b949e">created \${fmt(k.created_at)}</span>
+    <span style="font-size:12px;color:#8b949e">last used \${fmt(k.last_used_at)}</span>
+    <button class="btn" style="font-size:12px;padding:4px 10px;color:#f85149" onclick="revokeKey('\${esc(k.name)}')">Revoke</button>
+  </div>\`).join('');
+}
+async function createKey() {
+  const name = g('ak-name').value.trim();
+  if (!name) return;
+  const r = await localFetch('/api/apikeys',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name})});
+  const d = await r.json();
+  if (d.error) { alert(d.error); return; }
+  g('ak-val').textContent = d.key;
+  g('ak-new').style.display='block';
+  g('ak-name').value='';
+  loadKeys();
+}
+function copyKey() { navigator.clipboard.writeText(g('ak-val').textContent); }
+async function revokeKey(name) {
+  if (!confirm(\`Revoke key "\${name}"?\`)) return;
+  await localFetch('/api/apikeys/'+encodeURIComponent(name),{method:'DELETE',headers:{'X-Hive-Local':'1'}});
+  loadKeys();
+}
 </script>
 </body></html>`;

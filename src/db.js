@@ -183,6 +183,19 @@ function _initSchema(db) {
     `);
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (5, ?)').run(Date.now());
   }
+  // v6: api_keys — hashed Bearer tokens for external tool access
+  if (sv < 6) {
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS api_keys (
+        id           INTEGER PRIMARY KEY AUTOINCREMENT,
+        name         TEXT NOT NULL UNIQUE,
+        key_hash     TEXT NOT NULL UNIQUE,
+        created_at   INTEGER NOT NULL,
+        last_used_at INTEGER
+      );
+    `);
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (6, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {

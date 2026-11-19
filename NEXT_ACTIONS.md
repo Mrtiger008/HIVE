@@ -37,9 +37,11 @@
 
 ## Phase 21 — Bulk Operations — DONE ✅ (2026-11-20)
 
-## Phase 22 — Candidates
+## Phase 22 — REST API Key Authentication — DONE ✅ (2026-11-20)
 
-- **REST API key authentication**: Bearer token auth for Obsidian/Alfred/Raycast plugin access
-- **Memory confidence scores**: visual indicators, filter by confidence range
-- **Graph visualization**: D3 force-directed entity relationship graph in the dashboard
-- **Embedding pipeline improvements**: auto-embed on `memory.add()` (Phase 6 backfill is manual today)
+## Phase 23 — Candidates
+
+- **Memory confidence scores**: visual confidence bar on each card, filter by range
+- **Graph visualization**: D3 force-directed entity relationship graph in dashboard
+- **Embedding pipeline improvements**: auto-embed on `memory.add()` (backfill is manual today)
+- **Webhook / push notifications**: POST to a configured URL when memories are added/updated

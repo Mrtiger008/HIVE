@@ -688,6 +688,31 @@ const COMMANDS = {
     console.log('');
   },
 
+  'apikey'(args) {
+    const { positional, flags } = parseArgs(args);
+    const ak = require('./apikeys');
+    const sub = positional;
+    if (sub === 'list' || !sub) {
+      const keys = ak.list();
+      if (!keys.length) { console.log('No API keys.'); return; }
+      const fmt = ts => ts ? new Date(ts).toLocaleString() : 'never';
+      keys.forEach(k => console.log(`[${k.id}] ${k.name}  created:${fmt(k.created_at)}  last_used:${fmt(k.last_used_at)}`));
+    } else if (sub === 'create') {
+      const name = flags.name || args[1];
+      if (!name) die('Usage: hive apikey create <name>  or  --name <name>');
+      const key = ak.generate(name);
+      console.log(`\nAPI key created for "${name}":\n\n  ${key}\n\nSave this — it will not be shown again.`);
+    } else if (sub === 'revoke') {
+      const name = flags.name || args[1];
+      if (!name) die('Usage: hive apikey revoke <name>');
+      const n = ak.revoke(name);
+      if (n) console.log(`Revoked key "${name}".`);
+      else console.log(`No key named "${name}".`);
+    } else {
+      die(`Unknown apikey subcommand: ${sub}\nUsage: hive apikey [list|create|revoke]`);
+    }
+  },
+
   'help'() {
     console.log(`
 HIVE — Personal AI Knowledge & Memory System
@@ -754,6 +779,11 @@ Markdown import:
 
 Web dashboard:
   hive serve     [--port N]   Start local dashboard (default port 7749)
+
+API key management:
+  hive apikey list              List all API keys
+  hive apikey create <name>     Generate a new Bearer token (shown once)
+  hive apikey revoke <name>     Delete a key
 
 Utility:
   hive export    Export all active memories to Markdown files

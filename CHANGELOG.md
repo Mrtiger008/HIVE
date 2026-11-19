@@ -1,5 +1,31 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 22 Complete
+
+**Phase 22: REST API Key Authentication**
+
+`src/apikeys.js` (new):
+- `generate(name)` — creates a `hive_<48-hex>` key, stores SHA-256 hash in DB, returns plain key once
+- `verify(key)` — hashes and checks against DB, stamps `last_used_at` on match
+- `list()` — returns all keys (id, name, created_at, last_used_at); never returns key hashes
+- `revoke(name)` — deletes by name, returns change count
+- `hasAny()` — boolean gate: open mode vs. auth mode
+
+`src/db.js` — schema v6: `api_keys` table (id, name, key_hash UNIQUE, created_at, last_used_at)
+
+`src/server.js`:
+- `checkAuth(req, pathname)` — middleware: open mode if no keys exist; `/api/*` requires `Authorization: Bearer <key>` unless `X-Hive-Local: 1` is present (dashboard fetches); `GET /` always passes
+- `GET /api/apikeys` — list keys
+- `POST /api/apikeys` — create key; returns `{key}` once
+- `DELETE /api/apikeys/:name` — revoke key
+- Dashboard "API Keys" tab: list table with created/last-used times and Revoke button; Generate form with one-time key display and Copy button; `X-Hive-Local: 1` on all dashboard fetches
+
+`src/hive.js` — `hive apikey [list|create|revoke]` CLI commands
+
+Tests: 10/10 passing (`tests/test-phase22.js`). All suites: **220/220 total**.
+
+---
+
 ## 2026-11-20 — Phase 21 Complete
 
 **Phase 21: Bulk Operations**
