@@ -1,5 +1,25 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 39 Complete
+
+**Phase 39: Knowledge Timeline**
+
+`src/timeline.js` (new):
+- `get(opts)` — returns memory creation grouped by date period
+  - Options: `days` (default 30), `granularity` ('day'|'week'), `memory_type`, `domain`
+  - Returns: `{ periods: [{date, ts, count, memories}], total, days, granularity }`
+  - Fills zero-count periods so the chart has no gaps
+
+`src/server.js`:
+- `GET /api/timeline` — query params: `?days=N&granularity=day|week&type=T&domain=D`
+- Dashboard: **Timeline** tab with CSS bar chart; click any bar to see memories from that period; filters for days/granularity/type
+
+`src/hive.js`:
+- `hive timeline` — ASCII bar chart of memory creation; flags: `--days N`, `--week`, `--type T`, `--domain D`
+
+`tests/test-phase39.js` — 10/10 passing
+Full regression: 300/300 (Phases 10–39, zero regressions)
+
 ## 2026-11-20 — Phase 38 Complete
 
 **Phase 38: Memory Relations Graph**

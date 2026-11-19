@@ -71,9 +71,11 @@
 
 ## Phase 38 — Memory Relations Graph — DONE ✅ (2026-11-20)
 
-## Phase 39 — Candidates
+## Phase 39 — Knowledge Timeline — DONE ✅ (2026-11-20)
+
+## Phase 40 — Candidates
 
 - **Keyboard shortcuts**: keyboard-driven navigation (j/k scroll, / focus search, n new)
 - **Multi-file import**: batch import from a directory of markdown files
-- **Knowledge timeline**: chronological view of memory creation and updates with filtering
 - **Memory clusters**: group related memories by topic using tag/domain co-occurrence
+- **Smart reminders**: surface memories due for review based on decay score and last access

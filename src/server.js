@@ -22,6 +22,7 @@ const decay            = require('./decay');
 const obsidian         = require('./obsidian');
 const conflicts        = require('./conflicts');
 const memgraph         = require('./memgraph');
+const timeline         = require('./timeline');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -459,6 +460,15 @@ const ROUTES = {
   },
   'GET /api/export/obsidian': (req, res) => json(res, obsidian.generate()),
   'GET /api/memories/graph': (req, res) => json(res, memgraph.build()),
+  'GET /api/timeline': (req, res) => {
+    const q = new URL(req.url, 'http://x').searchParams;
+    json(res, timeline.get({
+      days:        q.get('days')        ? +q.get('days')        : 30,
+      granularity: q.get('granularity') || 'day',
+      memory_type: q.get('type')        || null,
+      domain:      q.get('domain')      || null,
+    }));
+  },
   'GET /api/conflicts':      (req, res) => json(res, conflicts.detect()),
   'POST /api/conflicts':     async (req, res) => {
     const body = await readBody(req);
@@ -656,6 +666,7 @@ input{width:360px}
   <button onclick="show('decay',this);loadDecayPreview()">Decay</button>
   <button onclick="show('conflicts',this);loadConflicts()">Conflicts</button>
   <button onclick="show('memgraph',this);loadMemGraph()">Mem Graph</button>
+  <button onclick="show('timeline',this);loadTimeline()">Timeline</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -777,6 +788,29 @@ input{width:360px}
     <span id="mg-stats" style="font-size:12px;color:#8b949e"></span>
   </div>
   <canvas id="mg-canvas" style="width:100%;display:block;background:#0d1117"></canvas>
+</div>
+
+<div id="timeline" class="tab">
+  <div class="row" style="gap:8px;flex-wrap:wrap">
+    <select id="tl-days" onchange="loadTimeline()">
+      <option value="14">Last 14 days</option>
+      <option value="30" selected>Last 30 days</option>
+      <option value="60">Last 60 days</option>
+      <option value="90">Last 90 days</option>
+    </select>
+    <select id="tl-gran" onchange="loadTimeline()">
+      <option value="day">Daily</option>
+      <option value="week">Weekly</option>
+    </select>
+    <select id="tl-type" onchange="loadTimeline()">
+      <option value="">All types</option>
+      <option>core</option><option>domain</option><option>project</option>
+      <option>episodic</option><option>semantic</option><option>skill</option>
+    </select>
+    <span id="tl-summary" style="font-size:12px;color:#8b949e;margin-left:8px"></span>
+  </div>
+  <div id="tl-chart" style="margin:8px 0 20px"></div>
+  <div id="tl-detail"></div>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -1124,6 +1158,43 @@ async function loadMemGraph() {
     ctx.fillText(t,28,10+i*18);
   });
 }
+async function loadTimeline() {
+  const days  = g('tl-days').value;
+  const gran  = g('tl-gran').value;
+  const type  = g('tl-type').value;
+  let url = \`/api/timeline?days=\${days}&granularity=\${gran}\`;
+  if (type) url += '&type='+encodeURIComponent(type);
+  const d = await api(url);
+  g('tl-summary').textContent = \`\${d.total} memories added in last \${days} days\`;
+
+  const max = Math.max(1, ...d.periods.map(p => p.count));
+  const barW = Math.max(8, Math.min(40, Math.floor(600 / d.periods.length)));
+  const TYPE_COL = {core:'#ff7b72',domain:'#d2a8ff',project:'#3fb950',episodic:'#ffa657',semantic:'#58a6ff',skill:'#79c0ff'};
+
+  let chartHtml = '<div style="display:flex;align-items:flex-end;gap:2px;height:120px;padding:0 4px;overflow-x:auto">';
+  d.periods.forEach((p, i) => {
+    const h = p.count === 0 ? 2 : Math.max(4, Math.round(p.count / max * 110));
+    const col = type ? (TYPE_COL[type] || '#58a6ff') : '#58a6ff';
+    const label = gran === 'week' ? p.date.slice(5) : p.date.slice(5);
+    chartHtml += \`<div style="display:flex;flex-direction:column;align-items:center;cursor:pointer;flex-shrink:0;width:\${barW}px" onclick="tlShowDay(\${i})" title="\${p.date}: \${p.count}">
+      <div style="width:\${barW-2}px;height:\${h}px;background:\${p.count?col:'#21262d'};border-radius:2px 2px 0 0"></div>
+      \${barW >= 18 ? \`<div style="font-size:9px;color:#8b949e;transform:rotate(-45deg);transform-origin:top left;margin-top:4px;white-space:nowrap">\${label}</div>\` : ''}
+    </div>\`;
+  });
+  chartHtml += '</div>';
+  g('tl-chart').innerHTML = chartHtml;
+  g('tl-detail').innerHTML = '';
+
+  window._tlPeriods = d.periods;
+}
+
+function tlShowDay(i) {
+  const p = window._tlPeriods[i];
+  if (!p || !p.memories.length) { g('tl-detail').innerHTML = '<p class="empty">No memories on this date.</p>'; return; }
+  g('tl-detail').innerHTML = \`<h4 style="font-size:12px;color:#8b949e;margin:0 0 10px;text-transform:uppercase;letter-spacing:.05em">\${p.date} — \${p.count} \${p.count===1?'memory':'memories'}</h4>\`
+    + p.memories.map(m => card(m)).join('');
+}
+
 let gStop = null, gNodes = [], gOffset = {x:0,y:0}, gScale = 1;
 function fitGraph() {
   if (!gNodes.length) return;

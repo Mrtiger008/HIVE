@@ -1003,6 +1003,23 @@ const COMMANDS = {
     }
   },
 
+  'timeline'(args) {
+    const { flags } = parseArgs(args);
+    const tl = require('./timeline');
+    const days = +(flags.days || 30);
+    const gran = flags.week ? 'week' : (flags.granularity || 'day');
+    const d = tl.get({ days, granularity: gran, memory_type: flags.type || null, domain: flags.domain || null });
+    console.log(`\n── Knowledge Timeline (last ${days} days, by ${gran}) ──`);
+    console.log(`  ${d.total} memories added\n`);
+    const max = Math.max(1, ...d.periods.map(p => p.count));
+    for (const p of d.periods) {
+      if (!p.count && gran === 'day') continue;
+      const bar = '█'.repeat(Math.round(p.count / max * 20));
+      console.log(`  ${p.date}  ${bar} ${p.count}`);
+    }
+    console.log('');
+  },
+
   'memory-graph'() {
     const mg = require('./memgraph');
     const { nodes, edges } = mg.build();
@@ -1122,6 +1139,12 @@ Webhooks:
   hive webhook list             List registered webhooks
   hive webhook add <url>        Register a webhook URL [--events ev1,ev2  default: *]
   hive webhook remove <id>      Delete a webhook by id
+
+Knowledge timeline:
+  hive timeline                   Show daily memory creation for last 30 days
+  hive timeline --days 60         Last N days
+  hive timeline --week            Group by week instead of day
+  hive timeline --type semantic   Filter by memory type
 
 Memory relations graph:
   hive memory-graph                      Show graph stats (nodes, edges, type/rel breakdown)
