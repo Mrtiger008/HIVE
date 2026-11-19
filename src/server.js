@@ -122,7 +122,8 @@ function handleMemories(req, res, q) {
     min_conf:    q.min_conf != null ? +q.min_conf : undefined,
     max_conf:    q.max_conf != null ? +q.max_conf : undefined,
   });
-  if (q.tag) results = results.filter(m => (m.tags || []).includes(q.tag));
+  if (q.tag)    results = results.filter(m => (m.tags || []).includes(q.tag));
+  if (q.pinned) results = results.filter(m => m.pinned === 1 || m.pinned === true);
   json(res, results);
 }
 
@@ -253,6 +254,7 @@ async function handleUpdateMemory(req, res, id) {
   if (body.importance  !== undefined) updates.importance  = +body.importance;
   if (body.confidence  !== undefined) updates.confidence  = Math.min(1, Math.max(0, +body.confidence));
   if (body.tags        !== undefined) updates.tags        = body.tags;
+  if (body.pinned      !== undefined) updates.pinned      = body.pinned ? 1 : 0;
   if (!Object.keys(updates).length) { json(res, { error: 'no fields to update' }, 400); return; }
   if (updates.title !== undefined || updates.content !== undefined)
     versions.snapshot(id, m.title, m.content);
@@ -293,6 +295,12 @@ function handleSimilar(req, res, q) {
   if (!title.trim() && !content.trim()) { json(res, []); return; }
   json(res, findSimilar(title, content, { threshold, limit })
     .map(m => ({ id: m.id, title: m.title, memory_type: m.memory_type, score: +m._score.toFixed(3) })));
+}
+
+function handlePin(req, res, id, pinned) {
+  const m = memory.get(id);
+  if (!m) { json(res, { error: 'not found' }, 404); return; }
+  json(res, memory.update(id, { pinned }));
 }
 
 function handleListBookmarks(req, res) {
@@ -492,6 +500,10 @@ function createServer() {
       if (mv && req.method === 'GET') {
         handler = (req, res) => handleListVersions(req, res, mv[1]);
       }
+      const pin = pathname.match(/^\/api\/memories\/([^/]+)\/(pin|unpin)$/);
+      if (pin && req.method === 'POST') {
+        handler = (req, res) => handlePin(req, res, pin[1], pin[2] === 'pin' ? 1 : 0);
+      }
       const lk = pathname.match(/^\/api\/memories\/([^/]+)\/links$/);
       if (lk) {
         if (req.method === 'GET')  handler = (req, res) => handleListLinks(req, res, lk[1]);
@@ -625,6 +637,7 @@ input{width:360px}
     <select id="mproj" onchange="loadMem()"><option value="">All projects</option></select>
     <select id="mtag" onchange="loadMem()"><option value="">All tags</option></select>
     <select id="mconf" onchange="loadMem()" title="Min confidence"><option value="">Any confidence</option><option value="0.8">≥ 0.8 (high)</option><option value="0.6">≥ 0.6 (medium+)</option><option value="0.0" data-max="0.4">≤ 0.4 (low)</option></select>
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only</label>
     <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
   </div>
   <div id="bulk-bar" style="display:none;padding:8px 0;display:none;gap:10px;align-items:center;border-bottom:1px solid #30363d;margin-bottom:8px">
@@ -796,8 +809,12 @@ function confBar(c) {
 function card(m) {
   const preview = (m.content||'').replace(/\\n/g,' ').slice(0,280);
   const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
-  return \`<div class="card" data-id="\${m.id}">
-    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button></div>
+  const pinStyle = m.pinned ? 'border-left:3px solid #d29922;' : '';
+  const pinBtn = m.pinned
+    ? \`<button class="arch" style="color:#d29922" onclick="togglePin('\${m.id}',0)" title="Unpin">📌 pinned</button>\`
+    : \`<button class="arch" onclick="togglePin('\${m.id}',1)" title="Pin">📌 pin</button>\`;
+  return \`<div class="card" data-id="\${m.id}" style="\${pinStyle}">
+    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}</div>
     <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
     <div class="cc">\${esc(preview)}\${m.content.length>280?'…':''}</div>
   </div>\`;
@@ -873,6 +890,7 @@ async function loadMem() {
   const maxC = confOpt ? (confOpt.dataset.max||'') : '';
   if (t) u += '&type='+t; if (r) u += '&trust='+r; if (p) u += '&project='+p; if (tg) u += '&tag='+encodeURIComponent(tg);
   if (minC !== '') u += '&min_conf='+minC; if (maxC !== '') u += '&max_conf='+maxC;
+  if (g('mpinned').checked) u += '&pinned=1';
   const d = await api(u);
   g('ml').innerHTML = d.length ? d.map(card).join('') : '<p class="empty">No memories.</p>';
 }
@@ -1138,6 +1156,10 @@ async function archiveMem(id, btn) {
   const r = await fetch(\`/api/memories/\${id}\`, { method:'DELETE' });
   if (r.ok) { btn.closest('.card').remove(); refreshStats(); }
   else btn.textContent = '× archive';
+}
+async function togglePin(id, pin) {
+  await fetch(\`/api/memories/\${id}/\${pin?'pin':'unpin'}\`, {method:'POST',headers:{'X-Hive-Local':'1'}});
+  loadMem();
 }
 function filterTag(tag) { const sel=g('mtag'); sel.value=tag; document.querySelectorAll('nav button').forEach(b=>{if(b.textContent==='Memories')b.click();}); }
 function loadTagSelect() { api('/api/tags').then(ts => { const sel=g('mtag'); sel.innerHTML='<option value="">All tags</option>'; ts.forEach(({tag,count})=>{const o=document.createElement('option');o.value=tag;o.textContent=tag+' ('+count+')';sel.appendChild(o);}); }); }

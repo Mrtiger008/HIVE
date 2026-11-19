@@ -239,6 +239,11 @@ function _initSchema(db) {
     `);
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (9, ?)').run(Date.now());
   }
+  // v10: pinned column on memories
+  if (sv < 10) {
+    try { db.exec('ALTER TABLE memories ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0'); } catch {}
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (10, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {

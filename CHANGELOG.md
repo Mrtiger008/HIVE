@@ -1,5 +1,30 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 33 Complete
+
+**Phase 33: Memory Pinning**
+
+`src/db.js`:
+- Schema v10: `ALTER TABLE memories ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0`
+
+`src/memory.js`:
+- `update()` ALLOWED fields now includes `'pinned'`
+- `list()` ORDER BY: `pinned DESC, importance DESC, updated_at DESC`
+
+`src/server.js`:
+- `POST /api/memories/:id/pin` and `POST /api/memories/:id/unpin` endpoints
+- `PUT /api/memories/:id` accepts `pinned` field
+- `GET /api/memories?pinned=1` filter returns only pinned memories
+- Dashboard: pinned cards get amber left border and "📌 pinned" toggle button
+- "Pinned only" checkbox in memories filter bar
+
+`src/hive.js`:
+- `hive memory pin <id>` — pins a memory to top of list
+- `hive memory unpin <id>` — unpins a memory
+
+`tests/test-phase33.js` — 10/10 passing
+Full regression: 240/240 (Phases 10–33, zero regressions)
+
 ## 2026-11-20 — Phase 32 Complete
 
 **Phase 32: Search Bookmarks**

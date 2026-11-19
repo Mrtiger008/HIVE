@@ -137,6 +137,20 @@ const COMMANDS = {
     console.log(fmt(m));
   },
 
+  'memory pin'(args) {
+    const { positional } = parseArgs(args);
+    if (!positional) die('Usage: hive memory pin <id>');
+    const m = memory.update(positional, { pinned: 1 });
+    console.log(`Pinned: ${m.title}`);
+  },
+
+  'memory unpin'(args) {
+    const { positional } = parseArgs(args);
+    if (!positional) die('Usage: hive memory unpin <id>');
+    const m = memory.update(positional, { pinned: 0 });
+    console.log(`Unpinned: ${m.title}`);
+  },
+
   'memory delete'(args) {
     const { positional } = parseArgs(args);
     if (!positional) die('Usage: hive memory delete <id>');

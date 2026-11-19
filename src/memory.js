@@ -97,7 +97,7 @@ function update(id, updates) {
 
   const ALLOWED = ['title', 'content', 'memory_type', 'domain', 'project_id', 'confidence',
                    'trust_level', 'status', 'importance', 'tags', 'valid_until', 'superseded_by',
-                   'retrieval_keywords', 'user_confirmed'];
+                   'retrieval_keywords', 'user_confirmed', 'pinned'];
   const setClauses = [], values = [];
   for (const [k, v] of Object.entries(updates)) {
     if (!ALLOWED.includes(k)) continue;
@@ -134,7 +134,7 @@ function list({ type, domain, project_id, trust_level, status = 'active', limit 
   if (status)      { sql += ' AND status = ?';          params.push(status); }
   if (min_conf != null) { sql += ' AND confidence >= ?'; params.push(min_conf); }
   if (max_conf != null) { sql += ' AND confidence <= ?'; params.push(max_conf); }
-  sql += ' ORDER BY importance DESC, updated_at DESC LIMIT ? OFFSET ?';
+  sql += ' ORDER BY pinned DESC, importance DESC, updated_at DESC LIMIT ? OFFSET ?';
   params.push(limit, offset);
   return getDb().prepare(sql).all(...params).map(_parse);
 }
