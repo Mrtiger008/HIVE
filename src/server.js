@@ -24,6 +24,7 @@ const conflicts        = require('./conflicts');
 const memgraph         = require('./memgraph');
 const timeline         = require('./timeline');
 const clusters         = require('./clusters');
+const reminders        = require('./reminders');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -461,6 +462,19 @@ const ROUTES = {
   },
   'GET /api/export/obsidian': (req, res) => json(res, obsidian.generate()),
   'GET /api/memories/graph': (req, res) => json(res, memgraph.build()),
+  'GET /api/reminders': (req, res) => {
+    const q = new URL(req.url, 'http://x').searchParams;
+    json(res, reminders.get({
+      limit:         q.get('limit')    ? +q.get('limit')   : 20,
+      urgencyFilter: q.get('urgency')  || null,
+      projectId:     q.get('project')  || null,
+    }));
+  },
+  'POST /api/reminders/reviewed': async (req, res) => {
+    const body = await readBody(req);
+    try { json(res, reminders.markReviewed(body.id)); }
+    catch (e) { json(res, { error: e.message }, 404); }
+  },
   'GET /api/clusters': (req, res) => {
     const q = new URL(req.url, 'http://x').searchParams;
     json(res, clusters.get({
@@ -676,6 +690,7 @@ input{width:360px}
   <button onclick="show('memgraph',this);loadMemGraph()">Mem Graph</button>
   <button onclick="show('timeline',this);loadTimeline()">Timeline</button>
   <button onclick="show('clusters',this);loadClusters()">Clusters</button>
+  <button onclick="show('reminders',this);loadReminders()" id="rem-btn">Reminders</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -832,6 +847,20 @@ input{width:360px}
     <span id="cl-summary" style="font-size:12px;color:#8b949e;margin-left:8px"></span>
   </div>
   <div id="cl-list" style="margin-top:16px"></div>
+</div>
+
+<div id="reminders" class="tab">
+  <div class="row" style="gap:8px">
+    <select id="rem-urgency" onchange="loadReminders()">
+      <option value="">All urgencies</option>
+      <option value="critical">Critical</option>
+      <option value="high">High</option>
+      <option value="medium">Medium</option>
+      <option value="low">Low</option>
+    </select>
+    <span id="rem-summary" style="font-size:12px;color:#8b949e;margin-left:8px"></span>
+  </div>
+  <div id="rem-list" style="margin-top:16px"></div>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -1178,6 +1207,44 @@ async function loadMemGraph() {
     ctx.fillStyle='#8b949e'; ctx.textAlign='left'; ctx.textBaseline='top';
     ctx.fillText(t,28,10+i*18);
   });
+}
+const REM_COL = { critical: '#f85149', high: '#ffa657', medium: '#d29922', low: '#8b949e' };
+async function loadReminders() {
+  const urgency = g('rem-urgency').value;
+  let url = '/api/reminders?limit=50';
+  if (urgency) url += '&urgency=' + urgency;
+  const d = await api(url);
+  const { counts } = d;
+  g('rem-summary').textContent =
+    \`\${d.total} due · \${counts.critical} critical · \${counts.high} high · \${counts.medium} medium\`;
+  if (!d.reminders.length) {
+    g('rem-list').innerHTML = '<p class="empty">Nothing overdue — all memories are fresh.</p>';
+    return;
+  }
+  g('rem-list').innerHTML = d.reminders.map(m => {
+    const col = REM_COL[m.urgency] || '#8b949e';
+    const idle = m.idle_days === 1 ? '1 day' : m.idle_days + ' days';
+    return \`<div class="card" style="border-left:3px solid \${col}">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+        <span style="font-size:11px;font-weight:600;color:\${col};text-transform:uppercase;min-width:60px">\${m.urgency}</span>
+        <span style="font-weight:500;color:#e6edf3;flex:1">\${esc(m.title)}</span>
+        <span style="font-size:11px;color:#8b949e">\${idle} idle</span>
+        <button class="btn" style="font-size:11px;padding:3px 8px;color:#3fb950" onclick="markReviewed('\${m.id}',this)">✓ reviewed</button>
+      </div>
+      <div style="font-size:12px;color:#8b949e">
+        <span class="b bt">\${m.memory_type}</span>
+        <span style="margin-left:6px">conf: \${(m.confidence*100|0)}%</span>
+        <span style="margin-left:6px">importance: \${m.importance}</span>
+      </div>
+    </div>\`;
+  }).join('');
+}
+async function markReviewed(id, btn) {
+  btn.disabled = true;
+  const r = await fetch('/api/reminders/reviewed', { method:'POST',
+    headers:{'Content-Type':'application/json','X-Hive-Local':'1'}, body:JSON.stringify({id}) });
+  if (r.ok) btn.closest('.card').remove();
+  else { btn.disabled = false; alert('Could not mark as reviewed.'); }
 }
 async function loadClusters() {
   const minShared = g('cl-min').value;

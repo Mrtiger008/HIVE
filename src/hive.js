@@ -1003,6 +1003,24 @@ const COMMANDS = {
     }
   },
 
+  'reminders'(args) {
+    const { flags } = parseArgs(args);
+    const rem = require('./reminders');
+    const { reminders: list, counts } = rem.get({
+      limit:         +(flags.limit || 20),
+      urgencyFilter: flags.urgency || null,
+    });
+    const ICON = { critical: '🔴', high: '🟠', medium: '🟡', low: '⚪' };
+    console.log(`\n── Smart Reminders ──────────────────────────`);
+    console.log(`  Critical: ${counts.critical}  High: ${counts.high}  Medium: ${counts.medium}  Low: ${counts.low}\n`);
+    if (!list.length) { console.log('  Nothing overdue — all memories are fresh.\n'); return; }
+    list.forEach(m => {
+      const icon = ICON[m.urgency] || '⚪';
+      console.log(`  ${icon} [${m.urgency.toUpperCase().padEnd(8)}] ${m.title.slice(0,55).padEnd(55)} idle: ${m.idle_days}d  conf: ${(m.confidence*100|0)}%`);
+    });
+    console.log('');
+  },
+
   'clusters'(args) {
     const { flags } = parseArgs(args);
     const cl = require('./clusters');
@@ -1157,6 +1175,11 @@ Webhooks:
   hive webhook list             List registered webhooks
   hive webhook add <url>        Register a webhook URL [--events ev1,ev2  default: *]
   hive webhook remove <id>      Delete a webhook by id
+
+Smart reminders:
+  hive reminders                  Show all memories due for review (idle ≥7 days)
+  hive reminders --urgency high   Filter by urgency: critical|high|medium|low
+  hive reminders --limit 10       Show top N
 
 Memory clusters:
   hive clusters                   Show tag-based memory clusters

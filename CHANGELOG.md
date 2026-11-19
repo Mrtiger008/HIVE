@@ -1,5 +1,30 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 41 Complete
+
+**Phase 41: Smart Reminders**
+
+`src/reminders.js` (new):
+- `get(opts)` — returns memories idle ≥7 days, sorted by urgency then importance
+  - Urgency: `critical` (conf < 0.3 or idle > 60d), `high` (conf < 0.5 or idle > 30d),
+    `medium` (conf < 0.7 or idle > 14d), `low` (everything else)
+  - Options: `limit`, `urgencyFilter`, `projectId`
+  - Returns: `{ reminders, total, counts }` with `idle_days` and `urgency` on each
+- `markReviewed(id)` — stamps `last_accessed_at = now`, removing it from the queue
+- `urgency(idleDays, confidence, importance)` — exported for testing
+
+`src/server.js`:
+- `GET /api/reminders` — query params: `?limit=N&urgency=X&project=Y`
+- `POST /api/reminders/reviewed` — mark a memory reviewed (`{ id }`)
+- Dashboard: **Reminders** tab with urgency color-coded cards; inline "✓ reviewed" button removes the card; urgency filter selector
+
+`src/hive.js`:
+- `hive reminders` — table of overdue memories with urgency icons
+- Flags: `--urgency critical|high|medium|low`, `--limit N`
+
+`tests/test-phase41.js` — 10/10 passing
+Full regression: 320/320 (Phases 10–41, zero regressions)
+
 ## 2026-11-20 — Phase 40 Complete
 
 **Phase 40: Memory Clusters**

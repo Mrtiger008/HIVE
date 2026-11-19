@@ -75,9 +75,11 @@
 
 ## Phase 40 — Memory Clusters — DONE ✅ (2026-11-20)
 
-## Phase 41 — Candidates
+## Phase 41 — Smart Reminders — DONE ✅ (2026-11-20)
+
+## Phase 42 — Candidates
 
 - **Keyboard shortcuts**: keyboard-driven navigation (j/k scroll, / focus search, n new)
 - **Multi-file import**: batch import from a directory of markdown files
-- **Smart reminders**: surface memories due for review based on decay score and last access
 - **Memory compare**: side-by-side diff view of two memories
+- **Knowledge gaps**: detect topic areas with low confidence or sparse coverage
