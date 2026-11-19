@@ -512,6 +512,19 @@ const COMMANDS = {
     }).catch(err => { console.error(`Error: ${err.message}`); process.exit(1); });
   },
 
+  // ── web dashboard ─────────────────────────────────────────────────────────
+
+  'serve'(args) {
+    const { flags } = parseArgs(args);
+    const port = flags.port ? +flags.port : 7749;
+    const { createServer } = require('./server');
+    const srv = createServer();
+    srv.listen(port, () => {
+      console.log(`HIVE dashboard → http://localhost:${port}/`);
+      console.log('Ctrl+C to stop.');
+    });
+  },
+
   // ── utility ───────────────────────────────────────────────────────────────
 
   'export'() {
@@ -660,6 +673,9 @@ Project commands:
   hive project list   [--status active|paused|completed|archived] [--domain D]
   hive project get    <id>
   hive project update <id>  [--name] [--status] [--objective] [--description] [--domain]
+
+Web dashboard:
+  hive serve     [--port N]   Start local dashboard (default port 7749)
 
 Utility:
   hive export    Export all active memories to Markdown files

@@ -1,5 +1,23 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 9 Complete
+
+**Phase 9: Web Dashboard**
+
+`src/server.js`:
+- Local HTTP server on port 7749 (`hive serve [--port N]`)
+- 8 JSON API endpoints: `/api/stats`, `/api/search`, `/api/memories`, `/api/patterns`, `/api/entities`, `/api/projects`, `/api/brief`, plus `/` for the HTML dashboard
+- Brief endpoint serves cached `database/last-briefing.md` if present, else calls `dailyBriefing()`
+- Embedded single-page dashboard: Search, Memories (filterable by type/trust/project), Briefing, Patterns (bar chart), Entities tabs
+- `createServer()` exported as factory for test lifecycle control (port 0 → OS-assigned)
+- Uses WHATWG `URL` API — no `url.parse()` deprecation warning
+
+`src/hive.js`: added `hive serve [--port N]` command
+
+Tests: 10/10 passing (`tests/test-server.js`). All suites: **90/90 total**.
+
+---
+
 ## 2026-11-20 — Phase 8 Complete
 
 **Phase 8: Entity Extraction / Auto-tagging**
