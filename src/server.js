@@ -21,6 +21,7 @@ const digest           = require('./digest');
 const decay            = require('./decay');
 const obsidian         = require('./obsidian');
 const conflicts        = require('./conflicts');
+const memgraph         = require('./memgraph');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -457,6 +458,7 @@ const ROUTES = {
     json(res, { changes: decay.preview({ minIdleDays }) });
   },
   'GET /api/export/obsidian': (req, res) => json(res, obsidian.generate()),
+  'GET /api/memories/graph': (req, res) => json(res, memgraph.build()),
   'GET /api/conflicts':      (req, res) => json(res, conflicts.detect()),
   'POST /api/conflicts':     async (req, res) => {
     const body = await readBody(req);
@@ -653,6 +655,7 @@ input{width:360px}
   <button onclick="show('digest',this);loadDigest()">Digest</button>
   <button onclick="show('decay',this);loadDecayPreview()">Decay</button>
   <button onclick="show('conflicts',this);loadConflicts()">Conflicts</button>
+  <button onclick="show('memgraph',this);loadMemGraph()">Mem Graph</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -766,6 +769,14 @@ input{width:360px}
 <div id="conflicts" class="tab">
   <div class="row" style="margin-bottom:16px"><button class="btn" onclick="loadConflicts()">↺ Refresh</button></div>
   <div id="cf-body"><p class="empty">Loading…</p></div>
+</div>
+
+<div id="memgraph" class="tab" style="padding:0">
+  <div style="padding:12px 24px;display:flex;gap:8px;align-items:center;border-bottom:1px solid #21262d">
+    <button class="btn" onclick="loadMemGraph()">↺ Refresh</button>
+    <span id="mg-stats" style="font-size:12px;color:#8b949e"></span>
+  </div>
+  <canvas id="mg-canvas" style="width:100%;display:block;background:#0d1117"></canvas>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -1036,6 +1047,83 @@ async function loadEnt() {
   g('el').innerHTML = d.map(e=>\`<div class="card"><div class="ct">\${esc(e.name)}</div><div class="cm"><span class="b bt">\${e.entity_type}</span>\${e.aliases.length?' · '+e.aliases.join(', '):''}</div>\${e.description?\`<div class="cc">\${esc(e.description)}</div>\`:''}</div>\`).join('');
 }
 
+let mgStop = null;
+async function loadMemGraph() {
+  if (mgStop) { mgStop(); mgStop = null; }
+  const data = await api('/api/memories/graph');
+  const canvas = g('mg-canvas');
+  const W = canvas.parentElement.clientWidth || 900;
+  const H = Math.max(500, Math.round(W * 0.6));
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  if (!data.nodes.length) {
+    ctx.fillStyle = '#8b949e'; ctx.font = '14px monospace';
+    ctx.fillText('No memory links yet — create links with hive link add', 20, 40);
+    g('mg-stats').textContent = '';
+    return;
+  }
+  g('mg-stats').textContent = \`\${data.nodes.length} memories · \${data.edges.length} links\`;
+  // Position nodes
+  const nodes = data.nodes.map((n,i) => ({
+    ...n, x: W/2 + Math.cos(i/data.nodes.length*Math.PI*2)*200,
+           y: H/2 + Math.sin(i/data.nodes.length*Math.PI*2)*150, vx:0, vy:0
+  }));
+  const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+  let running = true;
+  mgStop = () => { running = false; };
+  const tick = () => {
+    if (!running) return;
+    // Repulsion
+    for (let i=0;i<nodes.length;i++) for (let j=i+1;j<nodes.length;j++) {
+      const a=nodes[i],b=nodes[j]; const dx=b.x-a.x,dy=b.y-a.y;
+      const d=Math.max(1,Math.sqrt(dx*dx+dy*dy)); const f=800/(d*d);
+      a.vx-=dx*f; a.vy-=dy*f; b.vx+=dx*f; b.vy+=dy*f;
+    }
+    // Spring attraction along edges
+    for (const e of data.edges) {
+      const a=byId[e.from],b=byId[e.to]; if(!a||!b) continue;
+      const dx=b.x-a.x,dy=b.y-a.y; const d=Math.max(1,Math.sqrt(dx*dx+dy*dy));
+      const f=(d-80)*0.004; a.vx+=dx*f; a.vy+=dy*f; b.vx-=dx*f; b.vy-=dy*f;
+    }
+    // Center gravity + damping + bounds
+    for (const n of nodes) {
+      n.vx += (W/2-n.x)*0.001; n.vy += (H/2-n.y)*0.001;
+      n.vx*=0.85; n.vy*=0.85;
+      n.x=Math.max(n.size,Math.min(W-n.size,n.x+n.vx));
+      n.y=Math.max(n.size,Math.min(H-n.size,n.y+n.vy));
+    }
+    ctx.clearRect(0,0,W,H);
+    // Draw edges
+    for (const e of data.edges) {
+      const a=byId[e.from],b=byId[e.to]; if(!a||!b) continue;
+      ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+      ctx.strokeStyle=e.color+'88'; ctx.lineWidth=1.5; ctx.stroke();
+    }
+    // Draw nodes
+    for (const n of nodes) {
+      ctx.beginPath(); ctx.arc(n.x,n.y,n.size,0,Math.PI*2);
+      ctx.fillStyle = n.pinned ? '#d29922' : n.color;
+      ctx.fill();
+      if (n.size > 8) {
+        ctx.fillStyle='#c9d1d9'; ctx.font=\`\${Math.min(11,n.size)}px monospace\`;
+        ctx.textAlign='center'; ctx.textBaseline='middle';
+        const lbl = n.label.length>18 ? n.label.slice(0,16)+'…' : n.label;
+        ctx.fillText(lbl, n.x, n.y+n.size+9);
+      }
+    }
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+  // Legend
+  const types = [...new Set(data.nodes.map(n=>n.type))];
+  ctx.font='11px monospace';
+  types.forEach((t,i) => {
+    const col = data.nodes.find(n=>n.type===t)?.color||'#8b949e';
+    ctx.fillStyle=col; ctx.fillRect(10,10+i*18,12,12);
+    ctx.fillStyle='#8b949e'; ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillText(t,28,10+i*18);
+  });
+}
 let gStop = null, gNodes = [], gOffset = {x:0,y:0}, gScale = 1;
 function fitGraph() {
   if (!gNodes.length) return;

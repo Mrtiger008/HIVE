@@ -69,9 +69,11 @@
 
 ## Phase 37 — Conflict Resolution — DONE ✅ (2026-11-20)
 
-## Phase 38 — Candidates
+## Phase 38 — Memory Relations Graph — DONE ✅ (2026-11-20)
+
+## Phase 39 — Candidates
 
 - **Keyboard shortcuts**: keyboard-driven navigation (j/k scroll, / focus search, n new)
-- **Memory relations graph**: visualize memory-to-memory links as a force-directed graph
 - **Multi-file import**: batch import from a directory of markdown files
 - **Knowledge timeline**: chronological view of memory creation and updates with filtering
+- **Memory clusters**: group related memories by topic using tag/domain co-occurrence

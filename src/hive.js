@@ -1003,6 +1003,21 @@ const COMMANDS = {
     }
   },
 
+  'memory-graph'() {
+    const mg = require('./memgraph');
+    const { nodes, edges } = mg.build();
+    console.log(`\n── Memory Relations Graph ──────────────────`);
+    console.log(`  Nodes : ${nodes.length} active memories`);
+    console.log(`  Edges : ${edges.length} links`);
+    if (!edges.length) { console.log('  No links yet. Use `hive link add` to connect memories.\n'); return; }
+    const byType = {};
+    for (const n of nodes) byType[n.type] = (byType[n.type] || 0) + 1;
+    console.log(`\n  By type: ${Object.entries(byType).map(([t,c])=>`${t}(${c})`).join('  ')}`);
+    const byRel = {};
+    for (const e of edges) byRel[e.rel_type] = (byRel[e.rel_type] || 0) + 1;
+    console.log(`  By rel:  ${Object.entries(byRel).map(([r,c])=>`${r}(${c})`).join('  ')}\n`);
+  },
+
   'help'() {
     console.log(`
 HIVE — Personal AI Knowledge & Memory System
@@ -1107,6 +1122,10 @@ Webhooks:
   hive webhook list             List registered webhooks
   hive webhook add <url>        Register a webhook URL [--events ev1,ev2  default: *]
   hive webhook remove <id>      Delete a webhook by id
+
+Memory relations graph:
+  hive memory-graph                      Show graph stats (nodes, edges, type/rel breakdown)
+  hive serve → Mem Graph tab            Interactive force-directed visualization in browser
 
 Utility:
   hive export    Export all active memories to Markdown files

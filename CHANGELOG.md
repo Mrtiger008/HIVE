@@ -1,5 +1,30 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 38 Complete
+
+**Phase 38: Memory Relations Graph**
+
+`src/memgraph.js` (new):
+- `build()` — returns `{ nodes, edges }` from active memories and their relationships
+  - Nodes: `{ id, label, type, importance, confidence, pinned, color, size }` — size = `6 + importance * 1.4`
+  - Edges: `{ id, from, to, rel_type, color }` — only between active memories
+- `TYPE_COLORS` — hex palette for 6 memory types (core/domain/project/episodic/semantic/skill)
+- `EDGE_COLORS` — hex palette for 6 rel types (related/supports/contradicts/supersedes/predecessor/see-also)
+
+`src/server.js`:
+- `GET /api/memories/graph` — returns full graph data
+- Dashboard: **Mem Graph** tab with force-directed canvas simulation
+  - Physics: repulsion + spring attraction + center gravity + damping
+  - Nodes sized by importance, colored by memory type (pinned = gold)
+  - Edges colored by rel_type; legend rendered on canvas
+  - `mg-stats` shows node/edge counts
+
+`src/hive.js`:
+- `hive memory-graph` — text stats: total nodes/edges, breakdown by type and rel_type
+
+`tests/test-phase38.js` — 10/10 passing
+Full regression: 290/290 (Phases 10–38, zero regressions)
+
 ## 2026-11-20 — Phase 37 Complete
 
 **Phase 37: Conflict Resolution**
