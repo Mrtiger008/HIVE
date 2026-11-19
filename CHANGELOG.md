@@ -1,5 +1,26 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 29 Complete
+
+**Phase 29: Memory Templates**
+
+`src/templates.js` (new):
+- Six built-in templates keyed by `memory_type` (core, domain, project, episodic, semantic, skill)
+- Each template carries: `title_hint`, `content_hint`, `trust_level`, `importance`, `confidence`, `tags`
+- `list()` — returns all templates; `get(type)` — returns template for type, falls back to semantic
+
+`src/server.js`:
+- `GET /api/templates` — returns all template definitions
+- Add modal type selector now fires `applyTemplate(type)` on change
+- `applyTemplate()` — loads templates once (cached), pre-fills content, trust, importance, confidence and tags without overwriting user-entered values; no-ops during edits
+
+`src/hive.js`:
+- `hive template list` — shows all templates with defaults
+- `hive template <type>` — shows full template including content hint
+
+`tests/test-phase29.js`: 10/10 passing
+Full regression: 200/200 (Phases 10–29)
+
 ## 2026-11-20 — Phase 28 Complete
 
 **Phase 28: Tag Analytics**

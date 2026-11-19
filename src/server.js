@@ -13,6 +13,7 @@ const apikeys          = require('./apikeys');
 const webhooks         = require('./webhooks');
 const versions         = require('./versions');
 const tags             = require('./tags');
+const templates        = require('./templates');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -384,6 +385,7 @@ const ROUTES = {
   'GET /api/brief':          handleBrief,
   'GET /api/apikeys':        handleListKeys,
   'POST /api/apikeys':       handleCreateKey,
+  'GET /api/templates':      (req, res) => json(res, templates.list()),
   'GET /api/tags/stats':     (req, res) => { const u = new URL(req.url,'http://l'); handleTagStats(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/webhooks':       handleListWebhooks,
   'POST /api/webhooks':      handleAddWebhook,
@@ -649,7 +651,7 @@ input{width:360px}
     <h3 id="nm-h">Add Memory</h3>
     <div class="f"><label>Title *</label><input id="nm-t" style="width:100%" placeholder="Memory title"></div>
     <div class="f"><label>Content *</label><textarea id="nm-c" rows="5" placeholder="Memory content…"></textarea></div>
-    <div class="f"><label>Type</label><select id="nm-ty"><option>semantic</option><option>core</option><option>domain</option><option>project</option><option>episodic</option><option>skill</option></select></div>
+    <div class="f"><label>Type</label><select id="nm-ty" onchange="applyTemplate(this.value)"><option>semantic</option><option>core</option><option>domain</option><option>project</option><option>episodic</option><option>skill</option></select></div>
     <div class="f"><label>Trust</label><select id="nm-tr"><option>OBSERVED</option><option>USER_CONFIRMED</option><option>SOURCE_VERIFIED</option><option>INFERRED</option></select></div>
     <div class="f"><label>Importance (1–10)</label><input id="nm-i" type="number" min="1" max="10" value="5"></div>
     <div class="f"><label>Confidence (0–1) <span style="font-weight:normal;color:#8b949e">how certain this is</span></label><input id="nm-cf" type="number" min="0" max="1" step="0.05" value="0.5" style="width:88px"></div>
@@ -965,6 +967,23 @@ async function loadGraph() {
 
 function refreshStats() { api('/api/stats').then(d => g('stats').textContent = \`\${d.memories} memories · \${d.entities} entities · \${d.projects} projects\`); }
 let _editId = null;
+let _tplCache = null;
+async function _loadTemplates() {
+  if (!_tplCache) _tplCache = await api('/api/templates').then(a => Object.fromEntries(a.map(t=>[t.memory_type,t])));
+  return _tplCache;
+}
+async function applyTemplate(type) {
+  if (_editId) return; // don't clobber an edit
+  const tpls = await _loadTemplates();
+  const tpl = tpls[type]; if (!tpl) return;
+  if (tpl.title_hint && !g('nm-t').value) g('nm-t').placeholder = tpl.title_hint + '…';
+  else if (!tpl.title_hint) g('nm-t').placeholder = 'Memory title';
+  if (!g('nm-c').value && tpl.content_hint) g('nm-c').value = tpl.content_hint;
+  g('nm-tr').value = tpl.trust_level;
+  g('nm-i').value  = tpl.importance;
+  g('nm-cf').value = tpl.confidence;
+  if (tpl.tags.length && !g('nm-tg').value) g('nm-tg').value = tpl.tags.join(', ');
+}
 function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-cf').value='0.5'; g('nm-tg').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
 async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-cf').value=d.confidence!=null?d.confidence:0.5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
 function closeAdd() { g('add-modal').classList.remove('on'); g('nm-dup').style.display='none'; }

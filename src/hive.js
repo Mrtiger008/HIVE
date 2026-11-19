@@ -724,6 +724,28 @@ const COMMANDS = {
     }
   },
 
+  'template'(args) {
+    const { positional } = parseArgs(args);
+    const t = require('./templates');
+    if (positional && positional !== 'list') {
+      const tpl = t.get(positional);
+      console.log(`\nTemplate: ${tpl.memory_type}`);
+      console.log(`  Trust:      ${tpl.trust_level}`);
+      console.log(`  Importance: ${tpl.importance}`);
+      console.log(`  Confidence: ${tpl.confidence}`);
+      if (tpl.title_hint) console.log(`  Title hint: ${tpl.title_hint}…`);
+      if (tpl.tags.length) console.log(`  Tags:       ${tpl.tags.join(', ')}`);
+      if (tpl.content_hint) console.log(`\n  Content template:\n${tpl.content_hint.split('\n').map(l=>'    '+l).join('\n')}`);
+    } else {
+      const all = t.list();
+      console.log('\nAvailable templates:\n');
+      for (const tpl of all) {
+        console.log(`  ${tpl.memory_type.padEnd(10)}  trust:${tpl.trust_level}  i=${tpl.importance}  conf=${tpl.confidence}`);
+      }
+      console.log('');
+    }
+  },
+
   'tags'(args) {
     const { flags } = parseArgs(args);
     const t = require('./tags');
@@ -861,6 +883,10 @@ API key management:
   hive apikey list              List all API keys
   hive apikey create <name>     Generate a new Bearer token (shown once)
   hive apikey revoke <name>     Delete a key
+
+Memory templates:
+  hive template list            List all built-in templates with their defaults
+  hive template <type>          Show full template for a memory type
 
 Tag analytics:
   hive tags                     Show top 20 tags by frequency

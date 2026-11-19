@@ -51,9 +51,11 @@
 
 ## Phase 28 — Tag Analytics — DONE ✅ (2026-11-20)
 
-## Phase 29 — Candidates
+## Phase 29 — Memory Templates — DONE ✅ (2026-11-20)
 
-- **Memory templates**: pre-fill add modal with type-specific field defaults
+## Phase 30 — Candidates
+
+- **Knowledge stats dashboard**: total memories, trust/type breakdown, growth over time
 - **Scheduled digests**: daily/weekly summary of stale + new memories (file or stdout)
 - **Full-text export to Obsidian**: sync memories as markdown vault notes with backlinks
-- **Knowledge stats dashboard**: total memories, trust breakdown, type breakdown, growth chart
+- **Memory linking**: manually link two memories as related, predecessor, or supersedes
