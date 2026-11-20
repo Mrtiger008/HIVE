@@ -107,6 +107,28 @@ function handleSearchHistory(req, res, q) {
   json(res, rows);
 }
 
+function handleSuggest(req, res, q) {
+  const query = (q.q || '').trim();
+  if (!query || query.length < 2) { json(res, []); return; }
+  const db = getDb();
+  const like = '%' + query + '%';
+  const titles = db.prepare(
+    "SELECT id, title FROM memories WHERE title LIKE ? AND status='active' LIMIT 5"
+  ).all(like);
+  let tagRows = [];
+  try {
+    tagRows = db.prepare(
+      "SELECT DISTINCT value FROM memories, json_each(memories.tags) WHERE value LIKE ? AND memories.status='active' LIMIT 4"
+    ).all(like);
+  } catch {}
+  const titleSet = new Set(titles.map(m => m.title));
+  const items = [
+    ...titles.map(m => ({ type: 'title', label: m.title, id: m.id })),
+    ...tagRows.map(r => r.value).filter(t => !titleSet.has(t)).map(t => ({ type: 'tag', label: t }))
+  ];
+  json(res, items.slice(0, 8));
+}
+
 function handleSearch(req, res, q) {
   const query = q.q || '';
   const limit = +(q.limit) || 20;
@@ -489,8 +511,9 @@ function handleIndex(req, res) {
 
 const ROUTES = {
   'GET /api/stats':          handleStats,
-  'GET /api/search':         handleSearch,
-  'GET /api/search/history': handleSearchHistory,
+  'GET /api/search':          handleSearch,
+  'GET /api/search/suggest':  handleSuggest,
+  'GET /api/search/history':  handleSearchHistory,
   'GET /api/tags':           handleTags,
   'GET /api/activity':       handleActivity,
   'GET /api/memories':         handleMemories,
@@ -744,6 +767,11 @@ input{width:360px}
 .tpl-chip{background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:12px;padding:3px 10px;font-size:12px;cursor:pointer;transition:all .15s}
 .tpl-chip:hover{border-color:#58a6ff;color:#58a6ff}
 .tpl-chip.on{background:#1f4b2b;border-color:#3fb950;color:#3fb950}
+#srch-sug{position:fixed;background:#161b22;border:1px solid #30363d;border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.5);z-index:9999;overflow:hidden;display:none;min-width:260px}
+#srch-sug .ss-item{padding:7px 12px;cursor:pointer;display:flex;align-items:center;gap:8px;font-size:13px;color:#e6edf3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#srch-sug .ss-item:hover,#srch-sug .ss-item.on{background:#1f2937}
+#srch-sug .ss-type{font-size:10px;padding:2px 5px;border-radius:3px;background:#21262d;color:#8b949e;flex-shrink:0}
+#srch-sug .ss-type.tag{background:#0d2a1f;color:#3fb950}
 .bt{background:#1f4b8e22;color:#58a6ff;border:1px solid #1f4b8e44}
 .br{background:#1a7f3722;color:#3fb950;border:1px solid #1a7f3744}
 .bi{background:#7d2f2f22;color:#f85149;border:1px solid #7d2f2f44}
@@ -807,8 +835,9 @@ input{width:360px}
 
 <div id="search" class="tab on">
   <div class="row">
-    <input id="q" placeholder="Search memories…" onkeydown="if(event.key==='Enter')doSearch()" list="q-history" autocomplete="off">
+    <input id="q" placeholder="Search memories…" oninput="suggestDebounce(this.value)" onkeydown="if(event.key==='Enter'){var _si=document.querySelector('#srch-sug .ss-item.on');if(_si){pickSuggest(_si);}else{doSearch();}hideSuggest();}else if(event.key==='Escape'){hideSuggest();}else if(event.key==='ArrowDown'||event.key==='ArrowUp'){suggestNav(event);}" list="q-history" autocomplete="off">
     <datalist id="q-history"></datalist>
+    <div id="srch-sug"></div>
     <select id="smode" title="Search mode"><option value="keyword">Keyword</option><option value="hybrid">Hybrid</option><option value="semantic">Semantic</option></select>
     <button class="btn" onclick="doSearch()">Search</button>
     <button class="btn" style="margin-left:4px" onclick="saveBookmark()" title="Save this search">★ Save</button>
@@ -1228,6 +1257,56 @@ async function doSearch() {
   g('sr').innerHTML = d.length ? d.map(searchCard).join('') : '<p class="empty">No results.</p>';
   loadHistory();
 }
+
+var _sugTimer = null, _sugIdx = -1;
+function suggestDebounce(v) {
+  clearTimeout(_sugTimer);
+  if (!v || v.length < 2) { hideSuggest(); return; }
+  _sugTimer = setTimeout(function() { runSuggest(v); }, 150);
+}
+async function runSuggest(v) {
+  var items = await api('/api/search/suggest?q=' + encodeURIComponent(v));
+  if (!items || !items.length) { hideSuggest(); return; }
+  showSuggest(items);
+}
+function showSuggest(items) {
+  var el = g('srch-sug');
+  el.innerHTML = items.map(function(it) {
+    var cls = it.type === 'tag' ? 'ss-type tag' : 'ss-type';
+    var lbl = it.type === 'tag' ? '#tag' : 'memory';
+    return '<div class="ss-item" data-label="' + esc(it.label) + '" onclick="pickSuggest(this)">'
+      + '<span class="' + cls + '">' + lbl + '</span>'
+      + '<span style="overflow:hidden;text-overflow:ellipsis">' + esc(it.label) + '</span>'
+      + '</div>';
+  }).join('');
+  _sugIdx = -1;
+  var r = g('q').getBoundingClientRect();
+  el.style.top = (r.bottom + 2) + 'px';
+  el.style.left = r.left + 'px';
+  el.style.width = Math.max(r.width, 260) + 'px';
+  el.style.display = 'block';
+}
+function hideSuggest() {
+  var el = g('srch-sug');
+  if (el) { el.style.display = 'none'; el.innerHTML = ''; _sugIdx = -1; }
+}
+function pickSuggest(el) {
+  g('q').value = el.dataset.label;
+  hideSuggest();
+  doSearch();
+}
+function suggestNav(e) {
+  var items = document.querySelectorAll('#srch-sug .ss-item');
+  if (!items.length) return;
+  e.preventDefault();
+  if (e.key === 'ArrowDown') _sugIdx = Math.min(_sugIdx + 1, items.length - 1);
+  else _sugIdx = Math.max(_sugIdx - 1, -1);
+  items.forEach(function(el, i) { el.classList.toggle('on', i === _sugIdx); });
+  if (_sugIdx >= 0) g('q').value = items[_sugIdx].dataset.label;
+}
+document.addEventListener('click', function(e) {
+  if (e.target.id !== 'q' && !g('srch-sug').contains(e.target)) hideSuggest();
+});
 
 let _sel = new Set();
 function toggleSel(id, on) {

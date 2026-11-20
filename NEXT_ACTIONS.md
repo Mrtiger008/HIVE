@@ -107,8 +107,10 @@
 
 ## Phase 56 — Memory Diff Viewer — DONE ✅ (2026-11-20)
 
-## Phase 57 — Candidates
+## Phase 57 — Smart Search Suggestions — DONE ✅ (2026-11-20)
+
+## Phase 58 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
 - **Memory export to CSV**: export filtered memories as a downloadable spreadsheet
-- **Smart search suggestions**: autocomplete/suggest as you type in the search box
+- **Memory merge**: merge two duplicate memories into one, keeping the better content

@@ -1,5 +1,18 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 57 Complete
+
+**Phase 57: Smart Search Suggestions**
+
+`src/server.js`:
+- Added `handleSuggest` backend function: LIKE query on memory titles + `json_each` tag scan, returns `[{type,label,id?}]`, max 8 items, no FTS overhead
+- Added `GET /api/search/suggest?q=` route
+- Added `#srch-sug` dropdown div and CSS (`.ss-item`, `.ss-type`, `.ss-type.tag`)
+- Updated `#q` input: added `oninput="suggestDebounce()"` and extended `onkeydown` for ↑/↓/Esc/Enter navigation
+- Added JS: `suggestDebounce`, `runSuggest`, `showSuggest`, `hideSuggest`, `pickSuggest`, `suggestNav`, outside-click dismiss
+
+`tests/test-phase57.js` — 10/10 passing
+
 ## 2026-11-20 — Phase 56 Complete
 
 **Phase 56: Memory Diff Viewer**
