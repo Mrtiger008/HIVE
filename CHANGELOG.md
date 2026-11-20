@@ -1,5 +1,19 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 54 Complete
+
+**Phase 54: Inline Memory Editing**
+
+`src/server.js` (dashboard):
+- Title text wrapped in `<span class="ct-title" ondblclick="inlineEdit(id)">` — double-click to enter edit mode
+- `.cc` content div gains `ondblclick="inlineEdit(id)"` too
+- `inlineEdit(id)`: fetches full memory, replaces title span with `<input>` and content with `<textarea>`, adds Save/Cancel buttons, highlights card border green
+- `inlineEditSave(id)`: PUTs title+content, calls `_inlineRestore` on success; flashes red border on empty fields
+- `inlineEditCancel(id)`: restores from `card.dataset.origTitle/origContent`
+- `_inlineRestore(id, title, content)`: shared helper that restores display, cleans up buttons, resets related drawer cache
+
+`tests/test-phase54.js`: 10/10 passing
+
 ## 2026-11-20 — Phase 53 Complete
 
 **Phase 53: Related Memories Panel**

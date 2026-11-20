@@ -101,8 +101,10 @@
 
 ## Phase 53 — Related Memories Panel — DONE ✅ (2026-11-20)
 
-## Phase 54 — Candidates
+## Phase 54 — Inline Memory Editing — DONE ✅ (2026-11-20)
+
+## Phase 55 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
-- **Memory export to CSV**: export memories as spreadsheet for external analysis
-- **Inline memory editing**: edit title/content directly on the card without opening the modal
+- **Memory export to CSV**: export filtered memories as a downloadable spreadsheet
+- **Bulk tag editor**: add/remove tags across multiple selected memories at once

@@ -1160,9 +1160,9 @@ function card(m) {
     ? \`<button class="arch" style="color:#d29922" onclick="togglePin('\${m.id}',0)" title="Unpin">📌 pinned</button>\`
     : \`<button class="arch" onclick="togglePin('\${m.id}',1)" title="Pin">📌 pin</button>\`;
   return \`<div class="card" data-id="\${m.id}" style="\${pinStyle}">
-    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button></div>
+    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button></div>
     <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
-    <div class="cc">\${esc(preview)}\${m.content.length>280?'…':''}</div>
+    <div class="cc" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(preview)}\${m.content.length>280?'…':''}</div>
     <div id="rel-\${m.id}" style="display:none;margin-top:8px;border-top:1px solid #21262d;padding-top:8px"></div>
   </div>\`;
 }
@@ -1991,6 +1991,57 @@ async function toggleRelated(id) {
 async function togglePin(id, pin) {
   await fetch(\`/api/memories/\${id}/\${pin?'pin':'unpin'}\`, {method:'POST',headers:{'X-Hive-Local':'1'}});
   loadMem();
+}
+async function inlineEdit(id) {
+  const card = document.querySelector('.card[data-id="' + id + '"]');
+  if (!card || card.dataset.editing) return;
+  card.dataset.editing = '1';
+  card.style.borderColor = '#3fb950';
+  const m = await api('/api/memories/' + id);
+  card.dataset.origTitle = m.title;
+  card.dataset.origContent = m.content || '';
+  const titleEl = card.querySelector('.ct-title');
+  if (titleEl) titleEl.outerHTML = '<input class="ie-inp" id="ie-t-' + id + '" value="' + esc(m.title) + '" style="flex:1;min-width:0;background:#0d1117;border:1px solid #3fb950;color:#e6edf3;border-radius:4px;padding:2px 6px;font-size:14px;font-weight:600">';
+  const cc = card.querySelector('.cc');
+  if (cc) cc.innerHTML = '<textarea id="ie-c-' + id + '" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #3fb950;color:#e6edf3;border-radius:4px;padding:4px 6px;font-size:13px;resize:vertical;min-height:80px">' + esc(m.content || '') + '</textarea>';
+  const ct = card.querySelector('.ct');
+  if (ct) ct.insertAdjacentHTML('beforeend',
+    '<button class="btn ie-btn" id="ie-save-' + id + '" style="font-size:11px;padding:2px 8px;color:#3fb950;margin-left:4px" onclick="inlineEditSave(\'' + id + '\')">✓ save</button>'
+    + '<button class="btn ie-btn" style="font-size:11px;padding:2px 8px;margin-left:2px" onclick="inlineEditCancel(\'' + id + '\')">✕</button>');
+}
+async function inlineEditSave(id) {
+  const tInput = document.getElementById('ie-t-' + id);
+  const cInput = document.getElementById('ie-c-' + id);
+  if (!tInput || !cInput) return;
+  const title = tInput.value.trim();
+  const content = cInput.value.trim();
+  if (!title)   { tInput.style.borderColor = '#f85149'; return; }
+  if (!content) { cInput.style.borderColor = '#f85149'; return; }
+  const btn = document.getElementById('ie-save-' + id);
+  if (btn) btn.textContent = '…';
+  const r = await fetch('/api/memories/' + id, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json','X-Hive-Local':'1'},
+    body: JSON.stringify({ title: title, content: content })
+  });
+  if (!r.ok) { if (btn) btn.textContent = '✓ save'; return; }
+  _inlineRestore(id, title, content);
+}
+function inlineEditCancel(id) {
+  const card = document.querySelector('.card[data-id="' + id + '"]');
+  if (card) _inlineRestore(id, card.dataset.origTitle, card.dataset.origContent);
+}
+function _inlineRestore(id, title, content) {
+  const card = document.querySelector('.card[data-id="' + id + '"]');
+  if (!card) return;
+  delete card.dataset.editing; card.style.borderColor = '';
+  const tEl = document.getElementById('ie-t-' + id);
+  if (tEl) tEl.outerHTML = '<span class="ct-title" ondblclick="inlineEdit(\'' + id + '\')" title="Double-click to edit inline" style="cursor:text">' + esc(title) + '</span>';
+  const cc = card.querySelector('.cc');
+  if (cc) { var p = (content||'').slice(0,280); cc.innerHTML = esc(p) + ((content||'').length>280?'…':''); cc.ondblclick = function(){ inlineEdit(id); }; }
+  card.querySelectorAll('.ie-btn').forEach(function(b){ b.remove(); });
+  const relEl = g('rel-' + id);
+  if (relEl) { relEl.style.display = 'none'; delete relEl.dataset.loaded; }
 }
 function filterTag(tag) { const sel=g('mtag'); sel.value=tag; document.querySelectorAll('nav button').forEach(b=>{if(b.textContent==='Memories')b.click();}); }
 function loadTagSelect() { api('/api/tags').then(ts => { const sel=g('mtag'); sel.innerHTML='<option value="">All tags</option>'; ts.forEach(({tag,count})=>{const o=document.createElement('option');o.value=tag;o.textContent=tag+' ('+count+')';sel.appendChild(o);}); }); }
