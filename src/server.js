@@ -1091,12 +1091,15 @@ input{width:360px}
 </div>
 
 <div id="hist-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
-  <div class="mbox" style="max-width:700px;max-height:85vh;overflow-y:auto">
+  <div class="mbox" style="max-width:900px;max-height:88vh;overflow-y:auto">
     <h3>Version History</h3>
     <div id="hist-list"></div>
     <div id="hist-diff" style="display:none;margin-top:12px">
-      <h4 style="margin:0 0 8px;font-size:13px;color:#8b949e">Diff vs current (snapshot → current)</h4>
-      <pre id="hist-diff-out" style="font-size:12px;line-height:1.6;white-space:pre-wrap;background:#0d1117;padding:12px;border-radius:6px;border:1px solid #21262d;overflow-x:auto"></pre>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+        <h4 style="margin:0;font-size:13px;color:#8b949e">Side-by-side diff (snapshot → current)</h4>
+        <button class="btn" id="hist-diff-toggle" style="font-size:11px;padding:2px 8px" onclick="toggleDiffMode()">Switch to unified</button>
+      </div>
+      <div id="hist-diff-out" style="font-size:12px;overflow-x:auto"></div>
     </div>
     <div class="mbtns"><button class="btn" onclick="g('hist-modal').style.display='none'">Close</button></div>
   </div>
@@ -2413,20 +2416,61 @@ async function loadCoOccurrence() {
     g('tc-co-out').style.display='block';
   }, 300);
 }
+var _lastDiffOps = [];
+var _diffMode = 'side'; // 'side' | 'unified'
+function _renderSideBySide(ops) {
+  var rows = [];
+  var i = 0;
+  while (i < ops.length) {
+    if (ops[i].type === 'eq') { rows.push({ l: ops[i].text, r: ops[i].text, t: 'eq' }); i++; }
+    else {
+      var dels = [], adds = [];
+      while (i < ops.length && ops[i].type === 'del') { dels.push(ops[i].text); i++; }
+      while (i < ops.length && ops[i].type === 'add') { adds.push(ops[i].text); i++; }
+      var mx = Math.max(dels.length, adds.length);
+      for (var k = 0; k < mx; k++) rows.push({ l: dels[k] != null ? dels[k] : null, r: adds[k] != null ? adds[k] : null, t: 'ch' });
+    }
+  }
+  var th = 'padding:4px 8px;text-align:left;font-size:11px;color:#8b949e;border-bottom:1px solid #30363d;background:#161b22;position:sticky;top:0';
+  var td = 'padding:2px 8px;vertical-align:top;white-space:pre-wrap;word-break:break-word;border-bottom:1px solid #161b22';
+  var html = '<table style="width:100%;border-collapse:collapse;font-family:monospace"><thead><tr>'
+    + '<th style="' + th + ';width:50%">Snapshot (old)</th><th style="' + th + ';width:50%">Current</th>'
+    + '</tr></thead><tbody>';
+  for (var ri = 0; ri < rows.length; ri++) {
+    var row = rows[ri];
+    if (row.t === 'eq') {
+      html += '<tr><td style="' + td + ';color:#8b949e">' + esc(row.l) + '</td><td style="' + td + ';color:#8b949e">' + esc(row.r) + '</td></tr>';
+    } else {
+      var lStyle = row.l !== null ? td + ';background:#2d1f1f;color:#f85149' : td + ';background:#0d1117';
+      var rStyle = row.r !== null ? td + ';background:#1a2d1a;color:#3fb950' : td + ';background:#0d1117';
+      var lTxt = row.l !== null ? '- ' + esc(row.l) : '';
+      var rTxt = row.r !== null ? '+ ' + esc(row.r) : '';
+      html += '<tr><td style="' + lStyle + '">' + lTxt + '</td><td style="' + rStyle + '">' + rTxt + '</td></tr>';
+    }
+  }
+  html += '</tbody></table>';
+  return html;
+}
+function _renderUnified(ops) {
+  return '<pre style="font-size:12px;line-height:1.6;white-space:pre-wrap;background:#0d1117;padding:12px;border-radius:6px;border:1px solid #21262d;overflow-x:auto">'
+    + ops.map(function(op) {
+      var t = esc(op.text);
+      if (op.type === 'add') return '<span style="color:#3fb950;display:block">+ ' + t + '</span>';
+      if (op.type === 'del') return '<span style="color:#f85149;display:block">- ' + t + '</span>';
+      return '<span style="color:#8b949e;display:block">  ' + t + '</span>';
+    }).join('') + '</pre>';
+}
+function toggleDiffMode() {
+  _diffMode = _diffMode === 'side' ? 'unified' : 'side';
+  g('hist-diff-toggle').textContent = _diffMode === 'side' ? 'Switch to unified' : 'Switch to side-by-side';
+  g('hist-diff-out').innerHTML = _diffMode === 'side' ? _renderSideBySide(_lastDiffOps) : _renderUnified(_lastDiffOps);
+}
 async function showDiff(versionId) {
   const d = await api('/api/versions/'+versionId+'/diff');
-  const lines = d.diff.map(op => {
-    if (op.type==='add') return \`\x1b[32m+ \${op.text}\x1b[0m\`;
-    if (op.type==='del') return \`\x1b[31m- \${op.text}\x1b[0m\`;
-    return \`  \${op.text}\`;
-  });
-  const colored = d.diff.map(op => {
-    const t = esc(op.text);
-    if (op.type==='add') return \`<span style="color:#3fb950;display:block">+ \${t}</span>\`;
-    if (op.type==='del') return \`<span style="color:#f85149;display:block">- \${t}</span>\`;
-    return \`<span style="color:#8b949e;display:block">  \${t}</span>\`;
-  }).join('');
-  g('hist-diff-out').innerHTML = colored;
+  _lastDiffOps = d.diff;
+  _diffMode = 'side';
+  g('hist-diff-toggle').textContent = 'Switch to unified';
+  g('hist-diff-out').innerHTML = _renderSideBySide(d.diff);
   g('hist-diff').style.display='block';
 }
 

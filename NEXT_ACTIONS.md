@@ -105,8 +105,10 @@
 
 ## Phase 55 — Bulk Tag Editor — DONE ✅ (2026-11-20)
 
-## Phase 56 — Candidates
+## Phase 56 — Memory Diff Viewer — DONE ✅ (2026-11-20)
+
+## Phase 57 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
 - **Memory export to CSV**: export filtered memories as a downloadable spreadsheet
-- **Memory diff viewer**: side-by-side diff when viewing version history
+- **Smart search suggestions**: autocomplete/suggest as you type in the search box

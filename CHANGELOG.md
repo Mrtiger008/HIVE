@@ -1,5 +1,19 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 56 Complete
+
+**Phase 56: Memory Diff Viewer**
+
+`src/server.js` (dashboard):
+- History modal widened to 900px for side-by-side layout
+- `<pre>` diff output replaced with `<div>` for table rendering
+- Added `_renderSideBySide(ops)`: groups consecutive `del`/`add` ops into replacement rows, pairs them side-by-side (old left in red, new right in green, unchanged grey across both columns)
+- Added `_renderUnified(ops)`: original unified `+/-` line rendering preserved as fallback
+- Added `toggleDiffMode()`: switches between side-by-side and unified; updates button label; re-renders using cached `_lastDiffOps`
+- `showDiff(versionId)`: now defaults to side-by-side; stores ops in `_lastDiffOps` for toggle re-render
+
+`tests/test-phase56.js`: 10/10 passing
+
 ## 2026-11-20 — Phase 55 Complete
 
 **Phase 55: Bulk Tag Editor**
