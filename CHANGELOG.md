@@ -1,5 +1,18 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 47 Complete
+
+**Phase 47: Tag Cloud UI — inline filtering**
+
+`src/server.js`:
+- Tags tab: clicking a tag now shows matching memories **inline** below the cloud (no navigation away)
+- Selected tag highlighted with underline + count badge; active tag indicator + ✕ clear button in toolbar
+- "Browse in Memories →" link for full browsing context
+- Bug fix: `handleMemories` now fetches all records before applying `?tag=` / `?pinned=` post-filters, then slices to `?limit=`; previous behavior cut the fetch at 50 before filtering, silently dropping results
+
+Tests: `tests/test-phase47.js` — 10/10 passing
+Full regression: 380/380
+
 ## 2026-11-20 — Phase 46 Complete
 
 **Phase 46: Memory Health Score**

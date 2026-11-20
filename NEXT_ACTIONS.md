@@ -87,9 +87,11 @@
 
 ## Phase 46 — Memory Health Score — DONE ✅ (2026-11-20)
 
-## Phase 47 — Candidates
+## Phase 47 — Tag Cloud UI — DONE ✅ (2026-11-20)
+
+## Phase 48 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
-- **Tag cloud UI**: visual tag frequency display in dashboard with click-to-filter
 - **Search filters UI**: filter panel in dashboard (type, domain, trust, date range)
 - **Memory export to CSV**: export memories as spreadsheet for external analysis
+- **Confidence calibration**: bulk-update confidence scores based on age + trust level

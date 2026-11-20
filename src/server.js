@@ -126,16 +126,21 @@ function handleSearch(req, res, q) {
 }
 
 function handleMemories(req, res, q) {
+  const explicitLimit = q.limit ? +(q.limit) : null;
+  // When post-filtering by tag or pinned, fetch all then slice — a pre-fetch limit
+  // would silently cut results before the filter sees them.
+  const needsPostFilter = q.tag || q.pinned;
   let results = memory.list({
     type:        q.type    || undefined,
     trust_level: q.trust   || undefined,
     project_id:  q.project || undefined,
-    limit:       +(q.limit) || 50,
+    limit:       needsPostFilter ? 100000 : (explicitLimit || 50),
     min_conf:    q.min_conf != null ? +q.min_conf : undefined,
     max_conf:    q.max_conf != null ? +q.max_conf : undefined,
   });
   if (q.tag)    results = results.filter(m => (m.tags || []).includes(q.tag));
   if (q.pinned) results = results.filter(m => m.pinned === 1 || m.pinned === true);
+  if (needsPostFilter && explicitLimit) results = results.slice(0, explicitLimit);
   json(res, results);
 }
 
@@ -971,15 +976,26 @@ input{width:360px}
 </div>
 
 <div id="tagcloud" class="tab">
-  <div class="row" style="margin-bottom:12px;gap:8px">
+  <div class="row" style="margin-bottom:12px;gap:8px;align-items:center">
     <button class="btn" onclick="loadTagCloud()">↺ Refresh</button>
     <input id="tc-co" placeholder="Co-occurrence for tag…" style="width:200px" oninput="loadCoOccurrence()">
+    <span id="tc-active-tag" style="display:none;font-size:12px;color:#79c0ff">
+      Filtering: <b id="tc-active-label"></b>
+      <button onclick="clearTagFilter()" style="background:none;border:none;color:#8b949e;cursor:pointer;font-size:12px;margin-left:4px">✕ clear</button>
+    </span>
   </div>
   <div id="tc-cloud" style="line-height:2.4;padding:8px 0"></div>
   <div id="tc-top" style="margin-top:16px"></div>
   <div id="tc-co-out" style="margin-top:16px;display:none">
     <h4 style="margin:0 0 8px;font-size:13px;color:#8b949e">Co-occurring tags</h4>
     <div id="tc-co-list"></div>
+  </div>
+  <div id="tc-results" style="margin-top:20px;display:none">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+      <h4 id="tc-results-title" style="margin:0;font-size:13px;color:#8b949e"></h4>
+      <a id="tc-results-browse" href="#" style="font-size:12px;color:#58a6ff" onclick="browseTag(event)">Browse in Memories →</a>
+    </div>
+    <div id="tc-results-list"></div>
   </div>
 </div>
 
@@ -2027,6 +2043,7 @@ async function loadKStats() {
 }
 
 let _tcTimer = null;
+let _tcSelectedTag = null;
 async function loadTagCloud() {
   const d = await api('/api/tags/stats?limit=80');
   const cloud = g('tc-cloud');
@@ -2035,12 +2052,47 @@ async function loadTagCloud() {
   const max = d.top[0].count;
   const minPx = 12, maxPx = 32;
   const colors = ['#79c0ff','#3fb950','#d2a8ff','#ffa657','#f85149','#58a6ff'];
-  cloud.innerHTML = d.top.map((t,i) => {
+  cloud.innerHTML = d.top.map((t, i) => {
     const size = minPx + Math.round((t.count / max) * (maxPx - minPx));
     const col = colors[i % colors.length];
-    return \`<span style="font-size:\${size}px;color:\${col};margin:0 8px;cursor:pointer;display:inline-block" onclick="filterByTag('\${esc(t.tag)}')" title="\${t.count} memories">#\${esc(t.tag)}</span>\`;
+    const active = _tcSelectedTag === t.tag;
+    const style = \`font-size:\${size}px;color:\${col};margin:0 8px;cursor:pointer;display:inline-block;transition:opacity .15s\${active ? ';text-decoration:underline;opacity:1' : ';opacity:.75'}\`;
+    return \`<span id="tc-tag-\${esc(t.tag.replace(/[^a-z0-9]/gi,'_'))}" style="\${style}" onclick="selectTag('\${esc(t.tag)}')" title="\${t.count} memor\${t.count===1?'y':'ies'}">#\${esc(t.tag)} <sup style="font-size:10px;opacity:.7">\${t.count}</sup></span>\`;
   }).join('');
-  top.innerHTML = \`<table style="font-size:12px;border-collapse:collapse;width:100%;max-width:400px">\${d.top.slice(0,15).map((t,i)=>\`<tr><td style="padding:3px 8px;color:#8b949e">\${i+1}</td><td style="padding:3px 8px"><span style="cursor:pointer;color:#79c0ff" onclick="filterByTag('\${esc(t.tag)}')">#\${esc(t.tag)}</span></td><td style="padding:3px 8px;color:#8b949e">\${t.count}</td></tr>\`).join('')}</table>\`;
+  top.innerHTML = \`<table style="font-size:12px;border-collapse:collapse;width:100%;max-width:400px">\${d.top.slice(0,15).map((t,i)=>\`<tr><td style="padding:3px 8px;color:#8b949e">\${i+1}</td><td style="padding:3px 8px"><span style="cursor:pointer;color:#79c0ff" onclick="selectTag('\${esc(t.tag)}')">#\${esc(t.tag)}</span></td><td style="padding:3px 8px;color:#8b949e">\${t.count}</td></tr>\`).join('')}</table>\`;
+}
+async function selectTag(tag) {
+  _tcSelectedTag = tag;
+  g('tc-active-label').textContent = '#' + tag;
+  g('tc-active-tag').style.display = 'inline';
+  loadTagCloud(); // re-render cloud with highlight
+  const mems = await api(\`/api/memories?tag=\${encodeURIComponent(tag)}&limit=50\`);
+  const res = g('tc-results');
+  const list = g('tc-results-list');
+  g('tc-results-title').textContent = \`\${mems.length} memor\${mems.length===1?'y':'ies'} tagged #\${tag}\`;
+  g('tc-results-browse').dataset.tag = tag;
+  res.style.display = 'block';
+  if (!mems.length) { list.innerHTML='<p class="empty">No memories with this tag.</p>'; return; }
+  list.innerHTML = mems.map(m => \`<div class="card" style="padding:10px 14px">
+    <div style="font-weight:500;color:#e6edf3;margin-bottom:3px">\${esc(m.title)}</div>
+    <div style="font-size:12px;color:#8b949e">
+      <span class="b bt">\${m.memory_type}</span>
+      <span style="margin-left:8px">conf: \${(m.confidence*100|0)}%</span>
+      <span style="margin-left:8px">imp: \${m.importance}</span>
+      \${m.domain ? \`<span style="margin-left:8px">· \${esc(m.domain)}</span>\` : ''}
+    </div>
+  </div>\`).join('');
+}
+function clearTagFilter() {
+  _tcSelectedTag = null;
+  g('tc-active-tag').style.display = 'none';
+  g('tc-results').style.display = 'none';
+  loadTagCloud();
+}
+function browseTag(e) {
+  e.preventDefault();
+  const tag = e.currentTarget.dataset.tag;
+  filterByTag(tag);
 }
 function filterByTag(tag) {
   const tf = g('mtag'); if (tf) { tf.value = tag; }
