@@ -1305,9 +1305,11 @@ function card(m) {
   const pinBtn = m.pinned
     ? \`<button class="arch" style="color:#d29922" onclick="togglePin('\${m.id}',0)" title="Unpin">📌 pinned</button>\`
     : \`<button class="arch" onclick="togglePin('\${m.id}',1)" title="Pin">📌 pin</button>\`;
+  const words = (m.content||'').trim().split(/\s+/).filter(Boolean).length;
+  const rt = Math.max(1, Math.ceil(words / 200));
   return \`<div class="card" data-id="\${m.id}" style="\${pinStyle}">
     <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="duplicateMem('\${m.id}')" title="Duplicate">⧉ dupe</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button></div>
-    <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
+    <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span>\${tags}</div>
     <div class="cc" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(preview)}\${m.content.length>280?'…':''}</div>
     <div id="rel-\${m.id}" style="display:none;margin-top:8px;border-top:1px solid #21262d;padding-top:8px"></div>
   </div>\`;
@@ -1317,11 +1319,13 @@ function searchCard(m) {
   const titleHtml  = m.highlight_title ? hlEsc(m.highlight_title) : esc(m.title);
   const snippetHtml = m.snippet        ? hlEsc(m.snippet)         : esc((m.content||'').replace(/\\n/g,' ').slice(0, 280));
   const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" title="Filter by #\${esc(t)}" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
+  const words = (m.content||'').trim().split(/\s+/).filter(Boolean).length;
+  const rt = Math.max(1, Math.ceil(words / 200));
   return \`<div class="card" data-id="\${m.id}">
     <div class="ct">\${titleHtml}
       <button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button>
     </div>
-    <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
+    <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span>\${tags}</div>
     <div class="cc">\${snippetHtml}</div>
   </div>\`;
 }

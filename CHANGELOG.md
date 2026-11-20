@@ -1,5 +1,15 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 63 Complete
+
+**Phase 63: Reading Time / Word Count**
+
+`src/server.js`:
+- `card()` and `searchCard()`: compute `words` (whitespace-split word count) and `rt` (ceil(words/200), min 1 min)
+- Added `<span class="b" ...>Nw Nm</span>` badge to `.cm` metadata row on every memory card; tooltip shows raw word count
+
+`tests/test-phase63.js`: 10/10 tests (formula edge cases: empty, single word, exactly 200, 201; badge presence in both card functions; HTML checks)
+
 ## 2026-11-20 — Phase 62 Complete
 
 **Phase 62: Multi-file Markdown Import**
