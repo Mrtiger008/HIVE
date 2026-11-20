@@ -1021,6 +1021,29 @@ const COMMANDS = {
     console.log('');
   },
 
+  'gaps'(args) {
+    const { flags } = parseArgs(args);
+    const g = require('./gaps');
+    const d = g.get({
+      confThreshold:  +(flags.conf       || 0.5),
+      importanceFloor:+(flags.importance || 7),
+      minCount:       +(flags['min-count'] || 3),
+      limit:          +(flags.limit      || 20),
+    });
+    const { summary } = d;
+    console.log('\n── Knowledge Gaps ───────────────────────────');
+    console.log(`  Critical: ${summary.critical_memories}  Low-conf domains: ${summary.low_confidence_domains}  Low-conf types: ${summary.low_confidence_types}  Sparse: ${summary.sparse_domains}\n`);
+    if (!d.gaps.length) { console.log('  No significant gaps — knowledge base looks solid.\n'); return; }
+    const SEV = { high: '\x1b[31m', medium: '\x1b[33m' };
+    d.gaps.forEach(gap => {
+      const col = SEV[gap.severity] || '';
+      const scope = gap.scope === 'memory' ? `[mem]` : `[${gap.scope}]`;
+      const extra = gap.scope !== 'memory' ? `  ${gap.count} mems` : `  imp:${gap.avg_importance}`;
+      console.log(`  ${col}${gap.type.padEnd(16)}\x1b[0m ${scope.padEnd(8)} ${gap.label.slice(0,45).padEnd(45)} conf:${(gap.avg_confidence*100|0)}%${extra}`);
+    });
+    console.log('');
+  },
+
   'compare'(args) {
     const { positional } = parseArgs(args);
     const [id1, id2] = positional;
@@ -1235,6 +1258,11 @@ Knowledge timeline:
 Memory relations graph:
   hive memory-graph                      Show graph stats (nodes, edges, type/rel breakdown)
   hive serve → Mem Graph tab            Interactive force-directed visualization in browser
+
+Knowledge gaps:
+  hive gaps                       Detect weak areas in the knowledge base
+  hive gaps --conf 0.4            Custom confidence threshold (default 0.5)
+  hive gaps --importance 8        Min importance for critical gaps (default 7)
 
 Memory compare:
   hive compare <id1> <id2>    Side-by-side field diff + content diff of two memories

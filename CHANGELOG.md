@@ -1,5 +1,25 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 44 Complete
+
+**Phase 44: Knowledge Gaps**
+
+`src/gaps.js` (new):
+- `get(opts)` — detects three gap types: `low_confidence` (domain/type avg confidence < threshold), `sparse` (domain with fewer than minCount memories), `critical` (high-importance + low-confidence individual memory)
+- Options: `minCount=3`, `confThreshold=0.5`, `importanceFloor=7`, `limit=20`
+- Returns: `{ gaps, total, summary }` with severity (`high`/`medium`) on each gap; sorted high → medium, then by ascending confidence
+- Summary counts: `low_confidence_domains`, `low_confidence_types`, `sparse_domains`, `critical_memories`
+
+`src/server.js`:
+- `GET /api/gaps` — returns gap analysis result
+- Dashboard: **Gaps** tab — interactive controls for threshold/minCount, severity-coloured cards
+
+`src/hive.js`:
+- `hive gaps` — prints gap analysis to terminal
+
+Tests: `tests/test-phase44.js` — 10/10 passing
+Full regression: 350/350 (phases 10–44), zero regressions
+
 ## 2026-11-20 — Phase 43 Complete
 
 **Phase 43: Memory Compare**

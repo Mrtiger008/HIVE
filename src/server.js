@@ -27,6 +27,7 @@ const clusters         = require('./clusters');
 const reminders        = require('./reminders');
 const shortcuts        = require('./shortcuts');
 const compare          = require('./compare');
+const gaps             = require('./gaps');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -465,6 +466,15 @@ const ROUTES = {
   'GET /api/export/obsidian': (req, res) => json(res, obsidian.generate()),
   'GET /api/memories/graph': (req, res) => json(res, memgraph.build()),
   'GET /api/shortcuts': (req, res) => json(res, { shortcuts: shortcuts.SHORTCUTS }),
+  'GET /api/gaps': (req, res) => {
+    const q = new URL(req.url, 'http://x').searchParams;
+    json(res, gaps.get({
+      minCount:       q.get('min_count')   ? +q.get('min_count')   : 3,
+      confThreshold:  q.get('conf')        ? +q.get('conf')        : 0.5,
+      importanceFloor:q.get('importance')  ? +q.get('importance')  : 7,
+      limit:          q.get('limit')       ? +q.get('limit')       : 20,
+    }));
+  },
   'GET /api/memories/compare': (req, res) => {
     const q = new URL(req.url, 'http://x').searchParams;
     const id1 = q.get('id1'), id2 = q.get('id2');
@@ -702,6 +712,7 @@ input{width:360px}
   <button onclick="show('clusters',this);loadClusters()">Clusters</button>
   <button onclick="show('reminders',this);loadReminders()" id="rem-btn">Reminders</button>
   <button onclick="show('compare',this);initCompare()">Compare</button>
+  <button onclick="show('gaps',this);loadGaps()">Gaps</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -889,6 +900,20 @@ input{width:360px}
     <button class="btn" onclick="runCompare()">Compare →</button>
   </div>
   <div id="cmp-out" style="margin-top:20px"></div>
+</div>
+
+<div id="gaps" class="tab">
+  <div class="row" style="gap:8px;align-items:center">
+    <button class="btn" onclick="loadGaps()">↺ Refresh</button>
+    <label style="font-size:12px;color:#8b949e">Min confidence threshold:
+      <input id="gap-conf" type="number" min="0" max="1" step="0.1" value="0.5" style="width:60px;margin-left:4px">
+    </label>
+    <label style="font-size:12px;color:#8b949e">Min importance (critical):
+      <input id="gap-imp" type="number" min="1" max="10" step="1" value="7" style="width:50px;margin-left:4px">
+    </label>
+    <span id="gap-summary" style="font-size:12px;color:#8b949e;margin-left:8px"></span>
+  </div>
+  <div id="gap-list" style="margin-top:16px"></div>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -1286,6 +1311,42 @@ async function loadReminders() {
     </div>\`;
   }).join('');
 }
+// ── Knowledge Gaps ────────────────────────────────────────────────────────
+const GAP_SEV = { high: '#f85149', medium: '#ffa657' };
+const GAP_ICON = { low_confidence: '⚠', sparse: '📂', critical: '🔴' };
+async function loadGaps() {
+  const conf = +(g('gap-conf').value || 0.5);
+  const imp  = +(g('gap-imp').value  || 7);
+  const d = await api(\`/api/gaps?conf=\${conf}&importance=\${imp}&limit=30\`);
+  const s = d.summary;
+  g('gap-summary').textContent =
+    \`\${d.total} gaps · \${s.low_confidence_domains} low-conf domains · \${s.critical_memories} critical memories\`;
+  if (!d.gaps.length) {
+    g('gap-list').innerHTML = '<p class="empty">No significant gaps found — knowledge base looks solid.</p>';
+    return;
+  }
+  const byType = { low_confidence: [], sparse: [], critical: [] };
+  for (const gap of d.gaps) (byType[gap.type] || []).push(gap);
+  const section = (title, list) => {
+    if (!list.length) return '';
+    return \`<h4 style="font-size:13px;color:#8b949e;margin:16px 0 8px">\${title}</h4>
+    <div style="display:flex;flex-wrap:wrap;gap:8px">\${list.map(gap => {
+      const col = GAP_SEV[gap.severity] || '#8b949e';
+      const extra = gap.scope === 'memory'
+        ? \`<span style="font-size:11px;color:#8b949e;margin-left:6px">\${esc(gap.memory_type||'')} · imp \${gap.avg_importance}</span>\`
+        : \`<span style="font-size:11px;color:#8b949e;margin-left:6px">\${gap.count} mem\${gap.count!==1?'s':''}</span>\`;
+      return \`<div class="card" style="border-left:3px solid \${col};min-width:200px;max-width:340px">
+        <div style="font-weight:500;color:#e6edf3;margin-bottom:4px">\${esc(gap.label)}\${extra}</div>
+        <div style="font-size:12px;color:#8b949e">conf: \${(gap.avg_confidence*100|0)}%\${gap.scope!=='memory'?' avg':''} · <span style="color:\${col}">\${gap.severity} severity</span></div>
+      </div>\`;
+    }).join('')}</div>\`;
+  };
+  g('gap-list').innerHTML =
+    section('🔴 Critical — high importance, low confidence', byType.critical) +
+    section('⚠ Low Confidence', byType.low_confidence) +
+    section('📂 Sparse Coverage', byType.sparse);
+}
+
 // ── Memory Compare ────────────────────────────────────────────────────────
 let _cmpA = null, _cmpB = null;
 function initCompare() { g('cmp-out').innerHTML = ''; }

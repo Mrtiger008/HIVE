@@ -81,9 +81,11 @@
 
 ## Phase 43 — Memory Compare — DONE ✅ (2026-11-20)
 
-## Phase 44 — Candidates
+## Phase 44 — Knowledge Gaps — DONE ✅ (2026-11-20)
+
+## Phase 45 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
-- **Knowledge gaps**: detect topic areas with low confidence or sparse coverage
 - **Quick capture**: minimal CLI mode — `hive add "thought here"` one-liner without prompts
-- **Memory templates**: pre-fill new memories from named templates
+- **Memory health score**: per-memory composite score (confidence + recency + importance) for triage
+- **Tag cloud UI**: visual tag frequency display with click-to-filter
