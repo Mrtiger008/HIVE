@@ -1,5 +1,17 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 61 Complete
+
+**Phase 61: Memory Duplication**
+
+`src/server.js`:
+- `handleDuplicate(req, res, id)` — creates a copy of a memory with "Copy of " title prefix, same content/tags/type/importance/domain
+- Dynamic route `POST /api/memories/:id/duplicate`
+- `⧉ dupe` button added to each memory card (between edit and history)
+- `duplicateMem(id)` JS — POSTs to duplicate endpoint, reloads list, opens edit modal on the new copy
+
+`tests/test-phase61.js`: 10/10 tests (duplication, field copying, title prefix, new id, independent editing, HTML checks)
+
 ## 2026-11-20 — Phase 60 Complete
 
 **Phase 60: Memory Export to CSV**

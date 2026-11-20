@@ -257,6 +257,23 @@ function handleReinforce(req, res, id) {
   catch (e) { res.writeHead(404); res.end(e.message); }
 }
 
+function handleDuplicate(req, res, id) {
+  const src = memory.get(id);
+  if (!src) { json(res, { error: 'Memory not found' }, 404); return; }
+  const dup = memory.add({
+    title: 'Copy of ' + src.title,
+    content: src.content,
+    memory_type: src.memory_type,
+    domain: src.domain || undefined,
+    project_id: src.project_id || undefined,
+    trust_level: src.trust_level,
+    confidence: src.confidence,
+    importance: src.importance,
+    tags: src.tags || [],
+  });
+  json(res, dup);
+}
+
 function handleProjectStats(req, res, id) {
   const p = projects.get(id);
   if (!p) { res.writeHead(404); res.end('Not Found'); return; }
@@ -750,6 +767,10 @@ function createServer() {
           const lim = Math.min(parseInt(new URL(req.url,'http://x').searchParams.get('limit')||'5',10),20);
           handleRelated(req, res, rlId, lim);
         };
+      }
+      const dup = pathname.match(/^\/api\/memories\/([^/]+)\/duplicate$/);
+      if (dup && req.method === 'POST') {
+        handler = (req, res) => handleDuplicate(req, res, dup[1]);
       }
     }
     if (!handler) { res.writeHead(404); res.end('Not Found'); return; }
@@ -1264,7 +1285,7 @@ function card(m) {
     ? \`<button class="arch" style="color:#d29922" onclick="togglePin('\${m.id}',0)" title="Unpin">📌 pinned</button>\`
     : \`<button class="arch" onclick="togglePin('\${m.id}',1)" title="Pin">📌 pin</button>\`;
   return \`<div class="card" data-id="\${m.id}" style="\${pinStyle}">
-    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button></div>
+    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="duplicateMem('\${m.id}')" title="Duplicate">⧉ dupe</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button></div>
     <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
     <div class="cc" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(preview)}\${m.content.length>280?'…':''}</div>
     <div id="rel-\${m.id}" style="display:none;margin-top:8px;border-top:1px solid #21262d;padding-top:8px"></div>
@@ -2184,6 +2205,13 @@ async function archiveMem(id, btn) {
   const r = await fetch(\`/api/memories/\${id}\`, { method:'DELETE' });
   if (r.ok) { btn.closest('.card').remove(); refreshStats(); }
   else btn.textContent = '× archive';
+}
+async function duplicateMem(id) {
+  const r = await fetch(\`/api/memories/\${id}/duplicate\`, {method:'POST',headers:{'X-Hive-Local':'1'}});
+  if (!r.ok) { alert('Duplicate failed'); return; }
+  const d = await r.json();
+  loadMem();
+  showEdit(d.id);
 }
 async function toggleRelated(id) {
   const el = g('rel-' + id);

@@ -115,8 +115,10 @@
 
 ## Phase 60 — Memory Export to CSV — DONE ✅ (2026-11-20)
 
-## Phase 61 — Candidates
+## Phase 61 — Memory Duplication — DONE ✅ (2026-11-20)
+
+## Phase 62 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
 - **Reading time / word count**: show estimated reading time and word count on each memory card
-- **Memory duplication**: one-click duplicate a memory as a starting point for a new one
+- **Memory templates quick-apply**: apply a template to a selected memory in one click
