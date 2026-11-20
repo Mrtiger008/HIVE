@@ -123,8 +123,10 @@
 
 ## Phase 64 — Memory Templates Quick-Apply — DONE ✅ (2026-11-20)
 
-## Phase 65 — Candidates
+## Phase 65 — Bulk Export Selection — DONE ✅ (2026-11-20)
 
-- **Bulk export selection**: export only the currently selected (checked) memories as CSV
+## Phase 66 — Candidates
+
 - **Keyboard shortcut cheatsheet**: a modal overlay showing all keyboard shortcuts
 - **Memory color labels**: assign a color label (red/yellow/green/blue) to memories for quick visual grouping
+- **Search export**: download current search results as CSV directly from the search tab

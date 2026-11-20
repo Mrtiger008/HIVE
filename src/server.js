@@ -215,6 +215,13 @@ function handleExport(req, res, q) {
   const { exportJson, exportCsv } = require('./export');
   const fmt = (q.format || 'json').toLowerCase();
   if (fmt === 'csv') {
+    if (q.ids) {
+      const ids = q.ids.split(',').map(s => s.trim()).filter(Boolean);
+      const rows = ids.map(id => memory.get(id)).filter(Boolean);
+      res.writeHead(200, { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="hive-selection.csv"' });
+      res.end(exportCsv(rows));
+      return;
+    }
     let rows = null;
     const hasFilter = q.tag || q.type || q.project || q.domain || q.trust || q.min_importance;
     if (hasFilter) {
@@ -937,6 +944,7 @@ input{width:360px}
     <button class="btn" onclick="bulkTagOp('add')" title="Add tags to selected">+ tags</button>
     <button class="btn" onclick="bulkTagOp('remove')" title="Remove tags from selected">− tags</button>
     <button class="btn" id="bulk-merge-btn" onclick="showMerge()" style="display:none" title="Merge two selected memories">⟳ Merge</button>
+    <button class="btn" onclick="exportSelectionCsv()" title="Export selected as CSV">⬇ CSV</button>
     <button class="arch" onclick="clearSelection()" style="margin-left:auto">✕ clear</button>
   </div>
   <div id="ml"></div>
@@ -1593,6 +1601,11 @@ function exportFilteredCsv() {
   const a = document.createElement('a'); a.href = url;
   a.download = (tg||t||r||p||dom||imp) ? 'hive-filtered.csv' : 'hive-export.csv';
   a.click();
+}
+function exportSelectionCsv() {
+  if (!_sel.size) return;
+  const url = '/api/export?format=csv&ids=' + [..._sel].map(encodeURIComponent).join(',');
+  const a = document.createElement('a'); a.href = url; a.download = 'hive-selection.csv'; a.click();
 }
 
 async function loadBrief() {

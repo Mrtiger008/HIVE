@@ -1,5 +1,16 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 65 Complete
+
+**Phase 65: Bulk Export Selection**
+
+`src/server.js`:
+- `handleExport`: `ids` query param (comma-separated) takes priority over filter params — fetches exactly those memories, returns `hive-selection.csv`; unknown IDs silently skipped
+- Bulk bar: added `⬇ CSV` button alongside Archive/Merge
+- `exportSelectionCsv()` JS: builds `?format=csv&ids=...` URL from `_sel` Set and triggers download
+
+`tests/test-phase65.js`: 10/10 tests (single/multi/all ids, filename, unknown-id skip, filter export unchanged, HTML checks)
+
 ## 2026-11-20 — Phase 64 Complete
 
 **Phase 64: Memory Templates Quick-Apply**
