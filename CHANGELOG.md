@@ -1,5 +1,23 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 50 Complete
+
+**Phase 50: Full-text Search Highlighting**
+
+`src/search.js`:
+- Search query now selects `highlight(memories_fts, 1, '\x01', '\x02') AS highlight_title` and `snippet(memories_fts, 2, '\x01', '\x02', '…', 24) AS snippet` using SQLite FTS5 native functions
+- `\x01` / `\x02` control chars used as highlight delimiters — survive JSON serialisation without escaping
+- Falls back cleanly to existing LIKE search (no highlight fields) when FTS5 is unavailable
+
+`src/server.js`:
+- `hlEsc(s)` — HTML-escapes first, then promotes `\x01...\x02` markers to `<mark>` tags (XSS-safe: escaping runs before markup insertion)
+- `searchCard(m)` — dedicated renderer for search results; uses `highlight_title` / `snippet` when present, otherwise falls back to plain `esc()` text
+- `doSearch()` now renders with `searchCard()` instead of the generic `card()`
+- Mark style: dark green background (`#2d4a1e`) with bright green text (`#7ee787`) matching the GitHub dark palette
+
+Tests: `tests/test-phase50.js` — 10/10 passing
+Full regression: 410/410
+
 ## 2026-11-20 — Phase 49 Complete
 
 **Phase 49: Confidence Calibration**

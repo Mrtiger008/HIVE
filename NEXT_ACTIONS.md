@@ -93,9 +93,11 @@
 
 ## Phase 49 — Confidence Calibration — DONE ✅ (2026-11-20)
 
-## Phase 50 — Candidates
+## Phase 50 — Full-text Search Highlighting — DONE ✅ (2026-11-20)
+
+## Phase 51 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
 - **Memory export to CSV**: export memories as spreadsheet for external analysis
 - **Pagination**: load-more / page navigation in Memories tab
-- **Full-text search highlighting**: highlight matched terms in search results
+- **Related memories panel**: show semantically similar memories when viewing one

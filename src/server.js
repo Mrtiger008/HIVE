@@ -1111,6 +1111,13 @@ function show(id, btn) {
   if (id==='kstats') loadKStats();
 }
 
+// Escape HTML then promote \x01...\x02 control-char markers to <mark> tags.
+// This is XSS-safe: esc() runs first, then we insert known-safe <mark> from fixed pattern.
+function hlEsc(s) {
+  if (!s) return '';
+  return esc(s).replace(/\x01([^\x02]*)\x02/g, '<mark style="background:#2d4a1e;color:#7ee787;border-radius:2px;padding:0 2px">$1</mark>');
+}
+
 function confBar(c) {
   const pct = Math.round((c||0.5)*100);
   const col = c >= 0.8 ? '#3fb950' : c >= 0.5 ? '#d29922' : '#f85149';
@@ -1127,6 +1134,19 @@ function card(m) {
     <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}</div>
     <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
     <div class="cc">\${esc(preview)}\${m.content.length>280?'…':''}</div>
+  </div>\`;
+}
+
+function searchCard(m) {
+  const titleHtml  = m.highlight_title ? hlEsc(m.highlight_title) : esc(m.title);
+  const snippetHtml = m.snippet        ? hlEsc(m.snippet)         : esc((m.content||'').replace(/\n/g,' ').slice(0, 280));
+  const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
+  return \`<div class="card" data-id="\${m.id}">
+    <div class="ct">\${titleHtml}
+      <button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button>
+    </div>
+    <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
+    <div class="cc">\${snippetHtml}</div>
   </div>\`;
 }
 
@@ -1160,7 +1180,7 @@ async function doSearch() {
   if (!q) return;
   const mode = g('smode').value;
   const d = await api('/api/search?q='+encodeURIComponent(q)+'&limit=20&mode='+mode);
-  g('sr').innerHTML = d.length ? d.map(card).join('') : '<p class="empty">No results.</p>';
+  g('sr').innerHTML = d.length ? d.map(searchCard).join('') : '<p class="empty">No results.</p>';
   loadHistory();
 }
 

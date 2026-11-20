@@ -18,8 +18,14 @@ function search(query, { domain, project_id, type, trust_level, status = 'active
     .join(' OR ');
   if (!ftsQuery) return [];
 
+  // \x01 / \x02 are safe highlight delimiters — survive JSON and HTML-escaping on the client
+  const HL_OPEN = '\x01', HL_CLOSE = '\x02';
+
   let sql = `
-    SELECT m.*, bm25(memories_fts) AS _rank
+    SELECT m.*,
+           bm25(memories_fts) AS _rank,
+           highlight(memories_fts, 1, '${HL_OPEN}', '${HL_CLOSE}') AS highlight_title,
+           snippet(memories_fts, 2, '${HL_OPEN}', '${HL_CLOSE}', '…', 24) AS snippet
     FROM memories_fts
     JOIN memories m ON memories_fts.id = m.id
     WHERE memories_fts MATCH ?
