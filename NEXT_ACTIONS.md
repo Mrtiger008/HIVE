@@ -111,8 +111,10 @@
 
 ## Phase 58 — Memory Merge — DONE ✅ (2026-11-20)
 
-## Phase 59 — Candidates
+## Phase 59 — Quick Tag Filter — DONE ✅ (2026-11-20)
+
+## Phase 60 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
 - **Memory export to CSV**: export filtered memories as a downloadable spreadsheet
-- **Quick tag filter**: click any tag chip in a memory card to instantly filter the list by that tag
+- **Reading time / word count**: show estimated reading time and word count on each memory card

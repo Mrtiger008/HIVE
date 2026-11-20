@@ -1242,7 +1242,8 @@ function confBar(c) {
 }
 function card(m) {
   const preview = (m.content||'').replace(/\\n/g,' ').slice(0,280);
-  const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
+  const _activeTg = g('mtag').value;
+  const tags = (m.tags||[]).map(t=>{const on=t===_activeTg;return \`<span class="b" style="cursor:pointer;\${on?'color:#3fb950;background:#1f4b2b;border-radius:3px;padding:0 3px':'color:#79c0ff'}" title="\${on?'Clear':'Filter by'} #\${esc(t)}" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`;}).join(' ');
   const pinStyle = m.pinned ? 'border-left:3px solid #d29922;' : '';
   const pinBtn = m.pinned
     ? \`<button class="arch" style="color:#d29922" onclick="togglePin('\${m.id}',0)" title="Unpin">📌 pinned</button>\`
@@ -1258,7 +1259,7 @@ function card(m) {
 function searchCard(m) {
   const titleHtml  = m.highlight_title ? hlEsc(m.highlight_title) : esc(m.title);
   const snippetHtml = m.snippet        ? hlEsc(m.snippet)         : esc((m.content||'').replace(/\\n/g,' ').slice(0, 280));
-  const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
+  const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" title="Filter by #\${esc(t)}" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
   return \`<div class="card" data-id="\${m.id}">
     <div class="ct">\${titleHtml}
       <button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button>
@@ -2231,7 +2232,17 @@ function _inlineRestore(id, title, content) {
   const relEl = g('rel-' + id);
   if (relEl) { relEl.style.display = 'none'; delete relEl.dataset.loaded; }
 }
-function filterTag(tag) { const sel=g('mtag'); sel.value=tag; document.querySelectorAll('nav button').forEach(b=>{if(b.textContent==='Memories')b.click();}); }
+function filterTag(tag) {
+  const sel = g('mtag');
+  if (sel.value === tag) { sel.value = ''; loadMem(); return; } // toggle off if already active
+  if (![...sel.options].some(o => o.value === tag)) { // ensure option exists
+    const o = document.createElement('option'); o.value = tag; o.textContent = tag; sel.appendChild(o);
+  }
+  sel.value = tag;
+  const memBtn = [...document.querySelectorAll('nav button')].find(b => b.textContent === 'Memories');
+  if (memBtn && memBtn.classList.contains('on')) loadMem();
+  else if (memBtn) memBtn.click();
+}
 function loadTagSelect() { api('/api/tags').then(ts => { const sel=g('mtag'); sel.innerHTML='<option value="">All tags</option>'; ts.forEach(({tag,count})=>{const o=document.createElement('option');o.value=tag;o.textContent=tag+' ('+count+')';sel.appendChild(o);}); }); }
 refreshStats();
 loadBookmarks();

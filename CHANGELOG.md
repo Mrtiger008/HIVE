@@ -1,5 +1,16 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 59 Complete
+
+**Phase 59: Quick Tag Filter**
+
+`src/server.js`:
+- `filterTag(tag)`: toggle-off if already active (clears filter), ensures option exists in `#mtag` select before setting value, calls `loadMem()` directly when already on Memories tab (no nav-button flicker)
+- `card()`: reads active tag from `g('mtag').value` and highlights matching chip green (`#3fb950` / `#1f4b2b` background); title shows "Filter by #tag" or "Clear #tag"
+- `searchCard()`: added `title="Filter by #tag"` to tag chips for discoverability
+
+`tests/test-phase59.js` — 10/10 passing
+
 ## 2026-11-20 — Phase 58 Complete
 
 **Phase 58: Memory Merge**
