@@ -214,8 +214,22 @@ function handleExport(req, res, q) {
   const { exportJson, exportCsv } = require('./export');
   const fmt = (q.format || 'json').toLowerCase();
   if (fmt === 'csv') {
-    res.writeHead(200, { 'Content-Type': 'text/csv', 'Content-Disposition': 'attachment; filename="hive-export.csv"' });
-    res.end(exportCsv());
+    let rows = null;
+    const hasFilter = q.tag || q.type || q.project || q.domain || q.trust || q.min_importance;
+    if (hasFilter) {
+      rows = memory.list({
+        type:           q.type           || undefined,
+        trust_level:    q.trust          || undefined,
+        project_id:     q.project        || undefined,
+        domain:         q.domain         || undefined,
+        min_importance: q.min_importance != null ? +q.min_importance : undefined,
+        limit: 100000,
+      });
+      if (q.tag) rows = rows.filter(m => (m.tags || []).includes(q.tag));
+    }
+    const filename = hasFilter ? 'hive-filtered.csv' : 'hive-export.csv';
+    res.writeHead(200, { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="${filename}"` });
+    res.end(exportCsv(rows));
   } else {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Content-Disposition': 'attachment; filename="hive-export.json"' });
     res.end(exportJson());
@@ -877,6 +891,7 @@ input{width:360px}
     <select id="mimportance" onchange="loadMem()" title="Min importance"><option value="">Any importance</option><option value="8">≥ 8 (high)</option><option value="6">≥ 6 (medium+)</option></select>
     <select id="msort" onchange="loadMem()" title="Sort order"><option value="updated">Sort: Updated</option><option value="created">Sort: Created</option><option value="importance">Sort: Importance</option><option value="confidence">Sort: Confidence</option></select>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only</label>
+    <button class="btn" onclick="exportFilteredCsv()" title="Export current filter as CSV" style="font-size:12px">⬇ CSV</button>
     <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
   </div>
   <div id="mem-chips" style="display:none;padding:4px 0 8px;display:none;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px"></div>
@@ -1518,6 +1533,20 @@ function clearAllMemFilters() {
   g('msort').value='updated';
   const mp=g('mpinned'); if(mp) mp.checked=false;
   loadMem();
+}
+function exportFilteredCsv() {
+  let url = '/api/export?format=csv';
+  const tg=g('mtag').value, t=g('mtype').value, r=g('mtrust').value;
+  const p=g('mproj').value, dom=g('mdomain').value, imp=g('mimportance').value;
+  if (tg)  url += '&tag='     + encodeURIComponent(tg);
+  if (t)   url += '&type='    + encodeURIComponent(t);
+  if (r)   url += '&trust='   + encodeURIComponent(r);
+  if (p)   url += '&project=' + encodeURIComponent(p);
+  if (dom) url += '&domain='  + encodeURIComponent(dom);
+  if (imp) url += '&min_importance=' + encodeURIComponent(imp);
+  const a = document.createElement('a'); a.href = url;
+  a.download = (tg||t||r||p||dom||imp) ? 'hive-filtered.csv' : 'hive-export.csv';
+  a.click();
 }
 
 async function loadBrief() {

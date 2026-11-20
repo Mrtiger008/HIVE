@@ -113,8 +113,10 @@
 
 ## Phase 59 — Quick Tag Filter — DONE ✅ (2026-11-20)
 
-## Phase 60 — Candidates
+## Phase 60 — Memory Export to CSV — DONE ✅ (2026-11-20)
+
+## Phase 61 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
-- **Memory export to CSV**: export filtered memories as a downloadable spreadsheet
 - **Reading time / word count**: show estimated reading time and word count on each memory card
+- **Memory duplication**: one-click duplicate a memory as a starting point for a new one

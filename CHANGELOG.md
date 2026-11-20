@@ -1,5 +1,19 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 60 Complete
+
+**Phase 60: Memory Export to CSV**
+
+`src/export.js`:
+- `exportCsv(rows?)` now accepts an optional pre-filtered rows array (backward compatible)
+
+`src/server.js`:
+- `handleExport` applies tag/type/project/domain/trust/min_importance filters when format=csv; uses `hive-filtered.csv` filename when any filter is active
+- Added `⬇ CSV` button to Memories tab toolbar
+- Added `exportFilteredCsv()` JS: builds URL from current filter state and triggers browser download
+
+`tests/test-phase60.js` — 10/10 passing
+
 ## 2026-11-20 — Phase 59 Complete
 
 **Phase 59: Quick Tag Filter**
