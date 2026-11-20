@@ -331,6 +331,14 @@ async function handleBulk(req, res) {
     try {
       if (action === 'archive') { memory.update(id, { status: 'archived' }); count++; }
       else if (action === 'update' && updates) { memory.update(id, updates); count++; }
+      else if (action === 'add_tags' && updates?.tags) {
+        const m = memory.get(id);
+        if (m) { const s = new Set(m.tags || []); updates.tags.forEach(t => s.add(t)); memory.update(id, { tags: [...s] }); count++; }
+      }
+      else if (action === 'remove_tags' && updates?.tags) {
+        const m = memory.get(id);
+        if (m) { const rm = new Set(updates.tags); memory.update(id, { tags: (m.tags || []).filter(t => !rm.has(t)) }); count++; }
+      }
     } catch {}
   }
   json(res, { count });
@@ -832,6 +840,10 @@ input{width:360px}
       <option value="">Change type…</option><option>core</option><option>domain</option><option>project</option><option>episodic</option><option>semantic</option><option>skill</option>
     </select>
     <button class="btn" onclick="bulkRetype()">Apply type</button>
+    <span style="color:#30363d;margin:0 4px">|</span>
+    <input id="bulk-tags" placeholder="tag1, tag2…" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:4px 8px;width:140px">
+    <button class="btn" onclick="bulkTagOp('add')" title="Add tags to selected">+ tags</button>
+    <button class="btn" onclick="bulkTagOp('remove')" title="Remove tags from selected">− tags</button>
     <button class="arch" onclick="clearSelection()" style="margin-left:auto">✕ clear</button>
   </div>
   <div id="ml"></div>
@@ -1239,6 +1251,20 @@ async function bulkRetype() {
   await fetch('/api/memories/bulk',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({ids:[..._sel],action:'update',updates:{memory_type:ty}})});
   _sel.clear(); loadMem();
   g('bulk-bar').style.display='none'; g('bulk-type').value='';
+}
+async function bulkTagOp(op) {
+  if (!_sel.size) return;
+  const raw = (g('bulk-tags').value || '').split(',').map(t => t.trim()).filter(Boolean);
+  if (!raw.length) { g('bulk-tags').style.borderColor='#f85149'; return; }
+  g('bulk-tags').style.borderColor='';
+  const action = op === 'add' ? 'add_tags' : 'remove_tags';
+  await fetch('/api/memories/bulk', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json','X-Hive-Local':'1'},
+    body: JSON.stringify({ ids: [..._sel], action: action, updates: { tags: raw } })
+  });
+  _sel.clear(); loadMem();
+  g('bulk-bar').style.display='none'; g('bulk-tags').value='';
 }
 
 let _domainsLoaded = false;

@@ -103,8 +103,10 @@
 
 ## Phase 54 — Inline Memory Editing — DONE ✅ (2026-11-20)
 
-## Phase 55 — Candidates
+## Phase 55 — Bulk Tag Editor — DONE ✅ (2026-11-20)
+
+## Phase 56 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
 - **Memory export to CSV**: export filtered memories as a downloadable spreadsheet
-- **Bulk tag editor**: add/remove tags across multiple selected memories at once
+- **Memory diff viewer**: side-by-side diff when viewing version history

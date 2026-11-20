@@ -1,5 +1,19 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 55 Complete
+
+**Phase 55: Bulk Tag Editor**
+
+`src/server.js` (backend):
+- Added `add_tags` action to `handleBulk`: reads each memory's existing tags, merges new tags (Set dedup), writes back — no duplicates
+- Added `remove_tags` action: filters out specified tags from each memory's tag list; silently skips absent tags
+
+`src/server.js` (dashboard):
+- Added tag input `#bulk-tags` and `+ tags` / `− tags` buttons to the bulk action bar
+- Added `bulkTagOp(op)`: parses comma-separated tags from input, calls `add_tags` or `remove_tags` bulk action, clears selection and reloads; flashes input red if tags field is empty
+
+`tests/test-phase55.js`: 10/10 passing
+
 ## 2026-11-20 — Phase 54 Complete
 
 **Phase 54: Inline Memory Editing**
