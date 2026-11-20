@@ -30,6 +30,7 @@ const compare          = require('./compare');
 const gaps             = require('./gaps');
 const health           = require('./health');
 const calibrate        = require('./calibrate');
+const importer         = require('./importer');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -598,6 +599,13 @@ const ROUTES = {
     const q = new URL(req.url, 'http://x').searchParams;
     json(res, calibrate.preview({ limit: q.get('limit') ? +q.get('limit') : 500 }));
   },
+  'POST /api/import/dir': async (req, res) => {
+    const body = await readBody(req).catch(() => ({}));
+    const dirPath = (body.path || '').trim();
+    if (!dirPath) { json(res, { error: 'path is required' }, 400); return; }
+    try { json(res, importer.importDir(dirPath, { auto: !!body.auto, limit: body.limit || 500 })); }
+    catch (e) { json(res, { error: e.message }, 400); }
+  },
   'POST /api/calibrate/apply': async (req, res) => {
     const body = await readBody(req).catch(() => ({}));
     json(res, calibrate.apply({ limit: body.limit || 500 }));
@@ -884,6 +892,7 @@ input{width:360px}
   <button onclick="show('gaps',this);loadGaps()">Gaps</button>
   <button onclick="show('health',this);loadHealth()">Health</button>
   <button onclick="show('calibrate',this);loadCalibrate()">Calibrate</button>
+  <button onclick="show('import',this)">Import</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -1128,6 +1137,18 @@ input{width:360px}
   </div>
   <p style="font-size:12px;color:#8b949e;margin-bottom:12px">Recalculates confidence based on trust-level ceiling and age decay. No effect on USER_CONFIRMED memories.</p>
   <div id="cal-list"></div>
+</div>
+
+<div id="import" class="tab">
+  <h3 style="margin:0 0 12px;font-size:14px;color:#e6edf3">Batch Markdown Import</h3>
+  <p style="font-size:12px;color:#8b949e;margin-bottom:12px">Import all <code>.md</code> files in a directory. Files already imported are skipped (deduplicated by path).</p>
+  <div class="row" style="gap:8px;align-items:center;margin-bottom:12px">
+    <input id="imp-path" placeholder="Directory path, e.g. C:\\notes or /home/user/notes" style="flex:1;min-width:0">
+    <button class="btn" onclick="importPreview()">🔍 Preview</button>
+    <button class="btn" id="imp-go-btn" style="display:none;background:#238636;border-color:#238636" onclick="importAll()">⬆ Import All</button>
+  </div>
+  <div id="imp-status" style="font-size:12px;color:#8b949e;margin-bottom:8px"></div>
+  <div id="imp-list"></div>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -1888,6 +1909,52 @@ async function applyCalibrate() {
   btn.style.display = 'none';
   g('cal-summary').textContent = \`Applied \${r.applied} update(s).\`;
   g('cal-list').innerHTML += \`<p style="color:#3fb950;font-size:13px;margin-top:10px">Done — \${r.applied} confidence score(s) updated.</p>\`;
+}
+
+// ── Batch Markdown Import ─────────────────────────────────────────────────
+let _impProposals = [];
+async function importPreview() {
+  const dirPath = g('imp-path').value.trim();
+  if (!dirPath) { g('imp-status').textContent = 'Enter a directory path.'; return; }
+  g('imp-status').textContent = 'Scanning…';
+  g('imp-list').innerHTML = '';
+  g('imp-go-btn').style.display = 'none';
+  const r = await fetch('/api/import/dir', {
+    method: 'POST', headers: {'Content-Type':'application/json','X-Hive-Local':'1'},
+    body: JSON.stringify({ path: dirPath, auto: false })
+  });
+  const d = await r.json();
+  if (d.error) { g('imp-status').textContent = '⚠ ' + d.error; return; }
+  _impProposals = d.proposals || [];
+  const skipped = d.skipped || [];
+  g('imp-status').textContent = \`\${_impProposals.length} to import, \${skipped.length} already imported / skipped.\`;
+  if (!_impProposals.length) { g('imp-list').innerHTML = '<p class="empty">Nothing new to import.</p>'; return; }
+  g('imp-go-btn').style.display = '';
+  g('imp-list').innerHTML = _impProposals.map(p =>
+    \`<div class="card" style="font-size:12px">
+      <div style="font-weight:600;color:#e6edf3">\${esc(p.title)}</div>
+      <div style="color:#8b949e;margin-top:3px">\${esc(p._file)}</div>
+      <div style="color:#484f58;margin-top:3px">\${esc((p.content||'').slice(0,120))}\${(p.content||'').length>120?'…':''}</div>
+      <div style="margin-top:4px"><span class="b bt">\${esc(p.memory_type)}</span><span class="b bi">i=\${p.importance}</span>\${(p.tags||[]).map(t=>\`<span class="b" style="color:#79c0ff">#\${esc(t)}</span>\`).join('')}</div>
+    </div>\`
+  ).join('');
+}
+async function importAll() {
+  const dirPath = g('imp-path').value.trim();
+  if (!dirPath) return;
+  const btn = g('imp-go-btn');
+  btn.disabled = true; btn.textContent = 'Importing…';
+  const r = await fetch('/api/import/dir', {
+    method: 'POST', headers: {'Content-Type':'application/json','X-Hive-Local':'1'},
+    body: JSON.stringify({ path: dirPath, auto: true })
+  });
+  const d = await r.json();
+  btn.style.display = 'none';
+  if (d.error) { g('imp-status').textContent = '⚠ ' + d.error; return; }
+  const n = (d.stored || []).length;
+  g('imp-status').textContent = \`✓ Imported \${n} memory/memories. \${(d.skipped||[]).length} skipped.\`;
+  g('imp-list').innerHTML = \`<p style="color:#3fb950;font-size:13px">Done — \${n} new memories added.</p>\`;
+  refreshStats();
 }
 
 // ── Memory Compare ────────────────────────────────────────────────────────

@@ -1,5 +1,19 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 62 Complete
+
+**Phase 62: Multi-file Markdown Import**
+
+`src/server.js`:
+- `POST /api/import/dir` route — calls `importer.importDir(path, { auto, limit: 500 })`; 400 on missing/invalid path
+- Added "Import" nav button
+- `<div id="import" class="tab">` — directory path input, 🔍 Preview (dry-run) + ⬆ Import All (auto) buttons, proposal cards, status line
+- `importPreview()` / `importAll()` JS functions; dedup/skip reporting
+
+`src/importer.js`: no changes needed (importDir already existed)
+
+`tests/test-phase62.js`: 10/10 tests (preview mode, auto import, dedup skip, frontmatter title/tags, error cases, non-md ignore, empty dir, HTML checks)
+
 ## 2026-11-20 — Phase 61 Complete
 
 **Phase 61: Memory Duplication**

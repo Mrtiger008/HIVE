@@ -117,8 +117,10 @@
 
 ## Phase 61 — Memory Duplication — DONE ✅ (2026-11-20)
 
-## Phase 62 — Candidates
+## Phase 62 — Multi-file Markdown Import — DONE ✅ (2026-11-20)
 
-- **Multi-file import**: batch import from a directory of markdown files
+## Phase 63 — Candidates
+
 - **Reading time / word count**: show estimated reading time and word count on each memory card
 - **Memory templates quick-apply**: apply a template to a selected memory in one click
+- **Bulk export selection**: export only the currently selected memories (not all/filtered)
