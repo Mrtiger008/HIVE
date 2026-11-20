@@ -83,9 +83,13 @@
 
 ## Phase 44 — Knowledge Gaps — DONE ✅ (2026-11-20)
 
-## Phase 45 — Candidates
+## Phase 45 — Quick Capture — DONE ✅ (2026-11-20)
+
+## Phase 46 — Memory Health Score — DONE ✅ (2026-11-20)
+
+## Phase 47 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
-- **Quick capture**: minimal CLI mode — `hive add "thought here"` one-liner without prompts
-- **Memory health score**: per-memory composite score (confidence + recency + importance) for triage
-- **Tag cloud UI**: visual tag frequency display with click-to-filter
+- **Tag cloud UI**: visual tag frequency display in dashboard with click-to-filter
+- **Search filters UI**: filter panel in dashboard (type, domain, trust, date range)
+- **Memory export to CSV**: export memories as spreadsheet for external analysis

@@ -1,5 +1,32 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 46 Complete
+
+**Phase 46: Memory Health Score**
+
+`src/health.js` (new):
+- `score(m)` — composite 0–100: confidence 40% + recency 30% + importance 30%; recency = `exp(−idle_days / 30)`
+- `grade(score)` — `good` (≥70) / `fair` (40–69) / `poor` (<40)
+- `list(opts)` — all active memories ranked by health; options: `limit`, `gradeFilter`, `domain`, `sortOrder` (asc=worst first / desc=best first)
+- `summary` — `{ good, fair, poor, avg_score }`
+
+`src/server.js`:
+- `GET /api/health` — query params: `?limit`, `?grade`, `?domain`, `?sort`
+- Dashboard: **Health** tab — progress-bar score display, grade filter, sort order toggle
+
+`src/hive.js`:
+- `hive health` — triage view (worst first by default)
+- `--best`, `--grade`, `--domain`, `--limit` flags
+
+Tests: `tests/test-phase46.js` — 10/10 passing
+Full regression: 370/370
+
+## 2026-11-20 — Phase 45 Complete
+
+**Phase 45: Quick Capture**
+
+`src/health.js` added above. For Phase 45 details see prior entry.
+
 ## 2026-11-20 — Phase 44 Complete
 
 **Phase 44: Knowledge Gaps**

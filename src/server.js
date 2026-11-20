@@ -28,6 +28,7 @@ const reminders        = require('./reminders');
 const shortcuts        = require('./shortcuts');
 const compare          = require('./compare');
 const gaps             = require('./gaps');
+const health           = require('./health');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -491,6 +492,15 @@ const ROUTES = {
   'GET /api/export/obsidian': (req, res) => json(res, obsidian.generate()),
   'GET /api/memories/graph': (req, res) => json(res, memgraph.build()),
   'GET /api/shortcuts': (req, res) => json(res, { shortcuts: shortcuts.SHORTCUTS }),
+  'GET /api/health': (req, res) => {
+    const q = new URL(req.url, 'http://x').searchParams;
+    json(res, health.list({
+      limit:       q.get('limit') ? +q.get('limit') : 50,
+      gradeFilter: q.get('grade') || undefined,
+      domain:      q.get('domain') || undefined,
+      sortOrder:   q.get('sort') || 'asc',
+    }));
+  },
   'GET /api/gaps': (req, res) => {
     const q = new URL(req.url, 'http://x').searchParams;
     json(res, gaps.get({
@@ -738,6 +748,7 @@ input{width:360px}
   <button onclick="show('reminders',this);loadReminders()" id="rem-btn">Reminders</button>
   <button onclick="show('compare',this);initCompare()">Compare</button>
   <button onclick="show('gaps',this);loadGaps()">Gaps</button>
+  <button onclick="show('health',this);loadHealth()">Health</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -939,6 +950,24 @@ input{width:360px}
     <span id="gap-summary" style="font-size:12px;color:#8b949e;margin-left:8px"></span>
   </div>
   <div id="gap-list" style="margin-top:16px"></div>
+</div>
+
+<div id="health" class="tab">
+  <div class="row" style="gap:8px;align-items:center;margin-bottom:12px">
+    <button class="btn" onclick="loadHealth()">↺ Refresh</button>
+    <select id="hlt-grade" onchange="loadHealth()" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:5px 8px;font-size:12px">
+      <option value="">All grades</option>
+      <option value="poor">Poor only</option>
+      <option value="fair">Fair only</option>
+      <option value="good">Good only</option>
+    </select>
+    <select id="hlt-sort" onchange="loadHealth()" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:5px 8px;font-size:12px">
+      <option value="asc">Worst first (triage)</option>
+      <option value="desc">Best first</option>
+    </select>
+    <span id="hlt-summary" style="font-size:12px;color:#8b949e;margin-left:4px"></span>
+  </div>
+  <div id="hlt-list"></div>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -1370,6 +1399,44 @@ async function loadGaps() {
     section('🔴 Critical — high importance, low confidence', byType.critical) +
     section('⚠ Low Confidence', byType.low_confidence) +
     section('📂 Sparse Coverage', byType.sparse);
+}
+
+// ── Memory Health ─────────────────────────────────────────────────────────
+const HLT_COL = { good: '#3fb950', fair: '#ffa657', poor: '#f85149' };
+async function loadHealth() {
+  const grade = g('hlt-grade').value || '';
+  const sort  = g('hlt-sort').value  || 'asc';
+  const url   = \`/api/health?limit=50&sort=\${sort}\${grade ? '&grade='+grade : ''}\`;
+  const d     = await api(url);
+  const s     = d.summary;
+  g('hlt-summary').innerHTML =
+    \`avg score: <b>\${s.avg_score}</b> &nbsp;
+     <span style="color:#3fb950">good:\${s.good}</span> &nbsp;
+     <span style="color:#ffa657">fair:\${s.fair}</span> &nbsp;
+     <span style="color:#f85149">poor:\${s.poor}</span>\`;
+  if (!d.memories.length) {
+    g('hlt-list').innerHTML = '<p class="empty">No memories match.</p>';
+    return;
+  }
+  g('hlt-list').innerHTML = d.memories.map(m => {
+    const col  = HLT_COL[m.health_grade] || '#8b949e';
+    const bar  = Math.round(m.health_score / 5); // 0-20 blocks
+    const pips = '█'.repeat(bar) + '░'.repeat(20 - bar);
+    return \`<div class="card" style="border-left:3px solid \${col}">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:18px;font-weight:700;color:\${col};min-width:34px;text-align:right">\${m.health_score}</span>
+        <span style="font-family:monospace;font-size:11px;color:\${col};letter-spacing:-1px">\${pips}</span>
+        <span style="font-weight:500;color:#e6edf3;flex:1">\${esc(m.title)}</span>
+        <span style="font-size:11px;color:\${col};font-weight:600">\${m.health_grade}</span>
+      </div>
+      <div style="font-size:12px;color:#8b949e;margin-top:4px">
+        <span class="b bt">\${m.memory_type}</span>
+        <span style="margin-left:8px">conf: \${(m.confidence*100|0)}%</span>
+        <span style="margin-left:8px">imp: \${m.importance}/10</span>
+        \${m.domain ? \`<span style="margin-left:8px">domain: \${esc(m.domain)}</span>\` : ''}
+      </div>
+    </div>\`;
+  }).join('');
 }
 
 // ── Memory Compare ────────────────────────────────────────────────────────

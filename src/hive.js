@@ -1068,6 +1068,24 @@ const COMMANDS = {
     console.log(`✓ [${m.id}] ${m.title}`);
   },
 
+  'health'(args) {
+    const { flags } = parseArgs(args);
+    const h = require('./health');
+    const grade = flags.grade || null;
+    const limit = +(flags.limit || 20);
+    const sort  = flags.best ? 'desc' : 'asc';
+    const { memories, summary } = h.list({ limit, gradeFilter: grade, sortOrder: sort, domain: flags.domain || undefined });
+    const COL = { good: '\x1b[32m', fair: '\x1b[33m', poor: '\x1b[31m' };
+    console.log('\n── Memory Health ───────────────────────────');
+    console.log(`  Avg score: ${summary.avg_score}  \x1b[32mgood:${summary.good}\x1b[0m  \x1b[33mfair:${summary.fair}\x1b[0m  \x1b[31mpoor:${summary.poor}\x1b[0m\n`);
+    if (!memories.length) { console.log('  No memories match.\n'); return; }
+    memories.forEach(m => {
+      const col = COL[m.health_grade] || '';
+      console.log(`  ${col}${String(m.health_score).padStart(3)}\x1b[0m  ${m.health_grade.padEnd(4)}  ${m.title.slice(0, 55).padEnd(55)}  conf:${(m.confidence * 100 | 0)}%  imp:${m.importance}`);
+    });
+    console.log('');
+  },
+
   'gaps'(args) {
     const { flags } = parseArgs(args);
     const g = require('./gaps');
@@ -1305,6 +1323,13 @@ Knowledge timeline:
 Memory relations graph:
   hive memory-graph                      Show graph stats (nodes, edges, type/rel breakdown)
   hive serve → Mem Graph tab            Interactive force-directed visualization in browser
+
+Memory health:
+  hive health                     Show worst memories first (triage view)
+  hive health --best              Show best memories first
+  hive health --grade poor        Filter by grade: good | fair | poor
+  hive health --domain D          Limit to a domain
+  hive health --limit N           Number of results (default: 20)
 
 Quick capture:
   hive add "your thought here"    One-liner — auto-title + sensible defaults
