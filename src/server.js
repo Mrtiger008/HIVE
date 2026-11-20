@@ -2010,7 +2010,7 @@ async function toggleRelated(id) {
   for (var i = 0; i < data.length; i++) {
     var m = data[i];
     var preview = esc((m.content||'').slice(0,120)) + ((m.content||'').length>120?'…':'');
-    html += '<div style="padding:6px 8px;margin-bottom:4px;background:#0d1117;border-radius:4px;border:1px solid #21262d;font-size:12px;cursor:pointer" onclick="showEdit(\'' + m.id + '\')">'
+    html += '<div style="padding:6px 8px;margin-bottom:4px;background:#0d1117;border-radius:4px;border:1px solid #21262d;font-size:12px;cursor:pointer" onclick="showEdit(&quot;' + m.id + '&quot;)">'
       + '<span style="font-weight:600;color:#e6edf3">' + esc(m.title) + '</span>'
       + '<span style="color:#8b949e;display:block;margin-top:2px">' + preview + '</span>'
       + '</div>';
@@ -2035,8 +2035,8 @@ async function inlineEdit(id) {
   if (cc) cc.innerHTML = '<textarea id="ie-c-' + id + '" style="width:100%;box-sizing:border-box;background:#0d1117;border:1px solid #3fb950;color:#e6edf3;border-radius:4px;padding:4px 6px;font-size:13px;resize:vertical;min-height:80px">' + esc(m.content || '') + '</textarea>';
   const ct = card.querySelector('.ct');
   if (ct) ct.insertAdjacentHTML('beforeend',
-    '<button class="btn ie-btn" id="ie-save-' + id + '" style="font-size:11px;padding:2px 8px;color:#3fb950;margin-left:4px" onclick="inlineEditSave(\'' + id + '\')">✓ save</button>'
-    + '<button class="btn ie-btn" style="font-size:11px;padding:2px 8px;margin-left:2px" onclick="inlineEditCancel(\'' + id + '\')">✕</button>');
+    '<button class="btn ie-btn" id="ie-save-' + id + '" style="font-size:11px;padding:2px 8px;color:#3fb950;margin-left:4px" onclick="inlineEditSave(&quot;' + id + '&quot;)">✓ save</button>'
+    + '<button class="btn ie-btn" style="font-size:11px;padding:2px 8px;margin-left:2px" onclick="inlineEditCancel(&quot;' + id + '&quot;)">✕</button>');
 }
 async function inlineEditSave(id) {
   const tInput = document.getElementById('ie-t-' + id);
@@ -2065,7 +2065,7 @@ function _inlineRestore(id, title, content) {
   if (!card) return;
   delete card.dataset.editing; card.style.borderColor = '';
   const tEl = document.getElementById('ie-t-' + id);
-  if (tEl) tEl.outerHTML = '<span class="ct-title" ondblclick="inlineEdit(\'' + id + '\')" title="Double-click to edit inline" style="cursor:text">' + esc(title) + '</span>';
+  if (tEl) tEl.outerHTML = '<span class="ct-title" ondblclick="inlineEdit(&quot;' + id + '&quot;)" title="Double-click to edit inline" style="cursor:text">' + esc(title) + '</span>';
   const cc = card.querySelector('.cc');
   if (cc) { var p = (content||'').slice(0,280); cc.innerHTML = esc(p) + ((content||'').length>280?'…':''); cc.ondblclick = function(){ inlineEdit(id); }; }
   card.querySelectorAll('.ie-btn').forEach(function(b){ b.remove(); });
