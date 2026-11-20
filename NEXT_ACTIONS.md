@@ -109,8 +109,10 @@
 
 ## Phase 57 — Smart Search Suggestions — DONE ✅ (2026-11-20)
 
-## Phase 58 — Candidates
+## Phase 58 — Memory Merge — DONE ✅ (2026-11-20)
+
+## Phase 59 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
 - **Memory export to CSV**: export filtered memories as a downloadable spreadsheet
-- **Memory merge**: merge two duplicate memories into one, keeping the better content
+- **Quick tag filter**: click any tag chip in a memory card to instantly filter the list by that tag

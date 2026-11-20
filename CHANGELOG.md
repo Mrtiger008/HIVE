@@ -1,5 +1,19 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 58 Complete
+
+**Phase 58: Memory Merge**
+
+`src/server.js`:
+- Added `handleMerge` backend: unions tags, transfers relationships from discard to keep, archives discard, returns merged memory
+- Added `POST /api/memories/merge` route
+- Added `#bulk-merge-btn` (visible only when exactly 2 memories are selected)
+- Added `#merge-modal` with keep/discard columns, ⇄ swap button, combined tags preview, and error display
+- Added JS: `showMerge`, `renderMergeModal`, `swapMerge`, `closeMerge`, `confirmMerge`
+- Updated `toggleSel` and `clearSelection` to show/hide the merge button
+
+`tests/test-phase58.js` — 10/10 passing
+
 ## 2026-11-20 — Phase 57 Complete
 
 **Phase 57: Smart Search Suggestions**

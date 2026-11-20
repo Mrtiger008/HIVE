@@ -343,6 +343,23 @@ async function handleDeleteMemory(req, res, id) {
   json(res, { ok: true });
 }
 
+async function handleMerge(req, res) {
+  const { keep, discard } = await readBody(req);
+  if (!keep || !discard || keep === discard) { json(res, { error: 'keep and discard ids required and must differ' }, 400); return; }
+  const keepMem = memory.get(keep);
+  const discardMem = memory.get(discard);
+  if (!keepMem || !discardMem) { json(res, { error: 'memory not found' }, 404); return; }
+  const db = getDb();
+  const tagSet = new Set([...(keepMem.tags || []), ...(discardMem.tags || [])]);
+  // Transfer relationships from discard to keep, skip self-links
+  db.prepare('UPDATE relationships SET from_id=? WHERE from_id=? AND to_id!=?').run(keep, discard, keep);
+  db.prepare('UPDATE relationships SET to_id=? WHERE to_id=? AND from_id!=?').run(keep, discard, keep);
+  db.prepare('DELETE FROM relationships WHERE from_id=? OR to_id=?').run(discard, discard);
+  memory.update(keep, { tags: [...tagSet] });
+  memory.update(discard, { status: 'archived' });
+  json(res, memory.get(keep));
+}
+
 async function handleBulk(req, res) {
   const body = await readBody(req);
   const { ids, action, updates } = body;
@@ -520,6 +537,7 @@ const ROUTES = {
   'GET /api/memories/similar': handleSimilar,
   'POST /api/capture':         handleCapture,
   'POST /api/memories':        handleAddMemory,
+  'POST /api/memories/merge':  handleMerge,
   'POST /api/memories/bulk':   handleBulk,
   'GET /api/patterns':       handlePatterns,
   'GET /api/graph':          handleGraph,
@@ -873,6 +891,7 @@ input{width:360px}
     <input id="bulk-tags" placeholder="tag1, tag2…" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:4px 8px;width:140px">
     <button class="btn" onclick="bulkTagOp('add')" title="Add tags to selected">+ tags</button>
     <button class="btn" onclick="bulkTagOp('remove')" title="Remove tags from selected">− tags</button>
+    <button class="btn" id="bulk-merge-btn" onclick="showMerge()" style="display:none" title="Merge two selected memories">⟳ Merge</button>
     <button class="arch" onclick="clearSelection()" style="margin-left:auto">✕ clear</button>
   </div>
   <div id="ml"></div>
@@ -1099,6 +1118,31 @@ input{width:360px}
   </div>
 </div>
 
+<div id="merge-modal" class="modal" onclick="if(event.target===this)closeMerge()">
+  <div class="mbox" style="max-width:720px">
+    <h3 style="margin-bottom:8px">Merge Memories</h3>
+    <p style="color:#8b949e;font-size:12px;margin-bottom:16px">Title and content from <b style="color:#3fb950">Keep</b> are preserved. Tags from both are combined. The discarded memory is archived.</p>
+    <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:start">
+      <div>
+        <div style="font-size:11px;color:#3fb950;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Keep</div>
+        <div id="mg-keep" style="background:#0d1117;border:1px solid #3fb950;border-radius:6px;padding:10px;font-size:13px;min-height:80px"></div>
+      </div>
+      <div style="display:flex;align-items:center;padding-top:22px">
+        <button class="btn" onclick="swapMerge()" title="Swap keep / discard" style="padding:6px 10px">⇄</button>
+      </div>
+      <div>
+        <div style="font-size:11px;color:#f85149;text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">Discard</div>
+        <div id="mg-discard" style="background:#0d1117;border:1px solid #f85149;border-radius:6px;padding:10px;font-size:13px;min-height:80px"></div>
+      </div>
+    </div>
+    <div id="mg-tags" style="margin-top:12px;font-size:12px;color:#8b949e;min-height:20px"></div>
+    <div id="mg-err" style="color:#f85149;font-size:12px;margin-top:8px"></div>
+    <div style="display:flex;gap:8px;margin-top:16px">
+      <button class="btn" onclick="confirmMerge()">Confirm Merge</button>
+      <button class="arch" onclick="closeMerge()">Cancel</button>
+    </div>
+  </div>
+</div>
 <div id="link-modal" class="modal" onclick="if(event.target===this)this.style.display='none'">
   <div class="mbox" style="max-width:620px">
     <h3>Memory Links</h3>
@@ -1314,11 +1358,47 @@ function toggleSel(id, on) {
   const bar = g('bulk-bar');
   if (_sel.size) { bar.style.display='flex'; g('bulk-count').textContent=_sel.size+' selected'; }
   else { bar.style.display='none'; }
+  const mb = g('bulk-merge-btn');
+  if (mb) mb.style.display = _sel.size === 2 ? '' : 'none';
 }
 function clearSelection() {
   _sel.clear();
   g('bulk-bar').style.display='none';
+  const mb = g('bulk-merge-btn'); if (mb) mb.style.display='none';
   document.querySelectorAll('#ml input[type=checkbox]').forEach(cb => cb.checked=false);
+}
+var _mgKeep = null, _mgDiscard = null;
+function showMerge() {
+  if (_sel.size !== 2) return;
+  var ids = [..._sel]; _mgKeep = ids[0]; _mgDiscard = ids[1];
+  g('mg-err').textContent = '';
+  renderMergeModal();
+  g('merge-modal').style.display = 'flex';
+}
+async function renderMergeModal() {
+  var k = await api('/api/memories/' + _mgKeep);
+  var d = await api('/api/memories/' + _mgDiscard);
+  g('mg-keep').innerHTML = '<b style="color:#e6edf3">' + esc(k.title) + '</b>'
+    + '<div style="color:#8b949e;margin-top:4px;font-size:12px">' + esc((k.content||'').slice(0,120)) + ((k.content||'').length>120?'…':'') + '</div>';
+  g('mg-discard').innerHTML = '<b style="color:#e6edf3">' + esc(d.title) + '</b>'
+    + '<div style="color:#8b949e;margin-top:4px;font-size:12px">' + esc((d.content||'').slice(0,120)) + ((d.content||'').length>120?'…':'') + '</div>';
+  var allTags = [...new Set([...(k.tags||[]), ...(d.tags||[])])];
+  g('mg-tags').innerHTML = allTags.length
+    ? 'Combined tags: ' + allTags.map(t => '<span style="background:#21262d;border-radius:3px;padding:1px 6px;margin-right:4px;font-size:11px">' + esc(t) + '</span>').join('')
+    : '<span style="color:#484f58">No tags on either memory</span>';
+}
+function swapMerge() { var tmp=_mgKeep; _mgKeep=_mgDiscard; _mgDiscard=tmp; renderMergeModal(); }
+function closeMerge() { g('merge-modal').style.display='none'; }
+async function confirmMerge() {
+  g('mg-err').textContent = '';
+  const r = await localFetch('/api/memories/merge', {
+    method: 'POST', headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ keep: _mgKeep, discard: _mgDiscard })
+  });
+  if (!r.ok) { const e = await r.json(); g('mg-err').textContent = e.error || 'Merge failed'; return; }
+  closeMerge(); _sel.clear(); g('bulk-bar').style.display='none';
+  const mb = g('bulk-merge-btn'); if (mb) mb.style.display='none';
+  loadMem(); refreshStats();
 }
 async function bulkArchive() {
   if (!_sel.size) return;
