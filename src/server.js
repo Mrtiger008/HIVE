@@ -127,16 +127,17 @@ function handleSearch(req, res, q) {
 
 function handleMemories(req, res, q) {
   const explicitLimit = q.limit ? +(q.limit) : null;
-  // When post-filtering by tag or pinned, fetch all then slice — a pre-fetch limit
-  // would silently cut results before the filter sees them.
   const needsPostFilter = q.tag || q.pinned;
   let results = memory.list({
-    type:        q.type    || undefined,
-    trust_level: q.trust   || undefined,
-    project_id:  q.project || undefined,
-    limit:       needsPostFilter ? 100000 : (explicitLimit || 50),
-    min_conf:    q.min_conf != null ? +q.min_conf : undefined,
-    max_conf:    q.max_conf != null ? +q.max_conf : undefined,
+    type:           q.type           || undefined,
+    trust_level:    q.trust          || undefined,
+    project_id:     q.project        || undefined,
+    domain:         q.domain         || undefined,
+    sort:           q.sort           || undefined,
+    limit:          needsPostFilter ? 100000 : (explicitLimit || 50),
+    min_conf:       q.min_conf       != null ? +q.min_conf       : undefined,
+    max_conf:       q.max_conf       != null ? +q.max_conf       : undefined,
+    min_importance: q.min_importance != null ? +q.min_importance : undefined,
   });
   if (q.tag)    results = results.filter(m => (m.tags || []).includes(q.tag));
   if (q.pinned) results = results.filter(m => m.pinned === 1 || m.pinned === true);
@@ -272,6 +273,8 @@ async function handleAddMemory(req, res) {
     importance:  body.importance  ? +body.importance : 5,
     confidence:  body.confidence  != null ? Math.min(1, Math.max(0, +body.confidence)) : 0.5,
     tags:        body.tags        || [],
+    domain:      body.domain      || undefined,
+    project_id:  body.project_id  || undefined,
   });
   webhooks.fire('memory.created', { id: m.id, title: m.title, memory_type: m.memory_type, trust_level: m.trust_level, importance: m.importance });
   json(res, m, 201);
@@ -497,6 +500,10 @@ const ROUTES = {
   'GET /api/export/obsidian': (req, res) => json(res, obsidian.generate()),
   'GET /api/memories/graph': (req, res) => json(res, memgraph.build()),
   'GET /api/shortcuts': (req, res) => json(res, { shortcuts: shortcuts.SHORTCUTS }),
+  'GET /api/domains': (req, res) => {
+    const rows = getDb().prepare("SELECT DISTINCT domain FROM memories WHERE status='active' AND domain IS NOT NULL ORDER BY domain").all();
+    json(res, rows.map(r => r.domain));
+  },
   'GET /api/health': (req, res) => {
     const q = new URL(req.url, 'http://x').searchParams;
     json(res, health.list({
@@ -776,10 +783,14 @@ input{width:360px}
     <select id="mtrust" onchange="loadMem()"><option value="">All trust</option><option>USER_CONFIRMED</option><option>SOURCE_VERIFIED</option><option>OBSERVED</option><option>INFERRED</option></select>
     <select id="mproj" onchange="loadMem()"><option value="">All projects</option></select>
     <select id="mtag" onchange="loadMem()"><option value="">All tags</option></select>
+    <select id="mdomain" onchange="loadMem()"><option value="">All domains</option></select>
     <select id="mconf" onchange="loadMem()" title="Min confidence"><option value="">Any confidence</option><option value="0.8">≥ 0.8 (high)</option><option value="0.6">≥ 0.6 (medium+)</option><option value="0.0" data-max="0.4">≤ 0.4 (low)</option></select>
+    <select id="mimportance" onchange="loadMem()" title="Min importance"><option value="">Any importance</option><option value="8">≥ 8 (high)</option><option value="6">≥ 6 (medium+)</option></select>
+    <select id="msort" onchange="loadMem()" title="Sort order"><option value="updated">Sort: Updated</option><option value="created">Sort: Created</option><option value="importance">Sort: Importance</option><option value="confidence">Sort: Confidence</option></select>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only</label>
     <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
   </div>
+  <div id="mem-chips" style="display:none;padding:4px 0 8px;display:none;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px"></div>
   <div id="bulk-bar" style="display:none;padding:8px 0;display:none;gap:10px;align-items:center;border-bottom:1px solid #30363d;margin-bottom:8px">
     <span id="bulk-count" style="color:#8b949e;font-size:13px"></span>
     <button class="btn" onclick="bulkArchive()">Archive selected</button>
@@ -1160,18 +1171,61 @@ async function bulkRetype() {
   g('bulk-bar').style.display='none'; g('bulk-type').value='';
 }
 
+let _domainsLoaded = false;
 async function loadMem() {
   _sel.clear(); g('bulk-bar').style.display='none';
+  if (!_domainsLoaded) {
+    _domainsLoaded = true;
+    try {
+      const doms = await api('/api/domains');
+      const sel = g('mdomain');
+      sel.innerHTML = '<option value="">All domains</option>' + doms.map(d=>\`<option>\${esc(d)}</option>\`).join('');
+    } catch {}
+  }
   let u = '/api/memories?limit=50';
   const t=g('mtype').value, r=g('mtrust').value, p=g('mproj').value, tg=g('mtag').value;
+  const dom=g('mdomain').value, imp=g('mimportance').value, sort=g('msort').value;
   const confOpt = g('mconf').selectedOptions[0];
   const minC = confOpt ? confOpt.value : '';
   const maxC = confOpt ? (confOpt.dataset.max||'') : '';
   if (t) u += '&type='+t; if (r) u += '&trust='+r; if (p) u += '&project='+p; if (tg) u += '&tag='+encodeURIComponent(tg);
+  if (dom) u += '&domain='+encodeURIComponent(dom);
   if (minC !== '') u += '&min_conf='+minC; if (maxC !== '') u += '&max_conf='+maxC;
+  if (imp) u += '&min_importance='+imp;
+  if (sort && sort !== 'updated') u += '&sort='+sort;
   if (g('mpinned').checked) u += '&pinned=1';
+  const chips = [];
+  if (t) chips.push([t,'mtype']);
+  if (r) chips.push([r,'mtrust']);
+  if (tg) chips.push(['tag:'+tg,'mtag']);
+  if (dom) chips.push(['domain:'+dom,'mdomain']);
+  if (imp) chips.push(['importance≥'+imp,'mimportance']);
+  if (sort && sort !== 'updated') chips.push(['sort:'+sort,'msort']);
+  if (g('mpinned').checked) chips.push(['pinned','mpinned']);
+  const bar = g('mem-chips');
+  if (chips.length) {
+    bar.style.display='flex';
+    bar.innerHTML = chips.map(([label, selId])=>
+      \`<span style="background:#1f4b8e33;border:1px solid #1f4b8e55;border-radius:12px;padding:2px 10px;color:#58a6ff;cursor:pointer" onclick="clearMemFilter('\${selId}')">\${esc(label)} ✕</span>\`
+    ).join('') + \`<span style="color:#8b949e;cursor:pointer;padding:2px 6px" onclick="clearAllMemFilters()">Clear all</span>\`;
+  } else {
+    bar.style.display='none'; bar.innerHTML='';
+  }
   const d = await api(u);
   g('ml').innerHTML = d.length ? d.map(card).join('') : '<p class="empty">No memories.</p>';
+}
+function clearMemFilter(selId) {
+  const el = g(selId);
+  if (!el) return;
+  if (el.type === 'checkbox') el.checked = false;
+  else el.value = '';
+  loadMem();
+}
+function clearAllMemFilters() {
+  ['mtype','mtrust','mproj','mtag','mdomain','mconf','mimportance'].forEach(id => { const e=g(id); if(e) e.value=''; });
+  g('msort').value='updated';
+  const mp=g('mpinned'); if(mp) mp.checked=false;
+  loadMem();
 }
 
 async function loadBrief() {

@@ -124,17 +124,26 @@ function remove(id) {
   return true;
 }
 
-function list({ type, domain, project_id, trust_level, status = 'active', limit = 20, offset = 0, min_conf, max_conf } = {}) {
+const SORT_MAP = {
+  updated:    'pinned DESC, updated_at DESC',
+  created:    'pinned DESC, created_at DESC',
+  importance: 'pinned DESC, importance DESC, updated_at DESC',
+  confidence: 'pinned DESC, confidence DESC, updated_at DESC',
+};
+
+function list({ type, domain, project_id, trust_level, status = 'active', limit = 20, offset = 0, min_conf, max_conf, min_importance, sort } = {}) {
   let sql = 'SELECT * FROM memories WHERE 1=1';
   const params = [];
-  if (type)        { sql += ' AND memory_type = ?';    params.push(type); }
-  if (domain)      { sql += ' AND domain = ?';          params.push(domain); }
-  if (project_id)  { sql += ' AND project_id = ?';      params.push(project_id); }
-  if (trust_level) { sql += ' AND trust_level = ?';     params.push(trust_level); }
-  if (status)      { sql += ' AND status = ?';          params.push(status); }
-  if (min_conf != null) { sql += ' AND confidence >= ?'; params.push(min_conf); }
-  if (max_conf != null) { sql += ' AND confidence <= ?'; params.push(max_conf); }
-  sql += ' ORDER BY pinned DESC, importance DESC, updated_at DESC LIMIT ? OFFSET ?';
+  if (type)           { sql += ' AND memory_type = ?';   params.push(type); }
+  if (domain)         { sql += ' AND domain = ?';         params.push(domain); }
+  if (project_id)     { sql += ' AND project_id = ?';     params.push(project_id); }
+  if (trust_level)    { sql += ' AND trust_level = ?';    params.push(trust_level); }
+  if (status)         { sql += ' AND status = ?';         params.push(status); }
+  if (min_conf != null)       { sql += ' AND confidence >= ?';  params.push(min_conf); }
+  if (max_conf != null)       { sql += ' AND confidence <= ?';  params.push(max_conf); }
+  if (min_importance != null) { sql += ' AND importance >= ?';  params.push(min_importance); }
+  const order = SORT_MAP[sort] || SORT_MAP.updated;
+  sql += ` ORDER BY ${order} LIMIT ? OFFSET ?`;
   params.push(limit, offset);
   return getDb().prepare(sql).all(...params).map(_parse);
 }

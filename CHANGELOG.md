@@ -1,5 +1,22 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 48 Complete
+
+**Phase 48: Search Filters UI — domain, importance, sort**
+
+`src/memory.js`:
+- `list()` gains `min_importance` and `sort` params; `SORT_MAP` with 4 sort keys: `updated`, `created`, `importance`, `confidence`
+
+`src/server.js`:
+- `GET /api/domains` — returns distinct domain values from active memories
+- `GET /api/memories` gains `?domain=`, `?min_importance=`, `?sort=` query params (passed through to `memory.list()`)
+- `POST /api/memories` now also passes `domain` and `project_id` from request body (was silently dropped before)
+- Dashboard **Memories** tab: added domain `<select>` (populated on first load), importance `<select>` (≥8 high / ≥6 medium+), sort `<select>` (updated/created/importance/confidence)
+- Active filter chips bar: each active filter shown as a removable ✕ chip; "Clear all" button resets all filters
+
+Tests: `tests/test-phase48.js` — 10/10 passing
+Full regression: 390/390
+
 ## 2026-11-20 — Phase 47 Complete
 
 **Phase 47: Tag Cloud UI — inline filtering**
