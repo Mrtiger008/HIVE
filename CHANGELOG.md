@@ -1,5 +1,20 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 53 Complete
+
+**Phase 53: Related Memories Panel**
+
+`src/server.js` (backend):
+- Added `handleRelated(req, res, id, limit)`: fetches the target memory, builds a search query from its title + tags + retrieval_keywords, runs FTS5 search, excludes the source, returns top N (default 5, max 20)
+- Added route `GET /api/memories/:id/related?limit=N`
+
+`src/server.js` (dashboard):
+- Added `~ related` button to every memory card in `card()`
+- Added hidden `<div id="rel-{id}">` drawer inside each card
+- Added `toggleRelated(id)`: toggle/lazy-load drawer; fetches the API once, renders mini-cards, caches result in `dataset.loaded`
+
+`tests/test-phase53.js`: 10/10 passing
+
 ## 2026-11-20 — Phase 52 Complete
 
 **Phase 52: Memory Templates UI**

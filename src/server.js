@@ -411,6 +411,14 @@ function handleListVersions(req, res, id) {
   json(res, versions.list(id));
 }
 
+function handleRelated(req, res, id, limit) {
+  const m = memory.get(id);
+  if (!m) { json(res, { error: 'not found' }, 404); return; }
+  const terms = [m.title, ...(m.tags || []), ...(m.retrieval_keywords || [])].join(' ');
+  const results = search(terms, { limit: limit + 1 });
+  json(res, results.filter(r => r.id !== id).slice(0, limit));
+}
+
 function handleGetVersion(req, res, vid) {
   const v = versions.get(+vid);
   if (!v) { json(res, { error: 'not found' }, 404); return; }
@@ -671,6 +679,14 @@ function createServer() {
       const vd = pathname.match(/^\/api\/versions\/(\d+)\/diff$/);
       if (vd && req.method === 'GET') {
         handler = (req, res) => handleGetVersion(req, res, vd[1]);
+      }
+      const rl = pathname.match(/^\/api\/memories\/([^/]+)\/related$/);
+      if (rl && req.method === 'GET') {
+        const rlId = rl[1];
+        handler = (req, res) => {
+          const lim = Math.min(parseInt(new URL(req.url,'http://x').searchParams.get('limit')||'5',10),20);
+          handleRelated(req, res, rlId, lim);
+        };
       }
     }
     if (!handler) { res.writeHead(404); res.end('Not Found'); return; }
@@ -1144,9 +1160,10 @@ function card(m) {
     ? \`<button class="arch" style="color:#d29922" onclick="togglePin('\${m.id}',0)" title="Unpin">📌 pinned</button>\`
     : \`<button class="arch" onclick="togglePin('\${m.id}',1)" title="Pin">📌 pin</button>\`;
   return \`<div class="card" data-id="\${m.id}" style="\${pinStyle}">
-    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}</div>
+    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)">\${esc(m.title)}<button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button></div>
     <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span>\${tags}</div>
     <div class="cc">\${esc(preview)}\${m.content.length>280?'…':''}</div>
+    <div id="rel-\${m.id}" style="display:none;margin-top:8px;border-top:1px solid #21262d;padding-top:8px"></div>
   </div>\`;
 }
 
@@ -1949,6 +1966,27 @@ async function archiveMem(id, btn) {
   const r = await fetch(\`/api/memories/\${id}\`, { method:'DELETE' });
   if (r.ok) { btn.closest('.card').remove(); refreshStats(); }
   else btn.textContent = '× archive';
+}
+async function toggleRelated(id) {
+  const el = g('rel-' + id);
+  if (!el) return;
+  if (el.style.display !== 'none') { el.style.display = 'none'; return; }
+  el.style.display = 'block';
+  if (el.dataset.loaded) return;
+  el.innerHTML = '<p class="empty" style="font-size:12px;padding:8px 0">Loading…</p>';
+  const data = await api('/api/memories/' + id + '/related');
+  el.dataset.loaded = '1';
+  if (!data.length) { el.innerHTML = '<p class="empty" style="font-size:12px">No related memories found.</p>'; return; }
+  var html = '<div style="font-size:11px;color:#8b949e;margin-bottom:6px">Related memories</div>';
+  for (var i = 0; i < data.length; i++) {
+    var m = data[i];
+    var preview = esc((m.content||'').slice(0,120)) + ((m.content||'').length>120?'…':'');
+    html += '<div style="padding:6px 8px;margin-bottom:4px;background:#0d1117;border-radius:4px;border:1px solid #21262d;font-size:12px;cursor:pointer" onclick="showEdit(\'' + m.id + '\')">'
+      + '<span style="font-weight:600;color:#e6edf3">' + esc(m.title) + '</span>'
+      + '<span style="color:#8b949e;display:block;margin-top:2px">' + preview + '</span>'
+      + '</div>';
+  }
+  el.innerHTML = html;
 }
 async function togglePin(id, pin) {
   await fetch(\`/api/memories/\${id}/\${pin?'pin':'unpin'}\`, {method:'POST',headers:{'X-Hive-Local':'1'}});

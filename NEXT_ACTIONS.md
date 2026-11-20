@@ -99,8 +99,10 @@
 
 ## Phase 52 — Memory Templates UI — DONE ✅ (2026-11-20)
 
-## Phase 53 — Candidates
+## Phase 53 — Related Memories Panel — DONE ✅ (2026-11-20)
+
+## Phase 54 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
 - **Memory export to CSV**: export memories as spreadsheet for external analysis
-- **Related memories panel**: show keyword-similar memories inline when clicking a card
+- **Inline memory editing**: edit title/content directly on the card without opening the modal
