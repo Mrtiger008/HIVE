@@ -1,5 +1,19 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 52 Complete
+
+**Phase 52: Memory Templates UI**
+
+`src/server.js`:
+- Added `.tpl-chip` / `.tpl-chip.on` CSS for template picker chips
+- Added `#nm-tpl-row` / `#nm-tpl-chips` HTML to the Add Memory modal
+- Added `TPL_LABEL` map, `renderTplChips(active)`, `selectTemplate(type)` JS functions
+- `applyTemplate(type)` now calls `renderTplChips` to sync the active chip
+- `showAdd()` now calls `_loadTemplates().then(() => renderTplChips('semantic'))` to populate chips on open
+- Also fixed: `updateStats()` → `refreshStats()` (Phase 45 quick-capture bug) and `Cache-Control: no-store` header on HTML responses; fixed `/\n/g` regex in template literal (`searchCard`)
+
+`tests/test-phase52.js`: 10/10 passing
+
 ## 2026-11-20 — Phase 51 Complete
 
 **Phase 51: Pagination**

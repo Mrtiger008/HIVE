@@ -97,9 +97,10 @@
 
 ## Phase 51 — Pagination — DONE ✅ (2026-11-20)
 
-## Phase 52 — Candidates
+## Phase 52 — Memory Templates UI — DONE ✅ (2026-11-20)
+
+## Phase 53 — Candidates
 
 - **Multi-file import**: batch import from a directory of markdown files
 - **Memory export to CSV**: export memories as spreadsheet for external analysis
 - **Related memories panel**: show keyword-similar memories inline when clicking a card
-- **Memory templates UI**: template picker in the Add Memory modal

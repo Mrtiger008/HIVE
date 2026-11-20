@@ -467,7 +467,7 @@ async function handleRevokeKey(req, res, name) {
 }
 
 function handleIndex(req, res) {
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end(HTML);
 }
 
@@ -717,6 +717,9 @@ input{width:360px}
 .cm{font-size:12px;color:#8b949e;margin-bottom:8px}
 .cc{font-size:13px;white-space:pre-wrap;max-height:160px;overflow:hidden}
 .b{display:inline-block;padding:2px 8px;border-radius:12px;font-size:11px;margin-right:4px}
+.tpl-chip{background:#21262d;border:1px solid #30363d;color:#8b949e;border-radius:12px;padding:3px 10px;font-size:12px;cursor:pointer;transition:all .15s}
+.tpl-chip:hover{border-color:#58a6ff;color:#58a6ff}
+.tpl-chip.on{background:#1f4b2b;border-color:#3fb950;color:#3fb950}
 .bt{background:#1f4b8e22;color:#58a6ff;border:1px solid #1f4b8e44}
 .br{background:#1a7f3722;color:#3fb950;border:1px solid #1a7f3744}
 .bi{background:#7d2f2f22;color:#f85149;border:1px solid #7d2f2f44}
@@ -1074,6 +1077,7 @@ input{width:360px}
 <div id="add-modal" class="modal">
   <div class="mbox">
     <h3 id="nm-h">Add Memory</h3>
+    <div class="f" id="nm-tpl-row" style="display:none"><label style="margin-bottom:4px">Template</label><div id="nm-tpl-chips" style="display:flex;flex-wrap:wrap;gap:4px"></div></div>
     <div class="f"><label>Title *</label><input id="nm-t" style="width:100%" placeholder="Memory title"></div>
     <div class="f"><label>Content *</label><textarea id="nm-c" rows="5" placeholder="Memory content…"></textarea></div>
     <div class="f"><label>Type</label><select id="nm-ty" onchange="applyTemplate(this.value)"><option>semantic</option><option>core</option><option>domain</option><option>project</option><option>episodic</option><option>skill</option></select></div>
@@ -1148,7 +1152,7 @@ function card(m) {
 
 function searchCard(m) {
   const titleHtml  = m.highlight_title ? hlEsc(m.highlight_title) : esc(m.title);
-  const snippetHtml = m.snippet        ? hlEsc(m.snippet)         : esc((m.content||'').replace(/\n/g,' ').slice(0, 280));
+  const snippetHtml = m.snippet        ? hlEsc(m.snippet)         : esc((m.content||'').replace(/\\n/g,' ').slice(0, 280));
   const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
   return \`<div class="card" data-id="\${m.id}">
     <div class="ct">\${titleHtml}
@@ -1889,8 +1893,17 @@ async function _loadTemplates() {
   if (!_tplCache) _tplCache = await api('/api/templates').then(a => Object.fromEntries(a.map(t=>[t.memory_type,t])));
   return _tplCache;
 }
+const TPL_LABEL = {semantic:'📝 semantic',core:'⭐ core',domain:'🌐 domain',project:'🏗 project',episodic:'📅 episodic',skill:'🔧 skill'};
+function renderTplChips(active) {
+  if (!_tplCache) return;
+  const row = g('nm-tpl-row'); if (row) row.style.display = 'block';
+  g('nm-tpl-chips').innerHTML = Object.keys(_tplCache).map(t =>
+    \`<button class="tpl-chip\${t===active?' on':''}" onclick="selectTemplate('\${t}')">\${TPL_LABEL[t]||t}</button>\`
+  ).join('');
+}
+function selectTemplate(type) { g('nm-ty').value = type; applyTemplate(type); }
 async function applyTemplate(type) {
-  if (_editId) return; // don't clobber an edit
+  if (_editId) return;
   const tpls = await _loadTemplates();
   const tpl = tpls[type]; if (!tpl) return;
   if (tpl.title_hint && !g('nm-t').value) g('nm-t').placeholder = tpl.title_hint + '…';
@@ -1900,8 +1913,9 @@ async function applyTemplate(type) {
   g('nm-i').value  = tpl.importance;
   g('nm-cf').value = tpl.confidence;
   if (tpl.tags.length && !g('nm-tg').value) g('nm-tg').value = tpl.tags.join(', ');
+  renderTplChips(type);
 }
-function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-cf').value='0.5'; g('nm-tg').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
+function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-cf').value='0.5'; g('nm-tg').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); _loadTemplates().then(()=>renderTplChips('semantic')); }
 async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-cf').value=d.confidence!=null?d.confidence:0.5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
 function closeAdd() { g('add-modal').classList.remove('on'); g('nm-dup').style.display='none'; }
 function _buildPayload() {
@@ -2344,7 +2358,7 @@ async function quickCaptureSave() {
     const m = await r.json();
     if (s) { s.textContent = \`✓ [\${m.id}] \${m.title}\`; s.style.color='#3fb950'; s.style.display='inline'; }
     setTimeout(quickCaptureClose, 1200);
-    updateStats();
+    refreshStats();
   } else {
     if (s) { s.textContent = 'Error saving.'; s.style.color='#f85149'; s.style.display='inline'; }
   }
