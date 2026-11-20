@@ -8,6 +8,7 @@ const SHORTCUTS = [
   { key: 'm',      guard: 'notInput', action: 'goMemories',   description: 'Go to Memories tab' },
   { key: 'r',      guard: 'notInput', action: 'goReminders',  description: 'Go to Reminders tab' },
   { key: 'Escape', guard: 'always',   action: 'closeAll',     description: 'Close modal / clear focus' },
+  { key: 'q',      guard: 'notInput', action: 'quickCapture', description: 'Quick capture a thought' },
   { key: '?',      guard: 'notInput', action: 'toggleHelp',   description: 'Show / hide shortcuts' },
 ];
 

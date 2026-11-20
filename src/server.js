@@ -900,6 +900,7 @@ input{width:360px}
   <button onclick="show('health',this);loadHealth()">Health</button>
   <button onclick="show('calibrate',this);loadCalibrate()">Calibrate</button>
   <button onclick="show('import',this)">Import</button>
+  <button onclick="toggleHelp()" title="Keyboard shortcuts" style="margin-left:auto;opacity:.7">?</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -2853,19 +2854,29 @@ async function quickCaptureSave() {
   const overlay = document.createElement('div');
   overlay.id = 'kb-help';
   overlay.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1000;align-items:center;justify-content:center';
-  overlay.innerHTML = \`<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:28px 36px;min-width:320px">
+  overlay.innerHTML = \`<div style="background:#161b22;border:1px solid #30363d;border-radius:12px;padding:28px 36px;min-width:320px;max-width:480px">
     <h3 style="margin:0 0 20px;color:#e6edf3;font-size:16px">Keyboard Shortcuts</h3>
-    <table style="border-collapse:collapse;width:100%">
-      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">/</td><td style="padding:6px 0;color:#e6edf3">Focus search box</td></tr>
-      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">n</td><td style="padding:6px 0;color:#e6edf3">New memory</td></tr>
-      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">m</td><td style="padding:6px 0;color:#e6edf3">Go to Memories tab</td></tr>
-      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">r</td><td style="padding:6px 0;color:#e6edf3">Go to Reminders tab</td></tr>
-      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">q</td><td style="padding:6px 0;color:#e6edf3">Quick capture a thought</td></tr>
-      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">Esc</td><td style="padding:6px 0;color:#e6edf3">Close modal / clear focus</td></tr>
-      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">?</td><td style="padding:6px 0;color:#e6edf3">Show / hide shortcuts</td></tr>
-    </table>
+    <table id="kb-table" style="border-collapse:collapse;width:100%"></table>
     <button onclick="document.getElementById('kb-help').style.display='none'" style="margin-top:20px;background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:6px 16px;cursor:pointer">Close</button>
   </div>\`;
+  document.body.appendChild(overlay);
+
+  async function populateShortcuts() {
+    const tbl = document.getElementById('kb-table');
+    if (!tbl || tbl.rows.length) return; // already populated
+    try {
+      const d = await fetch('/api/shortcuts').then(r => r.json());
+      tbl.innerHTML = (d.shortcuts || []).map(s =>
+        \`<tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">\${esc(s.key)}</td><td style="padding:6px 0;color:#e6edf3">\${esc(s.description)}</td></tr>\`
+      ).join('');
+    } catch {}
+  }
+
+  window.toggleHelp = function() {
+    const v = overlay.style.display === 'flex';
+    overlay.style.display = v ? 'none' : 'flex';
+    if (!v) populateShortcuts();
+  };
   document.body.appendChild(overlay);
 
   document.addEventListener('keydown', e => {
@@ -2887,7 +2898,7 @@ async function quickCaptureSave() {
       const am = g('add-modal'); if (am) am.style.display='none';
       if (document.activeElement) document.activeElement.blur();
     } else if (e.key === '?' && !inInput) {
-      overlay.style.display = overlay.style.display === 'none' ? 'flex' : 'none';
+      toggleHelp();
     }
   });
   overlay.addEventListener('click', e => { if (e.target===overlay) overlay.style.display='none'; });

@@ -125,8 +125,10 @@
 
 ## Phase 65 — Bulk Export Selection — DONE ✅ (2026-11-20)
 
-## Phase 66 — Candidates
+## Phase 66 — Keyboard Shortcut Cheatsheet — DONE ✅ (2026-11-20)
 
-- **Keyboard shortcut cheatsheet**: a modal overlay showing all keyboard shortcuts
+## Phase 67 — Candidates
+
 - **Memory color labels**: assign a color label (red/yellow/green/blue) to memories for quick visual grouping
 - **Search export**: download current search results as CSV directly from the search tab
+- **Memory age badge**: show how old a memory is (e.g. "3d", "2w", "1y") on each card

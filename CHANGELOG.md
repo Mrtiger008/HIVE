@@ -1,5 +1,20 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 66 Complete
+
+**Phase 66: Keyboard Shortcut Cheatsheet**
+
+`src/shortcuts.js`:
+- Added `q` → quickCapture shortcut (was implemented in JS but missing from data file)
+
+`src/server.js`:
+- Nav: added `?` button (right-aligned) that calls `toggleHelp()`
+- Overlay: replaced hardcoded table with `#kb-table` populated dynamically from `GET /api/shortcuts` on first open
+- Added `window.toggleHelp()` function; `?` keydown handler now calls it
+- `populateShortcuts()`: lazy-fetches shortcuts once and builds table rows
+
+`tests/test-phase66.js`: 10/10 tests (API shape, all 6 shortcuts present, overlay/table HTML, ? button, toggleHelp function)
+
 ## 2026-11-20 — Phase 65 Complete
 
 **Phase 65: Bulk Export Selection**
