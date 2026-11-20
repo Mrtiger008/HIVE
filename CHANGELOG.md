@@ -1,5 +1,17 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 64 Complete
+
+**Phase 64: Memory Templates Quick-Apply**
+
+`src/server.js`:
+- `card()`: added `⊞ tpl` select dropdown (core/skill/domain/project/episodic/semantic) to button row
+- `applyTemplate(id, type)`: reuses `_loadTemplates()` cache; PUTs memory_type, trust_level, importance, confidence; merges template tags with existing (no overwrite); preserves title and content
+
+No backend changes — reuses existing `GET /api/templates` + partial `PUT /api/memories/:id`
+
+`tests/test-phase64.js`: 10/10 tests (template apply, trust_level/importance/confidence changes, tag merge, title/content preservation, HTML checks)
+
 ## 2026-11-20 — Phase 63 Complete
 
 **Phase 63: Reading Time / Word Count**

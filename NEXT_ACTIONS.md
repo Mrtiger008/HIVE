@@ -121,8 +121,10 @@
 
 ## Phase 63 — Reading Time / Word Count — DONE ✅ (2026-11-20)
 
-## Phase 64 — Candidates
+## Phase 64 — Memory Templates Quick-Apply — DONE ✅ (2026-11-20)
 
-- **Memory templates quick-apply**: apply a template to a selected memory in one click
-- **Bulk export selection**: export only the currently selected memories as CSV
+## Phase 65 — Candidates
+
+- **Bulk export selection**: export only the currently selected (checked) memories as CSV
 - **Keyboard shortcut cheatsheet**: a modal overlay showing all keyboard shortcuts
+- **Memory color labels**: assign a color label (red/yellow/green/blue) to memories for quick visual grouping
