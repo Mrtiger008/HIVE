@@ -1,5 +1,28 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 49 Complete
+
+**Phase 49: Confidence Calibration**
+
+`src/calibrate.js` (new):
+- `TRUST_CEILING` map — max confidence each trust level can legitimately carry (USER_CONFIRMED=1.0, INFERRED=0.6, AI_HYPOTHESIS=0.4, OUTDATED=0.1, etc.)
+- `HALF_LIFE` map — confidence decay half-life in days per trust level (USER_CONFIRMED=Infinity, OBSERVED=180d, AI_HYPOTHESIS=60d, etc.)
+- `_calibrate(m)` — computes calibrated score: `min(conf, ceiling) × exp(−age_days / half_life)`, floored at 0.05
+- `preview(opts)` — lists all memories where calibrated score differs from stored by ≥0.02, sorted most-decreased first
+- `apply(opts)` — writes the calibrated scores back; returns `{ applied, changes }`
+
+`src/server.js`:
+- `GET /api/calibrate/preview` — preview pending changes
+- `POST /api/calibrate/apply` — commit changes
+- Dashboard: **Calibrate** tab — shows pending changes with delta bars and reason; "Apply changes" button
+
+`src/hive.js`:
+- `hive calibrate` — preview in terminal with color-coded deltas
+- `hive calibrate --apply` — apply and report
+
+Tests: `tests/test-phase49.js` — 10/10 passing
+Full regression: 400/400
+
 ## 2026-11-20 — Phase 48 Complete
 
 **Phase 48: Search Filters UI — domain, importance, sort**

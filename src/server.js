@@ -29,6 +29,7 @@ const shortcuts        = require('./shortcuts');
 const compare          = require('./compare');
 const gaps             = require('./gaps');
 const health           = require('./health');
+const calibrate        = require('./calibrate');
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -500,6 +501,14 @@ const ROUTES = {
   'GET /api/export/obsidian': (req, res) => json(res, obsidian.generate()),
   'GET /api/memories/graph': (req, res) => json(res, memgraph.build()),
   'GET /api/shortcuts': (req, res) => json(res, { shortcuts: shortcuts.SHORTCUTS }),
+  'GET /api/calibrate/preview': (req, res) => {
+    const q = new URL(req.url, 'http://x').searchParams;
+    json(res, calibrate.preview({ limit: q.get('limit') ? +q.get('limit') : 500 }));
+  },
+  'POST /api/calibrate/apply': async (req, res) => {
+    const body = await readBody(req).catch(() => ({}));
+    json(res, calibrate.apply({ limit: body.limit || 500 }));
+  },
   'GET /api/domains': (req, res) => {
     const rows = getDb().prepare("SELECT DISTINCT domain FROM memories WHERE status='active' AND domain IS NOT NULL ORDER BY domain").all();
     json(res, rows.map(r => r.domain));
@@ -761,6 +770,7 @@ input{width:360px}
   <button onclick="show('compare',this);initCompare()">Compare</button>
   <button onclick="show('gaps',this);loadGaps()">Gaps</button>
   <button onclick="show('health',this);loadHealth()">Health</button>
+  <button onclick="show('calibrate',this);loadCalibrate()">Calibrate</button>
 </nav>
 
 <div id="search" class="tab on">
@@ -984,6 +994,16 @@ input{width:360px}
     <span id="hlt-summary" style="font-size:12px;color:#8b949e;margin-left:4px"></span>
   </div>
   <div id="hlt-list"></div>
+</div>
+
+<div id="calibrate" class="tab">
+  <div class="row" style="gap:8px;align-items:center;margin-bottom:4px">
+    <button class="btn" onclick="loadCalibrate()">↺ Preview</button>
+    <button class="btn" id="cal-apply-btn" style="display:none;background:#238636;border-color:#238636" onclick="applyCalibrate()">Apply changes</button>
+    <span id="cal-summary" style="font-size:12px;color:#8b949e;margin-left:4px"></span>
+  </div>
+  <p style="font-size:12px;color:#8b949e;margin-bottom:12px">Recalculates confidence based on trust-level ceiling and age decay. No effect on USER_CONFIRMED memories.</p>
+  <div id="cal-list"></div>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -1507,6 +1527,45 @@ async function loadHealth() {
       </div>
     </div>\`;
   }).join('');
+}
+
+// ── Confidence Calibration ────────────────────────────────────────────────
+let _calChanges = [];
+async function loadCalibrate() {
+  g('cal-list').innerHTML = '<p class="empty">Loading…</p>';
+  g('cal-apply-btn').style.display = 'none';
+  _calChanges = await api('/api/calibrate/preview?limit=500');
+  if (!_calChanges.length) {
+    g('cal-summary').textContent = '';
+    g('cal-list').innerHTML = '<p class="empty">All confidence scores are already well-calibrated.</p>';
+    return;
+  }
+  g('cal-summary').textContent = \`\${_calChanges.length} change(s) pending\`;
+  g('cal-apply-btn').style.display = '';
+  const dec = _calChanges.filter(c => c.delta < 0).length;
+  const inc = _calChanges.length - dec;
+  g('cal-list').innerHTML = \`
+    <div style="font-size:12px;color:#8b949e;margin-bottom:10px">
+      <span style="color:#ffa657">-\${dec} decreases</span> &nbsp; <span style="color:#3fb950">+\${inc} increases</span>
+    </div>\` +
+    _calChanges.map(c => {
+      const col = c.delta < 0 ? '#ffa657' : '#3fb950';
+      const sign = c.delta > 0 ? '+' : '';
+      return \`<div class="card" style="border-left:3px solid \${col};display:flex;align-items:center;gap:12px">
+        <span style="font-weight:700;color:\${col};min-width:44px;font-size:13px">\${sign}\${(c.delta*100).toFixed(1)}%</span>
+        <span style="flex:1;font-size:13px;color:#e6edf3">\${esc(c.title)}</span>
+        <span style="font-size:11px;color:#8b949e;min-width:120px;text-align:right">\${c.old_confidence.toFixed(2)} &#8594; \${c.new_confidence.toFixed(2)}</span>
+        <span style="font-size:11px;color:#484f58;min-width:140px">\${esc(c.reason)}</span>
+      </div>\`;
+    }).join('');
+}
+async function applyCalibrate() {
+  const btn = g('cal-apply-btn');
+  btn.disabled = true; btn.textContent = 'Applying…';
+  const r = await fetch('/api/calibrate/apply', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then(x => x.json());
+  btn.style.display = 'none';
+  g('cal-summary').textContent = \`Applied \${r.applied} update(s).\`;
+  g('cal-list').innerHTML += \`<p style="color:#3fb950;font-size:13px;margin-top:10px">Done — \${r.applied} confidence score(s) updated.</p>\`;
 }
 
 // ── Memory Compare ────────────────────────────────────────────────────────

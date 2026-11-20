@@ -1109,6 +1109,32 @@ const COMMANDS = {
     console.log('');
   },
 
+  'calibrate'(args) {
+    const { flags } = parseArgs(args);
+    const cal = require('./calibrate');
+    const limit = +(flags.limit || 500);
+    if (flags.apply) {
+      const { applied, changes } = cal.apply({ limit });
+      if (!applied) { console.log('\n  Nothing to calibrate — all scores are already accurate.\n'); return; }
+      console.log(`\n  Applied ${applied} confidence update(s).\n`);
+      changes.slice(0, 10).forEach(c =>
+        console.log(`  ${c.delta > 0 ? '\x1b[32m' : '\x1b[33m'}${(c.delta > 0 ? '+' : '')}${(c.delta * 100).toFixed(1)}%\x1b[0m  ${c.title.slice(0, 55).padEnd(55)}  ${c.old_confidence.toFixed(2)} -> ${c.new_confidence.toFixed(2)}`)
+      );
+      if (changes.length > 10) console.log(`  … and ${changes.length - 10} more`);
+      console.log('');
+      return;
+    }
+    const changes = cal.preview({ limit });
+    if (!changes.length) { console.log('\n  Nothing to calibrate — all scores are already accurate.\n'); return; }
+    console.log(`\n── Confidence Calibration Preview (${changes.length} changes) ──`);
+    console.log('  Run with --apply to commit.\n');
+    changes.slice(0, 20).forEach(c =>
+      console.log(`  ${c.delta > 0 ? '\x1b[32m' : '\x1b[33m'}${(c.delta > 0 ? '+' : '')}${(c.delta * 100).toFixed(1)}%\x1b[0m  ${c.title.slice(0, 50).padEnd(50)}  ${c.trust_level.padEnd(16)}  ${c.reason}`)
+    );
+    if (changes.length > 20) console.log(`  … and ${changes.length - 20} more`);
+    console.log('');
+  },
+
   'compare'(args) {
     const { positional } = parseArgs(args);
     const [id1, id2] = positional;
