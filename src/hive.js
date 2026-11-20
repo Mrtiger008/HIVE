@@ -75,6 +75,13 @@ function fmtProject(p) {
   ].filter(l => l !== null).join('\n');
 }
 
+function quickTitle(text, max = 60) {
+  const t = text.trim().replace(/\s+/g, ' ');
+  if (t.length <= max) return t;
+  const cut = t.lastIndexOf(' ', max);
+  return (cut > 20 ? t.slice(0, cut) : t.slice(0, max)) + '…';
+}
+
 const COMMANDS = {
 
   // ── memory ───────────────────────────────────────────────────────────────
@@ -1021,6 +1028,46 @@ const COMMANDS = {
     console.log('');
   },
 
+  'add'(args) {
+    const flags = {};
+    const words = [];
+    for (let i = 0; i < args.length; i++) {
+      if (args[i].startsWith('--')) {
+        const key = args[i].slice(2);
+        const next = args[i + 1];
+        if (next && !next.startsWith('--')) { flags[key] = next; i++; }
+        else { flags[key] = true; }
+      } else {
+        words.push(args[i]);
+      }
+    }
+    const text = words.join(' ').trim();
+    if (!text) die('Usage: hive add "your thought" [--type TYPE] [--domain D] [--importance N] [--force]');
+
+    const title = quickTitle(text);
+
+    if (!flags.force) {
+      const { findSimilar } = require('./dedupe');
+      const dups = findSimilar(title, text, { threshold: 0.25, limit: 1 });
+      if (dups.length) {
+        console.log(`  Similar: [${dups[0].id}] ${dups[0].title}`);
+        console.log(`  Add --force to save anyway.`);
+        return;
+      }
+    }
+
+    const m = memory.add({
+      title,
+      content:     text,
+      memory_type: flags.type       || 'semantic',
+      domain:      flags.domain     || undefined,
+      trust_level: 'OBSERVED',
+      confidence:  0.7,
+      importance:  flags.importance ? +flags.importance : 5,
+    });
+    console.log(`✓ [${m.id}] ${m.title}`);
+  },
+
   'gaps'(args) {
     const { flags } = parseArgs(args);
     const g = require('./gaps');
@@ -1258,6 +1305,13 @@ Knowledge timeline:
 Memory relations graph:
   hive memory-graph                      Show graph stats (nodes, edges, type/rel breakdown)
   hive serve → Mem Graph tab            Interactive force-directed visualization in browser
+
+Quick capture:
+  hive add "your thought here"    One-liner — auto-title + sensible defaults
+  hive add "..." --type core      Override memory type (default: semantic)
+  hive add "..." --domain D       Set domain
+  hive add "..." --importance N   Set importance (default: 5)
+  hive add "..." --force          Skip duplicate check
 
 Knowledge gaps:
   hive gaps                       Detect weak areas in the knowledge base

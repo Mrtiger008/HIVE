@@ -231,6 +231,30 @@ async function handleBrief(req, res) {
   json(res, { text: result.text });
 }
 
+function _quickTitle(text, max = 60) {
+  const t = text.trim().replace(/\s+/g, ' ');
+  if (t.length <= max) return t;
+  const cut = t.lastIndexOf(' ', max);
+  return (cut > 20 ? t.slice(0, cut) : t.slice(0, max)) + '…';
+}
+
+async function handleCapture(req, res) {
+  const body = await readBody(req);
+  if (!body.content?.trim()) { json(res, { error: 'content required' }, 400); return; }
+  const text = body.content.trim().replace(/\s+/g, ' ');
+  const m = memory.add({
+    title:       _quickTitle(text),
+    content:     text,
+    memory_type: body.type || 'semantic',
+    domain:      body.domain || undefined,
+    trust_level: 'OBSERVED',
+    confidence:  0.7,
+    importance:  body.importance != null ? +body.importance : 5,
+  });
+  webhooks.fire('memory.created', { id: m.id, title: m.title, memory_type: m.memory_type, trust_level: m.trust_level, importance: m.importance });
+  json(res, m, 201);
+}
+
 async function handleAddMemory(req, res) {
   const body = await readBody(req);
   if (!body.title || !body.content) { json(res, { error: 'title and content required' }, 400); return; }
@@ -440,6 +464,7 @@ const ROUTES = {
   'GET /api/activity':       handleActivity,
   'GET /api/memories':         handleMemories,
   'GET /api/memories/similar': handleSimilar,
+  'POST /api/capture':         handleCapture,
   'POST /api/memories':        handleAddMemory,
   'POST /api/memories/bulk':   handleBulk,
   'GET /api/patterns':       handlePatterns,
@@ -1982,6 +2007,55 @@ async function showDiff(versionId) {
   g('hist-diff').style.display='block';
 }
 
+// ── Quick Capture ──────────────────────────────────────────────────────────
+(function() {
+  const qc = document.createElement('div');
+  qc.id = 'qc-overlay';
+  qc.style.cssText = 'display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:1001;align-items:center;justify-content:center';
+  qc.innerHTML = \`<div style="background:#161b22;border:1px solid #58a6ff;border-radius:12px;padding:24px;width:520px;max-width:90vw">
+    <div style="color:#8b949e;font-size:12px;margin-bottom:8px">Quick capture — Enter to save · Shift+Enter for newline · Esc to cancel</div>
+    <textarea id="qc-text" rows="4" style="width:100%;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:10px;font-size:14px;resize:vertical;box-sizing:border-box" placeholder="Capture a thought…"></textarea>
+    <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+      <select id="qc-type" style="background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:4px 8px;font-size:12px">
+        <option value="semantic">semantic</option><option value="core">core</option><option value="episodic">episodic</option><option value="skill">skill</option>
+      </select>
+      <button onclick="quickCaptureSave()" style="background:#1f6feb;color:#fff;border:none;border-radius:6px;padding:6px 16px;cursor:pointer;font-size:13px">Save</button>
+      <button onclick="quickCaptureClose()" style="background:#21262d;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:6px 16px;cursor:pointer;font-size:13px">Cancel</button>
+      <span id="qc-status" style="font-size:12px;color:#3fb950;display:none;margin-left:4px"></span>
+    </div>
+  </div>\`;
+  document.body.appendChild(qc);
+  qc.addEventListener('click', e => { if (e.target === qc) quickCaptureClose(); });
+  g('qc-text').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); quickCaptureSave(); }
+    if (e.key === 'Escape') quickCaptureClose();
+  });
+})();
+function quickCaptureOpen() {
+  const o = g('qc-overlay'); if (!o) return;
+  o.style.display = 'flex';
+  const t = g('qc-text'); if (t) { t.value = ''; t.focus(); }
+  const s = g('qc-status'); if (s) s.style.display='none';
+}
+function quickCaptureClose() {
+  const o = g('qc-overlay'); if (o) o.style.display = 'none';
+}
+async function quickCaptureSave() {
+  const text = (g('qc-text')?.value || '').trim();
+  if (!text) return;
+  const type = g('qc-type')?.value || 'semantic';
+  const r = await fetch('/api/capture', { method:'POST', headers:{'Content-Type':'application/json','X-Hive-Local':'1'}, body: JSON.stringify({ content: text, type }) });
+  const s = g('qc-status');
+  if (r.ok) {
+    const m = await r.json();
+    if (s) { s.textContent = \`✓ [\${m.id}] \${m.title}\`; s.style.color='#3fb950'; s.style.display='inline'; }
+    setTimeout(quickCaptureClose, 1200);
+    updateStats();
+  } else {
+    if (s) { s.textContent = 'Error saving.'; s.style.color='#f85149'; s.style.display='inline'; }
+  }
+}
+
 // ── Keyboard Shortcuts ─────────────────────────────────────────────────────
 (function() {
   const overlay = document.createElement('div');
@@ -1994,6 +2068,7 @@ async function showDiff(versionId) {
       <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">n</td><td style="padding:6px 0;color:#e6edf3">New memory</td></tr>
       <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">m</td><td style="padding:6px 0;color:#e6edf3">Go to Memories tab</td></tr>
       <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">r</td><td style="padding:6px 0;color:#e6edf3">Go to Reminders tab</td></tr>
+      <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">q</td><td style="padding:6px 0;color:#e6edf3">Quick capture a thought</td></tr>
       <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">Esc</td><td style="padding:6px 0;color:#e6edf3">Close modal / clear focus</td></tr>
       <tr><td style="padding:6px 16px 6px 0;color:#58a6ff;font-family:monospace;font-size:14px">?</td><td style="padding:6px 0;color:#e6edf3">Show / hide shortcuts</td></tr>
     </table>
@@ -2012,8 +2087,11 @@ async function showDiff(versionId) {
       document.querySelectorAll('nav button').forEach(b => { if (b.textContent==='Memories') b.click(); });
     } else if (e.key === 'r' && !inInput) {
       document.querySelectorAll('nav button').forEach(b => { if (b.textContent==='Reminders') b.click(); });
+    } else if (e.key === 'q' && !inInput) {
+      e.preventDefault(); quickCaptureOpen();
     } else if (e.key === 'Escape') {
       overlay.style.display = 'none';
+      quickCaptureClose();
       const am = g('add-modal'); if (am) am.style.display='none';
       if (document.activeElement) document.activeElement.blur();
     } else if (e.key === '?' && !inInput) {
