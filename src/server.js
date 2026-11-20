@@ -126,8 +126,11 @@ function handleSearch(req, res, q) {
   json(res, search(query, { limit, project_id: projectId }));
 }
 
+const MEM_PAGE = 50; // memories per page
+
 function handleMemories(req, res, q) {
-  const explicitLimit = q.limit ? +(q.limit) : null;
+  const pageSize = q.limit ? +(q.limit) : MEM_PAGE;
+  const offset   = q.offset ? +(q.offset) : 0;
   const needsPostFilter = q.tag || q.pinned;
   let results = memory.list({
     type:           q.type           || undefined,
@@ -135,14 +138,16 @@ function handleMemories(req, res, q) {
     project_id:     q.project        || undefined,
     domain:         q.domain         || undefined,
     sort:           q.sort           || undefined,
-    limit:          needsPostFilter ? 100000 : (explicitLimit || 50),
+    limit:          needsPostFilter ? 100000 : pageSize,
+    offset:         needsPostFilter ? 0       : offset,
     min_conf:       q.min_conf       != null ? +q.min_conf       : undefined,
     max_conf:       q.max_conf       != null ? +q.max_conf       : undefined,
     min_importance: q.min_importance != null ? +q.min_importance : undefined,
   });
   if (q.tag)    results = results.filter(m => (m.tags || []).includes(q.tag));
   if (q.pinned) results = results.filter(m => m.pinned === 1 || m.pinned === true);
-  if (needsPostFilter && explicitLimit) results = results.slice(0, explicitLimit);
+  // For post-filter case apply client-side pagination
+  if (needsPostFilter) results = results.slice(offset, offset + pageSize);
   json(res, results);
 }
 
@@ -811,6 +816,10 @@ input{width:360px}
     <button class="arch" onclick="clearSelection()" style="margin-left:auto">✕ clear</button>
   </div>
   <div id="ml"></div>
+  <div id="mem-more" style="display:none;padding:12px 0;text-align:center">
+    <button class="btn" onclick="loadMoreMem()" id="mem-more-btn">Load more</button>
+    <span id="mem-count" style="font-size:12px;color:#8b949e;margin-left:10px"></span>
+  </div>
 </div>
 
 <div id="briefing" class="tab">
@@ -1212,17 +1221,11 @@ async function bulkRetype() {
 }
 
 let _domainsLoaded = false;
-async function loadMem() {
-  _sel.clear(); g('bulk-bar').style.display='none';
-  if (!_domainsLoaded) {
-    _domainsLoaded = true;
-    try {
-      const doms = await api('/api/domains');
-      const sel = g('mdomain');
-      sel.innerHTML = '<option value="">All domains</option>' + doms.map(d=>\`<option>\${esc(d)}</option>\`).join('');
-    } catch {}
-  }
-  let u = '/api/memories?limit=50';
+let _memOffset = 0;
+const _MEM_PAGE = 50;
+
+function _memUrl(offset) {
+  let u = \`/api/memories?limit=\${_MEM_PAGE}&offset=\${offset}\`;
   const t=g('mtype').value, r=g('mtrust').value, p=g('mproj').value, tg=g('mtag').value;
   const dom=g('mdomain').value, imp=g('mimportance').value, sort=g('msort').value;
   const confOpt = g('mconf').selectedOptions[0];
@@ -1234,6 +1237,22 @@ async function loadMem() {
   if (imp) u += '&min_importance='+imp;
   if (sort && sort !== 'updated') u += '&sort='+sort;
   if (g('mpinned').checked) u += '&pinned=1';
+  return u;
+}
+
+async function loadMem() {
+  _memOffset = 0;
+  _sel.clear(); g('bulk-bar').style.display='none';
+  if (!_domainsLoaded) {
+    _domainsLoaded = true;
+    try {
+      const doms = await api('/api/domains');
+      const sel = g('mdomain');
+      sel.innerHTML = '<option value="">All domains</option>' + doms.map(d=>\`<option>\${esc(d)}</option>\`).join('');
+    } catch {}
+  }
+  const t=g('mtype').value, r=g('mtrust').value, tg=g('mtag').value;
+  const dom=g('mdomain').value, imp=g('mimportance').value, sort=g('msort').value;
   const chips = [];
   if (t) chips.push([t,'mtype']);
   if (r) chips.push([r,'mtrust']);
@@ -1251,9 +1270,32 @@ async function loadMem() {
   } else {
     bar.style.display='none'; bar.innerHTML='';
   }
-  const d = await api(u);
+  const d = await api(_memUrl(0));
   g('ml').innerHTML = d.length ? d.map(card).join('') : '<p class="empty">No memories.</p>';
+  _updateMoreBtn(d.length);
 }
+
+async function loadMoreMem() {
+  _memOffset += _MEM_PAGE;
+  const btn = g('mem-more-btn');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  const d = await api(_memUrl(_memOffset));
+  if (d.length) g('ml').insertAdjacentHTML('beforeend', d.map(card).join(''));
+  btn.disabled = false; btn.textContent = 'Load more';
+  _updateMoreBtn(d.length);
+}
+
+function _updateMoreBtn(pageCount) {
+  const more = g('mem-more');
+  if (pageCount >= _MEM_PAGE) {
+    more.style.display = 'block';
+    g('mem-count').textContent = \`showing \${_memOffset + pageCount}\`;
+  } else {
+    more.style.display = 'none';
+    g('mem-count').textContent = '';
+  }
+}
+
 function clearMemFilter(selId) {
   const el = g(selId);
   if (!el) return;

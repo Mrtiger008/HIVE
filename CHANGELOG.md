@@ -1,5 +1,25 @@
 # CHANGELOG.md
 
+## 2026-11-20 — Phase 51 Complete
+
+**Phase 51: Pagination**
+
+`src/server.js` (backend):
+- `handleMemories` now accepts `?offset=N` query param and passes it to `memory.list()`
+- For server-side filters (type, domain, trust, etc.): offset passed directly to SQLite `LIMIT ? OFFSET ?`
+- For client-side post-filters (tag, pinned): full set fetched, then `slice(offset, offset+limit)` applied
+- Page size constant `MEM_PAGE = 50`
+
+`src/server.js` (dashboard UI):
+- Memories tab: "Load more" button + "showing N" count below the list
+- `_memOffset` state tracks current offset; resets to 0 on any filter change
+- `_memUrl(offset)` — builds the full query URL with all active filters + given offset
+- `loadMoreMem()` — appends next page to `#ml` without replacing existing results
+- `_updateMoreBtn(pageCount)` — shows/hides Load more based on whether a full page was returned
+
+Tests: `tests/test-phase51.js` — 10/10 passing
+Full regression: 420/420
+
 ## 2026-11-20 — Phase 50 Complete
 
 **Phase 50: Full-text Search Highlighting**
