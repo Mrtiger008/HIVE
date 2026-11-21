@@ -127,8 +127,10 @@
 
 ## Phase 66 — Keyboard Shortcut Cheatsheet — DONE ✅ (2026-11-20)
 
-## Phase 67 — Candidates
+## Phase 67 — Memory Color Labels — DONE ✅ (2026-11-21)
 
-- **Memory color labels**: assign a color label (red/yellow/green/blue) to memories for quick visual grouping
+## Phase 68 — Candidates
+
 - **Search export**: download current search results as CSV directly from the search tab
 - **Memory age badge**: show how old a memory is (e.g. "3d", "2w", "1y") on each card
+- **Inline tag editor**: click a tag on a card to rename or delete it without opening the full edit modal

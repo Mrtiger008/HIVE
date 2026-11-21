@@ -154,7 +154,7 @@ const MEM_PAGE = 50; // memories per page
 function handleMemories(req, res, q) {
   const pageSize = q.limit ? +(q.limit) : MEM_PAGE;
   const offset   = q.offset ? +(q.offset) : 0;
-  const needsPostFilter = q.tag || q.pinned;
+  const needsPostFilter = q.tag || q.pinned || q.label;
   let results = memory.list({
     type:           q.type           || undefined,
     trust_level:    q.trust          || undefined,
@@ -169,6 +169,7 @@ function handleMemories(req, res, q) {
   });
   if (q.tag)    results = results.filter(m => (m.tags || []).includes(q.tag));
   if (q.pinned) results = results.filter(m => m.pinned === 1 || m.pinned === true);
+  if (q.label)  results = results.filter(m => m.label === q.label);
   // For post-filter case apply client-side pagination
   if (needsPostFilter) results = results.slice(offset, offset + pageSize);
   json(res, results);
@@ -223,7 +224,7 @@ function handleExport(req, res, q) {
       return;
     }
     let rows = null;
-    const hasFilter = q.tag || q.type || q.project || q.domain || q.trust || q.min_importance;
+    const hasFilter = q.tag || q.type || q.project || q.domain || q.trust || q.min_importance || q.label;
     if (hasFilter) {
       rows = memory.list({
         type:           q.type           || undefined,
@@ -233,7 +234,8 @@ function handleExport(req, res, q) {
         min_importance: q.min_importance != null ? +q.min_importance : undefined,
         limit: 100000,
       });
-      if (q.tag) rows = rows.filter(m => (m.tags || []).includes(q.tag));
+      if (q.tag)   rows = rows.filter(m => (m.tags || []).includes(q.tag));
+      if (q.label) rows = rows.filter(m => m.label === q.label);
     }
     const filename = hasFilter ? 'hive-filtered.csv' : 'hive-export.csv';
     res.writeHead(200, { 'Content-Type': 'text/csv', 'Content-Disposition': `attachment; filename="${filename}"` });
@@ -366,6 +368,7 @@ async function handleUpdateMemory(req, res, id) {
   if (body.confidence  !== undefined) updates.confidence  = Math.min(1, Math.max(0, +body.confidence));
   if (body.tags        !== undefined) updates.tags        = body.tags;
   if (body.pinned      !== undefined) updates.pinned      = body.pinned ? 1 : 0;
+  if (body.label       !== undefined) updates.label       = body.label || null;
   if (!Object.keys(updates).length) { json(res, { error: 'no fields to update' }, 400); return; }
   if (updates.title !== undefined || updates.content !== undefined)
     versions.snapshot(id, m.title, m.content);
@@ -929,6 +932,7 @@ input{width:360px}
     <select id="mimportance" onchange="loadMem()" title="Min importance"><option value="">Any importance</option><option value="8">≥ 8 (high)</option><option value="6">≥ 6 (medium+)</option></select>
     <select id="msort" onchange="loadMem()" title="Sort order"><option value="updated">Sort: Updated</option><option value="created">Sort: Created</option><option value="importance">Sort: Importance</option><option value="confidence">Sort: Confidence</option></select>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only</label>
+    <select id="mlabel" onchange="loadMem()"><option value="">All labels</option><option value="red">🔴 Red</option><option value="yellow">🟡 Yellow</option><option value="green">🟢 Green</option><option value="blue">🔵 Blue</option></select>
     <button class="btn" onclick="exportFilteredCsv()" title="Export current filter as CSV" style="font-size:12px">⬇ CSV</button>
     <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
   </div>
@@ -1310,15 +1314,18 @@ function card(m) {
   const preview = (m.content||'').replace(/\\n/g,' ').slice(0,280);
   const _activeTg = g('mtag').value;
   const tags = (m.tags||[]).map(t=>{const on=t===_activeTg;return \`<span class="b" style="cursor:pointer;\${on?'color:#3fb950;background:#1f4b2b;border-radius:3px;padding:0 3px':'color:#79c0ff'}" title="\${on?'Clear':'Filter by'} #\${esc(t)}" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`;}).join(' ');
-  const pinStyle = m.pinned ? 'border-left:3px solid #d29922;' : '';
+  const LCOL = {red:'#f85149',yellow:'#d29922',green:'#3fb950',blue:'#58a6ff'};
+  const pinStyle = m.pinned ? 'border-left:3px solid #d29922;' : (m.label ? \`border-left:3px solid \${LCOL[m.label]};\` : '');
   const pinBtn = m.pinned
     ? \`<button class="arch" style="color:#d29922" onclick="togglePin('\${m.id}',0)" title="Unpin">📌 pinned</button>\`
     : \`<button class="arch" onclick="togglePin('\${m.id}',1)" title="Pin">📌 pin</button>\`;
   const words = (m.content||'').trim().split(/\s+/).filter(Boolean).length;
   const rt = Math.max(1, Math.ceil(words / 200));
+  const labelSel = \`<select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:\${m.label?LCOL[m.label]:'#8b949e'};border:1px solid #30363d;border-radius:3px" title="Color label" onchange="setLabel('\${m.id}',this.value)"><option value="">🏷 label</option><option value="red"\${m.label==='red'?' selected':''}>🔴 red</option><option value="yellow"\${m.label==='yellow'?' selected':''}>🟡 yellow</option><option value="green"\${m.label==='green'?' selected':''}>🟢 green</option><option value="blue"\${m.label==='blue'?' selected':''}>🔵 blue</option></select>\`;
+  const labelDot = m.label ? \`<span style="color:\${LCOL[m.label]};font-size:14px;margin-right:4px" title="Label: \${m.label}">●</span>\` : '';
   return \`<div class="card" data-id="\${m.id}" style="\${pinStyle}">
-    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="duplicateMem('\${m.id}')" title="Duplicate">⧉ dupe</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button><select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:3px" title="Apply template" onchange="applyTemplate('\${m.id}',this.value);this.value=''"><option value="">⊞ tpl</option><option value="core">core</option><option value="skill">skill</option><option value="domain">domain</option><option value="project">project</option><option value="episodic">episodic</option><option value="semantic">semantic</option></select></div>
-    <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span>\${tags}</div>
+    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="duplicateMem('\${m.id}')" title="Duplicate">⧉ dupe</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button><select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:3px" title="Apply template" onchange="applyTemplate('\${m.id}',this.value);this.value=''"><option value="">⊞ tpl</option><option value="core">core</option><option value="skill">skill</option><option value="domain">domain</option><option value="project">project</option><option value="episodic">episodic</option><option value="semantic">semantic</option></select>\${labelSel}</div>
+    <div class="cm">\${labelDot}\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span>\${tags}</div>
     <div class="cc" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(preview)}\${m.content.length>280?'…':''}</div>
     <div id="rel-\${m.id}" style="display:none;margin-top:8px;border-top:1px solid #21262d;padding-top:8px"></div>
   </div>\`;
@@ -1517,6 +1524,7 @@ function _memUrl(offset) {
   if (imp) u += '&min_importance='+imp;
   if (sort && sort !== 'updated') u += '&sort='+sort;
   if (g('mpinned').checked) u += '&pinned=1';
+  const lbl = g('mlabel').value; if (lbl) u += '&label='+encodeURIComponent(lbl);
   return u;
 }
 
@@ -1541,6 +1549,7 @@ async function loadMem() {
   if (imp) chips.push(['importance≥'+imp,'mimportance']);
   if (sort && sort !== 'updated') chips.push(['sort:'+sort,'msort']);
   if (g('mpinned').checked) chips.push(['pinned','mpinned']);
+  const lbl = g('mlabel').value; if (lbl) chips.push(['label:'+lbl,'mlabel']);
   const bar = g('mem-chips');
   if (chips.length) {
     bar.style.display='flex';
@@ -1584,7 +1593,7 @@ function clearMemFilter(selId) {
   loadMem();
 }
 function clearAllMemFilters() {
-  ['mtype','mtrust','mproj','mtag','mdomain','mconf','mimportance'].forEach(id => { const e=g(id); if(e) e.value=''; });
+  ['mtype','mtrust','mproj','mtag','mdomain','mconf','mimportance','mlabel'].forEach(id => { const e=g(id); if(e) e.value=''; });
   g('msort').value='updated';
   const mp=g('mpinned'); if(mp) mp.checked=false;
   loadMem();
@@ -1599,8 +1608,9 @@ function exportFilteredCsv() {
   if (p)   url += '&project=' + encodeURIComponent(p);
   if (dom) url += '&domain='  + encodeURIComponent(dom);
   if (imp) url += '&min_importance=' + encodeURIComponent(imp);
+  const lbl2=g('mlabel').value; if (lbl2) url += '&label=' + encodeURIComponent(lbl2);
   const a = document.createElement('a'); a.href = url;
-  a.download = (tg||t||r||p||dom||imp) ? 'hive-filtered.csv' : 'hive-export.csv';
+  a.download = (tg||t||r||p||dom||imp||lbl2) ? 'hive-filtered.csv' : 'hive-export.csv';
   a.click();
 }
 function exportSelectionCsv() {
@@ -2335,6 +2345,10 @@ async function toggleRelated(id) {
 }
 async function togglePin(id, pin) {
   await fetch(\`/api/memories/\${id}/\${pin?'pin':'unpin'}\`, {method:'POST',headers:{'X-Hive-Local':'1'}});
+  loadMem();
+}
+async function setLabel(id, label) {
+  await localFetch(\`/api/memories/\${id}\`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({label:label||null})});
   loadMem();
 }
 async function inlineEdit(id) {

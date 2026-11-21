@@ -97,7 +97,7 @@ function update(id, updates) {
 
   const ALLOWED = ['title', 'content', 'memory_type', 'domain', 'project_id', 'confidence',
                    'trust_level', 'status', 'importance', 'tags', 'valid_until', 'superseded_by',
-                   'retrieval_keywords', 'user_confirmed', 'pinned'];
+                   'retrieval_keywords', 'user_confirmed', 'pinned', 'label'];
   const setClauses = [], values = [];
   for (const [k, v] of Object.entries(updates)) {
     if (!ALLOWED.includes(k)) continue;

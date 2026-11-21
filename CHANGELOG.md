@@ -1,5 +1,29 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 67 Complete
+
+**Phase 67: Memory Color Labels**
+
+`src/db.js`:
+- v11 migration: `ALTER TABLE memories ADD COLUMN label TEXT`
+
+`src/memory.js`:
+- Added `'label'` to `ALLOWED` update fields
+
+`src/server.js`:
+- `handleMemories`: added `q.label` post-filter
+- `handleExport`: added `q.label` filter for CSV export
+- `handleUpdateMemory`: added `body.label` → `updates.label = body.label || null`
+- Memories toolbar: added `<select id="mlabel">` with All/🔴/🟡/🟢/🔵 options
+- `card()`: added `LCOL` color map, `labelSel` select (shows current label, calls `setLabel`), `labelDot` colored ● in `.cm` metadata row, `pinStyle` falls back to label color when not pinned
+- `_memUrl()`: appends `&label=` param when mlabel is set
+- `loadMem()`: adds `label:X` chip to active-filter bar
+- `clearAllMemFilters()`: clears `mlabel` select
+- `exportFilteredCsv()`: includes label in CSV export URL
+- Added `setLabel(id, label)` async function — PUTs label to backend then reloads
+
+`tests/test-phase67.js`: 10/10 tests passing
+
 ## 2026-11-20 — Phase 66 Complete
 
 **Phase 66: Keyboard Shortcut Cheatsheet**

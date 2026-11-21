@@ -244,6 +244,11 @@ function _initSchema(db) {
     try { db.exec('ALTER TABLE memories ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0'); } catch {}
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (10, ?)').run(Date.now());
   }
+  // v11: label column — color label for visual grouping (red/yellow/green/blue)
+  if (sv < 11) {
+    try { db.exec('ALTER TABLE memories ADD COLUMN label TEXT'); } catch {}
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (11, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {
