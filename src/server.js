@@ -575,6 +575,27 @@ function handleTagHeatmap(req, res, q) {
   json(res, rows);
 }
 
+function handleGetTagDescriptions(req, res) {
+  const rows = getDb().prepare('SELECT tag, description FROM tag_descriptions').all();
+  const map = {};
+  rows.forEach(r => { map[r.tag] = r.description; });
+  json(res, map);
+}
+
+async function handleSetTagDescription(req, res) {
+  const body = await readBody(req);
+  const { tag, description } = body;
+  if (!tag) { json(res, { error: 'tag required' }, 400); return; }
+  if (!description || !description.trim()) {
+    getDb().prepare('DELETE FROM tag_descriptions WHERE tag = ?').run(tag);
+    json(res, { ok: true, deleted: true });
+    return;
+  }
+  getDb().prepare('INSERT INTO tag_descriptions (tag, description, updated_at) VALUES (?,?,?) ON CONFLICT(tag) DO UPDATE SET description=excluded.description, updated_at=excluded.updated_at')
+    .run(tag, description.trim(), Date.now());
+  json(res, { ok: true, tag, description: description.trim() });
+}
+
 function handleListVersions(req, res, id) {
   const m = memory.get(id);
   if (!m) { json(res, { error: 'not found' }, 404); return; }
@@ -774,9 +795,11 @@ const ROUTES = {
   'GET /api/bookmarks':      handleListBookmarks,
   'POST /api/bookmarks':     handleAddBookmark,
   'GET /api/tags/stats':     (req, res) => { const u = new URL(req.url,'http://l'); handleTagStats(req, res, Object.fromEntries(u.searchParams)); },
-  'GET /api/tags/heatmap':   (req, res) => { const u = new URL(req.url,'http://l'); handleTagHeatmap(req, res, Object.fromEntries(u.searchParams)); },
-  'POST /api/tags/rename':   handleTagRename,
-  'POST /api/tags/merge':    handleTagMerge,
+  'GET /api/tags/heatmap':        (req, res) => { const u = new URL(req.url,'http://l'); handleTagHeatmap(req, res, Object.fromEntries(u.searchParams)); },
+  'GET /api/tags/descriptions':   handleGetTagDescriptions,
+  'PUT /api/tags/descriptions':   handleSetTagDescription,
+  'POST /api/tags/rename':        handleTagRename,
+  'POST /api/tags/merge':         handleTagMerge,
   'GET /api/webhooks':       handleListWebhooks,
   'POST /api/webhooks':      handleAddWebhook,
   'GET /':                   handleIndex,
@@ -3023,7 +3046,7 @@ async function loadKStats() {
 let _tcTimer = null;
 let _tcSelectedTag = null;
 async function loadTagCloud() {
-  const d = await api('/api/tags/stats?limit=80');
+  const [d, descs] = await Promise.all([api('/api/tags/stats?limit=80'), api('/api/tags/descriptions')]);
   const cloud = g('tc-cloud');
   const top = g('tc-top');
   if (!d.top.length) { cloud.innerHTML='<p class="empty">No tags yet — add tags when creating memories.</p>'; top.innerHTML=''; return; }
@@ -3034,10 +3057,20 @@ async function loadTagCloud() {
     const size = minPx + Math.round((t.count / max) * (maxPx - minPx));
     const col = colors[i % colors.length];
     const active = _tcSelectedTag === t.tag;
+    const desc = descs[t.tag] || '';
+    const tooltip = desc ? \`\${desc} (\${t.count} memor\${t.count===1?'y':'ies'})\` : \`\${t.count} memor\${t.count===1?'y':'ies'} · click ✎ to add description\`;
     const style = \`font-size:\${size}px;color:\${col};margin:0 8px;cursor:pointer;display:inline-block;transition:opacity .15s\${active ? ';text-decoration:underline;opacity:1' : ';opacity:.75'}\`;
-    return \`<span id="tc-tag-\${esc(t.tag.replace(/[^a-z0-9]/gi,'_'))}" style="\${style}" onclick="selectTag('\${esc(t.tag)}')" title="\${t.count} memor\${t.count===1?'y':'ies'}">#\${esc(t.tag)} <sup style="font-size:10px;opacity:.7">\${t.count}</sup></span>\`;
+    const editBtn = \`<span onclick="event.stopPropagation();setTagDesc('\${esc(t.tag)}')" style="font-size:10px;opacity:.5;cursor:pointer;vertical-align:super" title="\${desc?'Edit':'Add'} description">✎</span>\`;
+    return \`<span id="tc-tag-\${esc(t.tag.replace(/[^a-z0-9]/gi,'_'))}" style="\${style}" onclick="selectTag('\${esc(t.tag)}')" title="\${esc(tooltip)}">#\${esc(t.tag)} <sup style="font-size:10px;opacity:.7">\${t.count}</sup>\${editBtn}</span>\`;
   }).join('');
-  top.innerHTML = \`<table style="font-size:12px;border-collapse:collapse;width:100%;max-width:400px">\${d.top.slice(0,15).map((t,i)=>\`<tr><td style="padding:3px 8px;color:#8b949e">\${i+1}</td><td style="padding:3px 8px"><span style="cursor:pointer;color:#79c0ff" onclick="selectTag('\${esc(t.tag)}')">#\${esc(t.tag)}</span></td><td style="padding:3px 8px;color:#8b949e">\${t.count}</td></tr>\`).join('')}</table>\`;
+  top.innerHTML = \`<table style="font-size:12px;border-collapse:collapse;width:100%;max-width:500px">\${d.top.slice(0,15).map((t,i)=>{const desc=descs[t.tag]||'';return\`<tr><td style="padding:3px 8px;color:#8b949e">\${i+1}</td><td style="padding:3px 8px"><span style="cursor:pointer;color:#79c0ff" onclick="selectTag('\${esc(t.tag)}')">#\${esc(t.tag)}</span></td><td style="padding:3px 8px;color:#8b949e">\${t.count}</td><td style="padding:3px 8px;color:#8b949e;font-style:italic">\${esc(desc)}</td></tr>\`;}).join('')}</table>\`;
+}
+async function setTagDesc(tag) {
+  const cur = (await api('/api/tags/descriptions'))[tag] || '';
+  const val = prompt(\`Description for #\${tag} (blank to clear):\`, cur);
+  if (val === null) return;
+  await fetch('/api/tags/descriptions', { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Hive-Local': '1' }, body: JSON.stringify({ tag, description: val }) });
+  loadTagCloud();
 }
 function renderHeatmap(buckets) {
   if (!buckets.length) return '';

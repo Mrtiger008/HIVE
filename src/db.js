@@ -262,6 +262,14 @@ function _initSchema(db) {
     try { db.exec('ALTER TABLE memories ADD COLUMN starred INTEGER NOT NULL DEFAULT 0'); } catch {}
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (14, ?)').run(Date.now());
   }
+  if (sv < 15) {
+    db.exec(`CREATE TABLE IF NOT EXISTS tag_descriptions (
+      tag         TEXT PRIMARY KEY,
+      description TEXT NOT NULL,
+      updated_at  INTEGER NOT NULL
+    )`);
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (15, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {
