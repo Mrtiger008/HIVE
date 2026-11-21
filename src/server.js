@@ -949,6 +949,9 @@ input{width:360px}
     <input id="bulk-tags" placeholder="tag1, tag2…" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:4px 8px;width:140px">
     <button class="btn" onclick="bulkTagOp('add')" title="Add tags to selected">+ tags</button>
     <button class="btn" onclick="bulkTagOp('remove')" title="Remove tags from selected">− tags</button>
+    <span style="color:#30363d;margin:0 4px">|</span>
+    <select id="bulk-label" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:4px 8px"><option value="">Label…</option><option value="red">🔴 Red</option><option value="yellow">🟡 Yellow</option><option value="green">🟢 Green</option><option value="blue">🔵 Blue</option><option value="__clear__">— Remove label</option></select>
+    <button class="btn" onclick="bulkLabel()" title="Apply label to selected">Apply label</button>
     <button class="btn" id="bulk-merge-btn" onclick="showMerge()" style="display:none" title="Merge two selected memories">⟳ Merge</button>
     <button class="btn" onclick="exportSelectionCsv()" title="Export selected as CSV">⬇ CSV</button>
     <button class="arch" onclick="clearSelection()" style="margin-left:auto">✕ clear</button>
@@ -1525,6 +1528,15 @@ async function bulkTagOp(op) {
   });
   _sel.clear(); loadMem();
   g('bulk-bar').style.display='none'; g('bulk-tags').value='';
+}
+async function bulkLabel() {
+  const lbl = g('bulk-label').value;
+  if (!lbl || !_sel.size) return;
+  const label = lbl === '__clear__' ? null : lbl;
+  await fetch('/api/memories/bulk',{method:'POST',headers:{'Content-Type':'application/json','X-Hive-Local':'1'},
+    body:JSON.stringify({ids:[..._sel],action:'update',updates:{label}})});
+  _sel.clear(); loadMem();
+  g('bulk-bar').style.display='none'; g('bulk-label').value='';
 }
 
 let _domainsLoaded = false;

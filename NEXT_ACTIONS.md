@@ -135,8 +135,10 @@
 
 ## Phase 70 — Inline Tag Editor — DONE ✅ (2026-11-21)
 
-## Phase 71 — Candidates
+## Phase 71 — Bulk Label — DONE ✅ (2026-11-21)
 
-- **Bulk label**: apply a color label to all selected memories at once from the bulk action bar
-- **Memory sort by label**: sort the memories list by color label (grouped by color)
+## Phase 72 — Candidates
+
+- **Memory sort by label**: sort the memories list by color label so same-colored memories appear grouped together
 - **Tag suggestions**: as you type a new tag in the edit modal, suggest existing tags from the tag list
+- **Pinned memories count**: show a badge on the nav/toolbar with how many memories are currently pinned

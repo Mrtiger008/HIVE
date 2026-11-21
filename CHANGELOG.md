@@ -1,5 +1,16 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 71 Complete
+
+**Phase 71: Bulk Label**
+
+`src/server.js`:
+- Bulk bar: added `<select id="bulk-label">` with 🔴/🟡/🟢/🔵 options plus "— Remove label" (`__clear__`) + "Apply label" button
+- `bulkLabel()`: reads `bulk-label` value, maps `__clear__` → `null`, POSTs `{action:'update', updates:{label}}` to `/api/memories/bulk`, clears selection and reloads
+- No backend changes needed — bulk `action:'update'` already routes through `memory.update()` which has `label` in ALLOWED since Phase 67
+
+`tests/test-phase71.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 70 Complete
 
 **Phase 70: Inline Tag Editor**
