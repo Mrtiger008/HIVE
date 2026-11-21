@@ -1323,7 +1323,7 @@ function confBar(c) {
 function card(m) {
   const preview = (m.content||'').replace(/\\n/g,' ').slice(0,280);
   const _activeTg = g('mtag').value;
-  const tags = (m.tags||[]).map(t=>{const on=t===_activeTg;return \`<span class="b" style="cursor:pointer;\${on?'color:#3fb950;background:#1f4b2b;border-radius:3px;padding:0 3px':'color:#79c0ff'}" title="\${on?'Clear':'Filter by'} #\${esc(t)}" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`;}).join(' ');
+  const tags = (m.tags||[]).map(t=>{const on=t===_activeTg;return \`<span style="display:inline-flex;align-items:center;gap:1px"><span class="b" style="cursor:pointer;\${on?'color:#3fb950;background:#1f4b2b;border-radius:3px;padding:0 3px':'color:#79c0ff'}" title="\${on?'Clear':'Filter by'} #\${esc(t)} · dblclick to rename" onclick="filterTag('\${esc(t)}')" ondblclick="event.stopPropagation();renameTagInline('\${m.id}','\${esc(t)}',this)">#\${esc(t)}</span><span style="cursor:pointer;color:#484f58;font-size:9px;padding:0 1px" onmouseenter="this.style.color='#f85149'" onmouseleave="this.style.color='#484f58'" onclick="event.stopPropagation();removeTag('\${m.id}','\${esc(t)}')" title="Remove tag">✕</span></span>\`;}).join(' ');
   const LCOL = {red:'#f85149',yellow:'#d29922',green:'#3fb950',blue:'#58a6ff'};
   const pinStyle = m.pinned ? 'border-left:3px solid #d29922;' : (m.label ? \`border-left:3px solid \${LCOL[m.label]};\` : '');
   const pinBtn = m.pinned
@@ -1345,7 +1345,7 @@ function card(m) {
 function searchCard(m) {
   const titleHtml  = m.highlight_title ? hlEsc(m.highlight_title) : esc(m.title);
   const snippetHtml = m.snippet        ? hlEsc(m.snippet)         : esc((m.content||'').replace(/\\n/g,' ').slice(0, 280));
-  const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" title="Filter by #\${esc(t)}" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
+  const tags = (m.tags||[]).map(t=>\`<span style="display:inline-flex;align-items:center;gap:1px"><span class="b" style="cursor:pointer;color:#79c0ff" title="Filter by #\${esc(t)} · dblclick to rename" onclick="filterTag('\${esc(t)}')" ondblclick="event.stopPropagation();renameTagInline('\${m.id}','\${esc(t)}',this)">#\${esc(t)}</span><span style="cursor:pointer;color:#484f58;font-size:9px;padding:0 1px" onmouseenter="this.style.color='#f85149'" onmouseleave="this.style.color='#484f58'" onclick="event.stopPropagation();removeTag('\${m.id}','\${esc(t)}')" title="Remove tag">✕</span></span>\`).join(' ');
   const words = (m.content||'').trim().split(/\s+/).filter(Boolean).length;
   const rt = Math.max(1, Math.ceil(words / 200));
   const ageStr = age(m.created_at);
@@ -2370,6 +2370,31 @@ async function togglePin(id, pin) {
 async function setLabel(id, label) {
   await localFetch(\`/api/memories/\${id}\`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({label:label||null})});
   loadMem();
+}
+async function removeTag(id, tag) {
+  const m = await api('/api/memories/' + id);
+  const tags = (m.tags||[]).filter(t => t !== tag);
+  await localFetch('/api/memories/' + id, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({tags})});
+  loadMem();
+}
+function renameTagInline(id, oldTag, spanEl) {
+  const inp = document.createElement('input');
+  inp.value = oldTag;
+  inp.style.cssText = 'width:80px;font-size:12px;background:#0d1117;color:#e6edf3;border:1px solid #58a6ff;border-radius:3px;padding:1px 4px';
+  spanEl.replaceWith(inp);
+  inp.focus(); inp.select();
+  let saved = false;
+  async function save() {
+    if (saved) return; saved = true;
+    const newTag = inp.value.trim();
+    if (!newTag || newTag === oldTag) { loadMem(); return; }
+    const m = await api('/api/memories/' + id);
+    const tags = (m.tags||[]).map(t => t === oldTag ? newTag : t);
+    await localFetch('/api/memories/' + id, {method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({tags})});
+    loadMem();
+  }
+  inp.addEventListener('keydown', e => { if (e.key==='Enter') save(); else if (e.key==='Escape') { saved=true; loadMem(); } });
+  inp.addEventListener('blur', save);
 }
 async function inlineEdit(id) {
   const card = document.querySelector('.card[data-id="' + id + '"]');

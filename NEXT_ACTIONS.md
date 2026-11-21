@@ -133,8 +133,10 @@
 
 ## Phase 69 — Memory Age Badge — DONE ✅ (2026-11-21)
 
-## Phase 70 — Candidates
+## Phase 70 — Inline Tag Editor — DONE ✅ (2026-11-21)
 
-- **Inline tag editor**: click a tag on a card to rename or delete it without opening the full edit modal
+## Phase 71 — Candidates
+
 - **Bulk label**: apply a color label to all selected memories at once from the bulk action bar
 - **Memory sort by label**: sort the memories list by color label (grouped by color)
+- **Tag suggestions**: as you type a new tag in the edit modal, suggest existing tags from the tag list

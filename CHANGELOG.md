@@ -1,5 +1,18 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 70 Complete
+
+**Phase 70: Inline Tag Editor**
+
+`src/server.js`:
+- `card()` tags: each tag now renders as a flex chip with the tag text + muted `✕` button; `✕` brightens red on hover, calls `removeTag(id, tag)` with `stopPropagation` so filterTag isn't triggered
+- Dblclick on the tag text calls `renameTagInline(id, oldTag, spanEl)` — no prompt()
+- `searchCard()` tags: same treatment (✕ delete, dblclick rename)
+- `removeTag(id, tag)`: GETs current memory, filters tag out, PUTs updated tags array, reloads
+- `renameTagInline(id, oldTag, spanEl)`: replaces span with inline `<input>`, Enter saves, Escape cancels; blur also saves; deduped with `saved` flag
+
+`tests/test-phase70.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 69 Complete
 
 **Phase 69: Memory Age Badge**
