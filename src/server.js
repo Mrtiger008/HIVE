@@ -987,6 +987,7 @@ input{width:360px}
     <button class="btn" onclick="doSearch()">Search</button>
     <button class="btn" style="margin-left:4px" onclick="saveBookmark()" title="Save this search">★ Save</button>
     <button id="sr-csv-btn" class="btn" style="margin-left:4px;display:none" onclick="exportSearchCsv()" title="Export results as CSV">⬇ CSV</button>
+    <span id="sr-count" style="font-size:12px;color:#8b949e;margin-left:8px"></span>
   </div>
   <div id="bk-bar" style="display:none;padding:6px 0 10px;border-bottom:1px solid #21262d;margin-bottom:10px;font-size:12px;color:#8b949e">
     <span style="margin-right:8px">Bookmarks:</span><span id="bk-chips"></span>
@@ -1489,6 +1490,7 @@ async function doSearch() {
   _srResults = d;
   g('sr').innerHTML = d.length ? d.map(searchCard).join('') : '<p class="empty">No results.</p>';
   const csvBtn = g('sr-csv-btn'); if (csvBtn) csvBtn.style.display = d.length ? '' : 'none';
+  const cntEl = g('sr-count'); if (cntEl) cntEl.textContent = d.length ? d.length + (d.length === 20 ? '+ results' : ' result' + (d.length === 1 ? '' : 's')) : '';
   loadHistory();
 }
 function exportSearchCsv() {
