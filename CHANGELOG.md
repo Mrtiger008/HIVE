@@ -1,5 +1,16 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 69 Complete
+
+**Phase 69: Memory Age Badge**
+
+`src/server.js`:
+- Added `age(ts)` client-side helper: returns compact age string (Xmin / Xh / Xd / Xw / Xm / Xy) from epoch ms
+- `card()`: added `const ageStr = age(m.created_at)`, inserted `<span>` badge in `.cm` metadata row after word count; title shows full creation date via `toLocaleDateString()`
+- `searchCard()`: same treatment — age badge appears on search results too
+
+`tests/test-phase69.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 68 Complete
 
 **Phase 68: Search Export**

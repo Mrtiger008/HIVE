@@ -1280,6 +1280,15 @@ input{width:360px}
 const g = id => document.getElementById(id);
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const api = u => fetch(u).then(r => r.json());
+function age(ts) {
+  const s = (Date.now() - ts) / 1000;
+  if (s < 3600)      return Math.max(1, Math.round(s/60)) + 'min';
+  if (s < 86400)     return Math.round(s/3600) + 'h';
+  if (s < 7*86400)   return Math.round(s/86400) + 'd';
+  if (s < 30*86400)  return Math.round(s/(7*86400)) + 'w';
+  if (s < 365*86400) return Math.round(s/(30*86400)) + 'm';
+  return Math.round(s/(365*86400)) + 'y';
+}
 
 function show(id, btn) {
   document.querySelectorAll('.tab').forEach(t => t.classList.remove('on'));
@@ -1322,11 +1331,12 @@ function card(m) {
     : \`<button class="arch" onclick="togglePin('\${m.id}',1)" title="Pin">📌 pin</button>\`;
   const words = (m.content||'').trim().split(/\s+/).filter(Boolean).length;
   const rt = Math.max(1, Math.ceil(words / 200));
+  const ageStr = age(m.created_at);
   const labelSel = \`<select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:\${m.label?LCOL[m.label]:'#8b949e'};border:1px solid #30363d;border-radius:3px" title="Color label" onchange="setLabel('\${m.id}',this.value)"><option value="">🏷 label</option><option value="red"\${m.label==='red'?' selected':''}>🔴 red</option><option value="yellow"\${m.label==='yellow'?' selected':''}>🟡 yellow</option><option value="green"\${m.label==='green'?' selected':''}>🟢 green</option><option value="blue"\${m.label==='blue'?' selected':''}>🔵 blue</option></select>\`;
   const labelDot = m.label ? \`<span style="color:\${LCOL[m.label]};font-size:14px;margin-right:4px" title="Label: \${m.label}">●</span>\` : '';
   return \`<div class="card" data-id="\${m.id}" style="\${pinStyle}">
     <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="duplicateMem('\${m.id}')" title="Duplicate">⧉ dupe</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button><select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:3px" title="Apply template" onchange="applyTemplate('\${m.id}',this.value);this.value=''"><option value="">⊞ tpl</option><option value="core">core</option><option value="skill">skill</option><option value="domain">domain</option><option value="project">project</option><option value="episodic">episodic</option><option value="semantic">semantic</option></select>\${labelSel}</div>
-    <div class="cm">\${labelDot}\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span>\${tags}</div>
+    <div class="cm">\${labelDot}\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span><span class="b" style="color:#8b949e" title="Created \${new Date(m.created_at).toLocaleDateString()}">\${ageStr}</span>\${tags}</div>
     <div class="cc" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(preview)}\${m.content.length>280?'…':''}</div>
     <div id="rel-\${m.id}" style="display:none;margin-top:8px;border-top:1px solid #21262d;padding-top:8px"></div>
   </div>\`;
@@ -1338,11 +1348,12 @@ function searchCard(m) {
   const tags = (m.tags||[]).map(t=>\`<span class="b" style="cursor:pointer;color:#79c0ff" title="Filter by #\${esc(t)}" onclick="filterTag('\${esc(t)}')">#\${esc(t)}</span>\`).join(' ');
   const words = (m.content||'').trim().split(/\s+/).filter(Boolean).length;
   const rt = Math.max(1, Math.ceil(words / 200));
+  const ageStr = age(m.created_at);
   return \`<div class="card" data-id="\${m.id}">
     <div class="ct">\${titleHtml}
       <button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button>
     </div>
-    <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span>\${tags}</div>
+    <div class="cm">\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span><span class="b" style="color:#8b949e" title="Created \${new Date(m.created_at).toLocaleDateString()}">\${ageStr}</span>\${tags}</div>
     <div class="cc">\${snippetHtml}</div>
   </div>\`;
 }

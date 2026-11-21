@@ -131,8 +131,10 @@
 
 ## Phase 68 — Search Export — DONE ✅ (2026-11-21)
 
-## Phase 69 — Candidates
+## Phase 69 — Memory Age Badge — DONE ✅ (2026-11-21)
 
-- **Memory age badge**: show how old a memory is (e.g. "3d", "2w", "1y") on each card
+## Phase 70 — Candidates
+
 - **Inline tag editor**: click a tag on a card to rename or delete it without opening the full edit modal
 - **Bulk label**: apply a color label to all selected memories at once from the bulk action bar
+- **Memory sort by label**: sort the memories list by color label (grouped by color)
