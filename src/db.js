@@ -249,6 +249,11 @@ function _initSchema(db) {
     try { db.exec('ALTER TABLE memories ADD COLUMN label TEXT'); } catch {}
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (11, ?)').run(Date.now());
   }
+  // v12: note column — short sticky comment shown below content preview
+  if (sv < 12) {
+    try { db.exec('ALTER TABLE memories ADD COLUMN note TEXT'); } catch {}
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (12, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {

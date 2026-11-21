@@ -143,9 +143,11 @@
 
 ## Phase 74 — Pinned Memories Count Badge — DONE ✅ (2026-11-21)
 
-## Phase 75 — Candidates
+## Phase 75 — Memory Note / Sticky Comment — DONE ✅ (2026-11-21)
 
-- **Memory note / sticky comment**: add a short freeform note field to any memory that appears below the content preview
-- **Keyboard navigation for tag suggestions**: arrow keys to navigate suggestion dropdown, Enter to select
+## Phase 76 — Candidates
+
+- **Keyboard navigation for tag suggestions**: arrow keys to navigate the tag suggestion dropdown, Enter to select
 - **Tag rename across all memories**: rename a tag globally from the tag cloud / analytics view
 - **Memory copy link**: one-click button to copy a direct URL to a specific memory
+- **Note search**: include memory notes in full-text search results

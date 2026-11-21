@@ -346,6 +346,7 @@ async function handleAddMemory(req, res) {
     domain:      body.domain      || undefined,
     project_id:  body.project_id  || undefined,
     label:       body.label       || undefined,
+    note:        body.note        || undefined,
   });
   webhooks.fire('memory.created', { id: m.id, title: m.title, memory_type: m.memory_type, trust_level: m.trust_level, importance: m.importance });
   json(res, m, 201);
@@ -371,6 +372,7 @@ async function handleUpdateMemory(req, res, id) {
   if (body.tags        !== undefined) updates.tags        = body.tags;
   if (body.pinned      !== undefined) updates.pinned      = body.pinned ? 1 : 0;
   if (body.label       !== undefined) updates.label       = body.label || null;
+  if (body.note        !== undefined) updates.note        = body.note  || null;
   if (!Object.keys(updates).length) { json(res, { error: 'no fields to update' }, 400); return; }
   if (updates.title !== undefined || updates.content !== undefined)
     versions.snapshot(id, m.title, m.content);
@@ -1265,6 +1267,7 @@ input{width:360px}
     <div class="f"><label>Importance (1–10)</label><input id="nm-i" type="number" min="1" max="10" value="5"></div>
     <div class="f"><label>Confidence (0–1) <span style="font-weight:normal;color:#8b949e">how certain this is</span></label><input id="nm-cf" type="number" min="0" max="1" step="0.05" value="0.5" style="width:88px"></div>
     <div class="f"><label>Tags <span style="font-weight:normal;color:#8b949e">(comma-separated)</span></label><div style="position:relative"><input id="nm-tg" style="width:100%" placeholder="e.g. javascript, async, todo" oninput="tagSuggest(this)" onblur="setTimeout(()=>{const s=g('nm-tg-sug');if(s)s.style.display='none'},150)" autocomplete="off"><div id="nm-tg-sug" style="display:none;position:absolute;top:100%;left:0;right:0;background:#161b22;border:1px solid #30363d;border-radius:6px;z-index:200;max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.5)"></div></div></div>
+    <div class="f"><label>Note <span style="font-weight:normal;color:#8b949e">(optional sticky comment)</span></label><textarea id="nm-nt" rows="2" placeholder="Short note or reminder about this memory…" style="width:100%"></textarea></div>
     <p id="nm-err" class="merr"></p>
     <div id="nm-dup" style="display:none;margin:8px 0;padding:10px;background:#2d1f0a;border:1px solid #d2a8ff44;border-radius:6px;font-size:12px">
       <strong style="color:#d2a8ff">⚠ Similar memories found:</strong>
@@ -1343,6 +1346,7 @@ function card(m) {
     <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="duplicateMem('\${m.id}')" title="Duplicate">⧉ dupe</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button><select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:3px" title="Apply template" onchange="applyTemplate('\${m.id}',this.value);this.value=''"><option value="">⊞ tpl</option><option value="core">core</option><option value="skill">skill</option><option value="domain">domain</option><option value="project">project</option><option value="episodic">episodic</option><option value="semantic">semantic</option></select>\${labelSel}</div>
     <div class="cm">\${labelDot}\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span><span class="b" style="color:#8b949e" title="Created \${new Date(m.created_at).toLocaleDateString()}">\${ageStr}</span>\${tags}</div>
     <div class="cc" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(preview)}\${m.content.length>280?'…':''}</div>
+    \${m.note ? \`<div style="margin-top:6px;padding:5px 8px;background:#1c2128;border-left:2px solid #d29922;border-radius:0 4px 4px 0;font-size:12px;color:#c9a227;cursor:pointer" title="Click to edit note" onclick="editNote('\${m.id}',this)">\${esc(m.note)}</div>\` : \`<div style="margin-top:4px"><button class="arch" style="font-size:11px;color:#484f58" onclick="editNote('\${m.id}',this.parentElement)" title="Add a sticky note">📝 add note</button></div>\`}
     <div id="rel-\${m.id}" style="display:none;margin-top:8px;border-top:1px solid #21262d;padding-top:8px"></div>
   </div>\`;
 }
@@ -2300,12 +2304,12 @@ async function applyTemplate(type) {
   if (tpl.tags.length && !g('nm-tg').value) g('nm-tg').value = tpl.tags.join(', ');
   renderTplChips(type);
 }
-function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-cf').value='0.5'; g('nm-tg').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); _loadTemplates().then(()=>renderTplChips('semantic')); }
-async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-cf').value=d.confidence!=null?d.confidence:0.5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
+function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-cf').value='0.5'; g('nm-tg').value=''; g('nm-nt').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); _loadTemplates().then(()=>renderTplChips('semantic')); }
+async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-cf').value=d.confidence!=null?d.confidence:0.5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-nt').value=d.note||''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
 function closeAdd() { g('add-modal').classList.remove('on'); g('nm-dup').style.display='none'; }
 function _buildPayload() {
   const rawTags = g('nm-tg').value.split(',').map(t=>t.trim()).filter(Boolean);
-  return { title: g('nm-t').value.trim(), content: g('nm-c').value.trim(), memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value, confidence: +g('nm-cf').value, tags: rawTags };
+  return { title: g('nm-t').value.trim(), content: g('nm-c').value.trim(), memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value, confidence: +g('nm-cf').value, tags: rawTags, note: g('nm-nt').value.trim() || undefined };
 }
 async function _doSave(payload) {
   const r = _editId
@@ -2384,6 +2388,25 @@ async function togglePin(id, pin) {
 async function setLabel(id, label) {
   await localFetch(\`/api/memories/\${id}\`,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({label:label||null})});
   loadMem();
+}
+function editNote(id, containerEl) {
+  const existing = containerEl.dataset.note || (containerEl.tagName === 'DIV' && containerEl.style.borderLeft ? containerEl.textContent.trim() : '');
+  const ta = document.createElement('textarea');
+  ta.value = existing;
+  ta.rows = 2;
+  ta.style.cssText = 'width:100%;font-size:12px;background:#1c2128;color:#c9a227;border:1px solid #d29922;border-radius:4px;padding:4px 6px;resize:vertical;box-sizing:border-box';
+  ta.placeholder = 'Short note or reminder…';
+  containerEl.replaceWith(ta);
+  ta.focus();
+  let saved = false;
+  async function save() {
+    if (saved) return; saved = true;
+    const note = ta.value.trim();
+    await localFetch(\`/api/memories/\${id}\`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify({note: note || null})});
+    loadMem();
+  }
+  ta.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); save(); } else if (e.key === 'Escape') { saved = true; loadMem(); } });
+  ta.addEventListener('blur', save);
 }
 async function removeTag(id, tag) {
   const m = await api('/api/memories/' + id);

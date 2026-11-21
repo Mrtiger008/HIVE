@@ -1,5 +1,26 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 75 Complete
+
+**Phase 75: Memory Note / Sticky Comment**
+
+`src/db.js`: schema v12 — `ALTER TABLE memories ADD COLUMN note TEXT`
+
+`src/memory.js`:
+- `add()`: added `note` to destructure + INSERT
+- `ALLOWED`: added `'note'`
+
+`src/server.js`:
+- `handleAddMemory`: passes `note: body.note || undefined`
+- `handleUpdateMemory`: `if (body.note !== undefined) updates.note = body.note || null`
+- `card()`: renders amber sticky note below content (click to edit inline), or "📝 add note" button when empty
+- `showAdd()` / `showEdit()`: clear/populate `#nm-nt` textarea
+- `readForm()`: includes `note` field
+- `editNote(id, el)`: replaces note div with inline textarea; Enter saves, Esc cancels, blur saves
+- Add modal: `#nm-nt` textarea between Tags and error paragraph
+
+`tests/test-phase75.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 74 Complete
 
 **Phase 74: Pinned Memories Count Badge**
