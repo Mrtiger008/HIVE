@@ -137,8 +137,10 @@
 
 ## Phase 71 — Bulk Label — DONE ✅ (2026-11-21)
 
-## Phase 72 — Candidates
+## Phase 72 — Memory Sort by Label — DONE ✅ (2026-11-21)
 
-- **Memory sort by label**: sort the memories list by color label so same-colored memories appear grouped together
+## Phase 73 — Candidates
+
 - **Tag suggestions**: as you type a new tag in the edit modal, suggest existing tags from the tag list
-- **Pinned memories count**: show a badge on the nav/toolbar with how many memories are currently pinned
+- **Pinned memories count**: show a badge on the Memories toolbar with how many memories are currently pinned
+- **Memory note / sticky comment**: add a short freeform note field to any memory that appears below the content preview

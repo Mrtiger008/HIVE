@@ -1,5 +1,20 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 72 Complete
+
+**Phase 72: Memory Sort by Label**
+
+`src/memory.js`:
+- `SORT_MAP`: added `label` entry — `pinned DESC, CASE label WHEN 'red' THEN 0 WHEN 'yellow' THEN 1 WHEN 'green' THEN 2 WHEN 'blue' THEN 3 ELSE 4 END, updated_at DESC` (labeled memories grouped first, custom color order, unlabeled last)
+- `add()`: added `label` to destructured opts and INSERT statement — label can now be set at creation time (was silently ignored before)
+- `handleAddMemory()` in server.js: added `label: body.label || undefined` to `memory.add()` call
+
+`src/server.js`:
+- `msort` select: added `<option value="label">Sort: Label</option>`
+- `handleAddMemory`: passes `label` field through to `memory.add()`
+
+`tests/test-phase72.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 71 Complete
 
 **Phase 71: Bulk Label**

@@ -29,6 +29,7 @@ function add(opts) {
     valid_from, valid_until,
     supersedes,
     retrieval_keywords,
+    label,
   } = opts;
 
   if (!title?.trim())   throw new Error('title is required');
@@ -50,9 +51,9 @@ function add(opts) {
       (id, title, content, memory_type, domain, project_id,
        created_at, updated_at, source, source_type, source_ref,
        confidence, trust_level, status, importance, tags,
-       valid_from, valid_until, supersedes, retrieval_keywords)
+       valid_from, valid_until, supersedes, retrieval_keywords, label)
     VALUES
-      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, title, content, memory_type,
     domain || null, project_id || null,
@@ -63,6 +64,7 @@ function add(opts) {
     valid_from || null, valid_until || null,
     supersedes || null,
     retrieval_keywords || null,
+    label || null,
   );
 
   if (supersedes) {
@@ -129,6 +131,7 @@ const SORT_MAP = {
   created:    'pinned DESC, created_at DESC',
   importance: 'pinned DESC, importance DESC, updated_at DESC',
   confidence: 'pinned DESC, confidence DESC, updated_at DESC',
+  label:      "pinned DESC, CASE label WHEN 'red' THEN 0 WHEN 'yellow' THEN 1 WHEN 'green' THEN 2 WHEN 'blue' THEN 3 ELSE 4 END, updated_at DESC",
 };
 
 function list({ type, domain, project_id, trust_level, status = 'active', limit = 20, offset = 0, min_conf, max_conf, min_importance, sort } = {}) {
