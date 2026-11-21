@@ -1,5 +1,17 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 79 Complete
+
+**Phase 79: Tag Rename Across All Memories**
+
+`src/server.js`:
+- Added `handleTagRename`: `POST /api/tags/rename` — takes `{from, to}`, iterates all active memories, replaces the tag in every match, returns `{renamed, to, updated}`. Tag name is normalized (trimmed, lowercased, spaces→hyphens). Returns 400 for missing/identical from/to.
+- Route: `'POST /api/tags/rename': handleTagRename`
+- Tag cloud toolbar: added `✎ rename` button (shown when a tag is selected)
+- Added `renameTagGlobal()`: prompts for new name, calls API, refreshes cloud + tag select + active-tag display
+
+`tests/test-phase79.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 78 Complete
 
 **Phase 78: Memory Copy Link**

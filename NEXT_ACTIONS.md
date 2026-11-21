@@ -151,9 +151,11 @@
 
 ## Phase 78 — Memory Copy Link — DONE ✅ (2026-11-21)
 
-## Phase 79 — Candidates
+## Phase 79 — Tag Rename Across All Memories — DONE ✅ (2026-11-21)
 
-- **Tag rename across all memories**: rename a tag globally from the tag cloud / analytics view
+## Phase 80 — Candidates
+
 - **Note search**: include memory notes in full-text search results
 - **Reading time filter**: filter memories by estimated reading time (quick / medium / long)
 - **Memory highlight on load**: scroll to and highlight a memory when URL contains its id fragment
+- **Tag merge**: merge two tags into one from the tag cloud

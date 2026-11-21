@@ -101,6 +101,26 @@ function handleTags(req, res) {
   json(res, Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([tag, count]) => ({ tag, count })));
 }
 
+async function handleTagRename(req, res) {
+  const body = await readBody(req);
+  const { from, to } = body;
+  if (!from || !to || from === to) { json(res, { error: 'from and to required and must differ' }, 400); return; }
+  const toClean = to.trim().toLowerCase().replace(/\s+/g, '-');
+  if (!toClean) { json(res, { error: 'invalid tag name' }, 400); return; }
+  const db = getDb();
+  const rows = db.prepare("SELECT id, tags FROM memories WHERE status='active' AND tags IS NOT NULL AND tags != '[]'").all();
+  let updated = 0;
+  const now = Date.now();
+  for (const row of rows) {
+    const tags = JSON.parse(row.tags || '[]');
+    if (!tags.includes(from)) continue;
+    const newTags = tags.map(t => t === from ? toClean : t);
+    db.prepare('UPDATE memories SET tags = ?, updated_at = ? WHERE id = ?').run(JSON.stringify(newTags), now, row.id);
+    updated++;
+  }
+  json(res, { renamed: from, to: toClean, updated });
+}
+
 function handleSearchHistory(req, res, q) {
   const limit = +(q.limit) || 20;
   const rows = getDb().prepare(
@@ -699,6 +719,7 @@ const ROUTES = {
   'GET /api/bookmarks':      handleListBookmarks,
   'POST /api/bookmarks':     handleAddBookmark,
   'GET /api/tags/stats':     (req, res) => { const u = new URL(req.url,'http://l'); handleTagStats(req, res, Object.fromEntries(u.searchParams)); },
+  'POST /api/tags/rename':   handleTagRename,
   'GET /api/webhooks':       handleListWebhooks,
   'POST /api/webhooks':      handleAddWebhook,
   'GET /':                   handleIndex,
@@ -1182,6 +1203,7 @@ input{width:360px}
     <input id="tc-co" placeholder="Co-occurrence for tag…" style="width:200px" oninput="loadCoOccurrence()">
     <span id="tc-active-tag" style="display:none;font-size:12px;color:#79c0ff">
       Filtering: <b id="tc-active-label"></b>
+      <button onclick="renameTagGlobal()" style="background:none;border:none;color:#58a6ff;cursor:pointer;font-size:12px;margin-left:8px" title="Rename this tag across all memories">✎ rename</button>
       <button onclick="clearTagFilter()" style="background:none;border:none;color:#8b949e;cursor:pointer;font-size:12px;margin-left:4px">✕ clear</button>
     </span>
   </div>
@@ -2888,6 +2910,21 @@ function clearTagFilter() {
   g('tc-active-tag').style.display = 'none';
   g('tc-results').style.display = 'none';
   loadTagCloud();
+}
+async function renameTagGlobal() {
+  if (!_tcSelectedTag) return;
+  const newName = prompt(\`Rename "#\${_tcSelectedTag}" to:\`);
+  if (!newName || !newName.trim() || newName.trim() === _tcSelectedTag) return;
+  const r = await localFetch('/api/tags/rename', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: _tcSelectedTag, to: newName.trim() }) });
+  const d = await r.json();
+  if (d.error) { alert('Rename failed: ' + d.error); return; }
+  _allTags = null;
+  loadTagSelect();
+  _tcSelectedTag = d.to;
+  g('tc-active-label').textContent = '#' + d.to;
+  loadTagCloud();
+  selectTag(d.to);
+  refreshStats();
 }
 function browseTag(e) {
   e.preventDefault();
