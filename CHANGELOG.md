@@ -1,5 +1,19 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 80 Complete
+
+**Phase 80: Memory Highlight on Load**
+
+`src/server.js`:
+- Added `highlightCard(id)`: finds `[data-id="${id}"]`, scrolls it into view (smooth, center), applies amber outline for 2.5s then clears
+- Added `checkHashHighlight()`: reads `location.hash`, switches to Memories tab via nav button, waits 300ms for render, calls `highlightCard`
+- Page init: `if (location.hash) checkHashHighlight()` — activates on direct link open
+- `window.addEventListener('hashchange', ...)` — activates on in-page hash navigation
+
+Completes the Phase 78 copy-link flow: copied URLs now scroll to and highlight the target memory.
+
+`tests/test-phase80.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 79 Complete
 
 **Phase 79: Tag Rename Across All Memories**

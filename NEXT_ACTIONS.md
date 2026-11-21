@@ -153,9 +153,11 @@
 
 ## Phase 79 — Tag Rename Across All Memories — DONE ✅ (2026-11-21)
 
-## Phase 80 — Candidates
+## Phase 80 — Memory Highlight on Load — DONE ✅ (2026-11-21)
+
+## Phase 81 — Candidates
 
 - **Note search**: include memory notes in full-text search results
 - **Reading time filter**: filter memories by estimated reading time (quick / medium / long)
-- **Memory highlight on load**: scroll to and highlight a memory when URL contains its id fragment
 - **Tag merge**: merge two tags into one from the tag cloud
+- **Memory share card**: generate a styled text snippet of a memory for sharing

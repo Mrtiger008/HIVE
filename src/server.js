@@ -2595,6 +2595,25 @@ api('/api/projects').then(ps => { const sel=g('mproj'); ps.forEach(p=>{const o=d
 loadTagSelect();
 function loadHistory() { api('/api/search/history?limit=30').then(hs => { const dl=g('q-history'); dl.innerHTML=''; hs.forEach(h=>{const o=document.createElement('option');o.value=h.query;dl.appendChild(o);}); }); }
 loadHistory();
+function highlightCard(id) {
+  const el = document.querySelector(\`[data-id="\${id}"]\`);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  el.style.outline = '2px solid #d29922';
+  el.style.borderRadius = '6px';
+  el.style.transition = 'outline .3s';
+  setTimeout(() => { el.style.outline = ''; el.style.borderRadius = ''; }, 2500);
+}
+async function checkHashHighlight() {
+  const id = location.hash.slice(1);
+  if (!id) return;
+  const memNavBtn = document.querySelector('nav button[onclick*="memories"]');
+  if (memNavBtn) { show('memories', memNavBtn); } else { await loadMem(); }
+  await new Promise(r => setTimeout(r, 300));
+  highlightCard(id);
+}
+if (location.hash) checkHashHighlight();
+window.addEventListener('hashchange', () => checkHashHighlight());
 
 function localFetch(url, opts={}) {
   opts.headers = Object.assign({'X-Hive-Local':'1'}, opts.headers||{});
