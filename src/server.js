@@ -548,6 +548,18 @@ function handleTagStats(req, res, q) {
   json(res, { top, co, coTag: coTag || null });
 }
 
+function handleTagHeatmap(req, res, q) {
+  const tag = (q.tag || '').trim();
+  if (!tag) { json(res, { error: 'tag required' }, 400); return; }
+  const db = getDb();
+  // Return weekly buckets for the last 52 weeks (ISO year-week keys)
+  const rows = db.prepare(
+    "SELECT strftime('%Y-%W', created_at/1000, 'unixepoch') as week, COUNT(*) as count " +
+    "FROM memories WHERE status='active' AND tags LIKE ? GROUP BY week ORDER BY week"
+  ).all(`%"${tag}"%`);
+  json(res, rows);
+}
+
 function handleListVersions(req, res, id) {
   const m = memory.get(id);
   if (!m) { json(res, { error: 'not found' }, 404); return; }
@@ -747,6 +759,7 @@ const ROUTES = {
   'GET /api/bookmarks':      handleListBookmarks,
   'POST /api/bookmarks':     handleAddBookmark,
   'GET /api/tags/stats':     (req, res) => { const u = new URL(req.url,'http://l'); handleTagStats(req, res, Object.fromEntries(u.searchParams)); },
+  'GET /api/tags/heatmap':   (req, res) => { const u = new URL(req.url,'http://l'); handleTagHeatmap(req, res, Object.fromEntries(u.searchParams)); },
   'POST /api/tags/rename':   handleTagRename,
   'POST /api/tags/merge':    handleTagMerge,
   'GET /api/webhooks':       handleListWebhooks,
@@ -1251,6 +1264,7 @@ input{width:360px}
       <h4 id="tc-results-title" style="margin:0;font-size:13px;color:#8b949e"></h4>
       <a id="tc-results-browse" href="#" style="font-size:12px;color:#58a6ff" onclick="browseTag(event)">Browse in Memories →</a>
     </div>
+    <div id="tc-heatmap" style="margin-top:14px"></div>
     <div id="tc-results-list"></div>
   </div>
 </div>
@@ -2987,6 +3001,28 @@ async function loadTagCloud() {
   }).join('');
   top.innerHTML = \`<table style="font-size:12px;border-collapse:collapse;width:100%;max-width:400px">\${d.top.slice(0,15).map((t,i)=>\`<tr><td style="padding:3px 8px;color:#8b949e">\${i+1}</td><td style="padding:3px 8px"><span style="cursor:pointer;color:#79c0ff" onclick="selectTag('\${esc(t.tag)}')">#\${esc(t.tag)}</span></td><td style="padding:3px 8px;color:#8b949e">\${t.count}</td></tr>\`).join('')}</table>\`;
 }
+function renderHeatmap(buckets) {
+  if (!buckets.length) return '';
+  const byWeek = {};
+  buckets.forEach(b => { byWeek[b.week] = b.count; });
+  const max = Math.max(...Object.values(byWeek));
+  // Build last 52 weeks
+  const cells = [];
+  const now = new Date();
+  for (let w = 51; w >= 0; w--) {
+    const d = new Date(now);
+    d.setDate(d.getDate() - w * 7);
+    const year = d.getFullYear();
+    const jan1 = new Date(year, 0, 1);
+    const weekNum = Math.ceil(((d - jan1) / 86400000 + jan1.getDay() + 1) / 7);
+    const key = \`\${year}-\${String(weekNum).padStart(2,'0')}\`;
+    const count = byWeek[key] || 0;
+    const alpha = count === 0 ? 0.08 : 0.2 + 0.8 * (count / max);
+    const col = \`rgba(63,185,80,\${alpha.toFixed(2)})\`;
+    cells.push(\`<span title="\${key}: \${count} memor\${count===1?'y':'ies'}" style="display:inline-block;width:11px;height:11px;border-radius:2px;margin:1px;background:\${col}"></span>\`);
+  }
+  return \`<div style="margin-bottom:4px;font-size:11px;color:#8b949e">Activity (last 52 weeks)</div><div style="display:flex;flex-wrap:wrap;gap:1px">\${cells.join('')}</div>\`;
+}
 async function selectTag(tag) {
   _tcSelectedTag = tag;
   g('tc-active-label').textContent = '#' + tag;
@@ -2995,9 +3031,14 @@ async function selectTag(tag) {
   const mems = await api(\`/api/memories?tag=\${encodeURIComponent(tag)}&limit=50\`);
   const res = g('tc-results');
   const list = g('tc-results-list');
+  const heatEl = g('tc-heatmap');
   g('tc-results-title').textContent = \`\${mems.length} memor\${mems.length===1?'y':'ies'} tagged #\${tag}\`;
   g('tc-results-browse').dataset.tag = tag;
   res.style.display = 'block';
+  // Fetch heatmap data
+  api(\`/api/tags/heatmap?tag=\${encodeURIComponent(tag)}\`).then(buckets => {
+    heatEl.innerHTML = renderHeatmap(buckets);
+  }).catch(() => {});
   if (!mems.length) { list.innerHTML='<p class="empty">No memories with this tag.</p>'; return; }
   list.innerHTML = mems.map(m => \`<div class="card" style="padding:10px 14px">
     <div style="font-weight:500;color:#e6edf3;margin-bottom:3px">\${esc(m.title)}</div>
@@ -3013,6 +3054,7 @@ function clearTagFilter() {
   _tcSelectedTag = null;
   g('tc-active-tag').style.display = 'none';
   g('tc-results').style.display = 'none';
+  g('tc-heatmap').innerHTML = '';
   loadTagCloud();
 }
 async function renameTagGlobal() {

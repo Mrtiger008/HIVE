@@ -169,9 +169,11 @@
 
 ## Phase 87 — Bulk Archive by Filter — DONE ✅ (2026-11-21)
 
-## Phase 88 — Candidates
+## Phase 88 — Tag Usage Heatmap — DONE ✅ (2026-11-21)
 
-- **Tag usage heatmap**: show tag activity over time in the Tags tab
-- **Memory expiry date**: optional expiry date on a memory with an expired badge
+## Phase 89 — Candidates
+
+- **Memory expiry date**: optional expiry date on a memory with an expired badge when due
 - **Search result count badge**: show total match count in the search results header
 - **Memory favorite**: a ★ star button distinct from pinning (pin = top-of-list, star = personal highlight)
+- **Tag description**: add a short description to any tag, shown as tooltip in the tag cloud

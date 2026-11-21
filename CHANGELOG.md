@@ -1,5 +1,19 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 88 Complete
+
+**Phase 88: Tag Usage Heatmap**
+
+`src/server.js`:
+- Added `handleTagHeatmap`: `GET /api/tags/heatmap?tag=<tag>` — returns `[{week, count}]` weekly buckets using `strftime('%Y-%W', created_at/1000, 'unixepoch')`
+- Route `GET /api/tags/heatmap` registered
+- Added `#tc-heatmap` div inside the tag results section
+- Added `renderHeatmap(buckets)`: builds a 52-cell green-intensity grid (GitHub-style) from weekly bucket data
+- `selectTag()`: fetches heatmap async and renders it below the memory count header
+- `clearTagFilter()`: clears `#tc-heatmap` on close
+
+`tests/test-phase88.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 87 Complete
 
 **Phase 87: Bulk Archive by Filter**
