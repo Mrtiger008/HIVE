@@ -1,5 +1,18 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 82 Complete
+
+**Phase 82: Reading Time Filter**
+
+`src/server.js`:
+- Added `<select id="mread">` to memories toolbar: Any length / Quick (<1 min, <100 words) / Medium (1-3 min, 100-400 words) / Long (>3 min, >400 words)
+- Server `handleMemories`: `read_time` added to `needsPostFilter`; filters results by word count thresholds (quick <100, medium 100-400, long >400)
+- `_memUrl()`: emits `&read_time=...` when mread is set
+- `loadMem()` chips: shows `read:<value>` chip when active
+- `clearAllMemFilters()`: resets `mread` to empty
+
+`tests/test-phase82.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 81 Complete
 
 **Phase 81: Note Search**

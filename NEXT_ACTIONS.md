@@ -157,9 +157,11 @@
 
 ## Phase 81 — Note Search — DONE ✅ (2026-11-21)
 
-## Phase 82 — Candidates
+## Phase 82 — Reading Time Filter — DONE ✅ (2026-11-21)
 
-- **Reading time filter**: filter memories by estimated reading time (quick / medium / long)
+## Phase 83 — Candidates
+
 - **Tag merge**: merge two tags into one from the tag cloud
 - **Memory share card**: generate a styled text snippet of a memory for sharing
 - **Search in notes only**: toggle to restrict search to note field only
+- **Memory color theme**: let users pick a highlight color per memory (extends labels)
