@@ -1,5 +1,20 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 73 Complete
+
+**Phase 73: Tag Suggestions**
+
+`src/server.js`:
+- `#nm-tg` input: added `oninput="tagSuggest(this)"`, `onblur` with 150ms timeout, `autocomplete="off"`, wrapped in `position:relative` div
+- Added `#nm-tg-sug` suggestion dropdown div (position:absolute, z-index:200, dark styled)
+- Added `let _allTags = null` cache variable
+- Added `_loadAllTags()` — fetches `/api/tags` once per session, caches in `_allTags`
+- Added `tagSuggest(inp)` — splits on commas, matches existing tags by prefix, shows up to 8 suggestions
+- Added `pickTagSug(tag)` — appends chosen tag with trailing `, `, hides dropdown, clears `_allTags` cache
+- Invalidates `_allTags = null` after save so new tags appear next time
+
+`tests/test-phase73.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 72 Complete
 
 **Phase 72: Memory Sort by Label**

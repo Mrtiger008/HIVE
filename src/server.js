@@ -1263,7 +1263,7 @@ input{width:360px}
     <div class="f"><label>Trust</label><select id="nm-tr"><option>OBSERVED</option><option>USER_CONFIRMED</option><option>SOURCE_VERIFIED</option><option>INFERRED</option></select></div>
     <div class="f"><label>Importance (1–10)</label><input id="nm-i" type="number" min="1" max="10" value="5"></div>
     <div class="f"><label>Confidence (0–1) <span style="font-weight:normal;color:#8b949e">how certain this is</span></label><input id="nm-cf" type="number" min="0" max="1" step="0.05" value="0.5" style="width:88px"></div>
-    <div class="f"><label>Tags <span style="font-weight:normal;color:#8b949e">(comma-separated)</span></label><input id="nm-tg" style="width:100%" placeholder="e.g. javascript, async, todo"></div>
+    <div class="f"><label>Tags <span style="font-weight:normal;color:#8b949e">(comma-separated)</span></label><div style="position:relative"><input id="nm-tg" style="width:100%" placeholder="e.g. javascript, async, todo" oninput="tagSuggest(this)" onblur="setTimeout(()=>{const s=g('nm-tg-sug');if(s)s.style.display='none'},150)" autocomplete="off"><div id="nm-tg-sug" style="display:none;position:absolute;top:100%;left:0;right:0;background:#161b22;border:1px solid #30363d;border-radius:6px;z-index:200;max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.5)"></div></div></div>
     <p id="nm-err" class="merr"></p>
     <div id="nm-dup" style="display:none;margin:8px 0;padding:10px;background:#2d1f0a;border:1px solid #d2a8ff44;border-radius:6px;font-size:12px">
       <strong style="color:#d2a8ff">⚠ Similar memories found:</strong>
@@ -2311,7 +2311,7 @@ async function _doSave(payload) {
     ? await fetch('/api/memories/'+_editId, { method:'PUT',  headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) })
     : await fetch('/api/memories',           { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
   if (!r.ok) { const e = await r.json(); g('nm-err').textContent = e.error || 'Save failed.'; return false; }
-  closeAdd(); loadMem(); refreshStats(); loadTagSelect(); return true;
+  closeAdd(); loadMem(); refreshStats(); loadTagSelect(); _allTags = null; return true;
 }
 async function saveAnyway() { await _doSave(_buildPayload()); }
 async function submitAdd() {
@@ -2472,6 +2472,31 @@ function filterTag(tag) {
   else if (memBtn) memBtn.click();
 }
 function loadTagSelect() { api('/api/tags').then(ts => { const sel=g('mtag'); sel.innerHTML='<option value="">All tags</option>'; ts.forEach(({tag,count})=>{const o=document.createElement('option');o.value=tag;o.textContent=tag+' ('+count+')';sel.appendChild(o);}); }); }
+let _allTags = null;
+async function _loadAllTags() {
+  if (!_allTags) _allTags = (await api('/api/tags')).map(t => t.tag);
+  return _allTags;
+}
+async function tagSuggest(inp) {
+  const parts = inp.value.split(',');
+  const partial = parts[parts.length - 1].trim().toLowerCase();
+  const sug = g('nm-tg-sug');
+  if (!partial || partial.length < 1) { sug.style.display = 'none'; return; }
+  const all = await _loadAllTags();
+  const existing = new Set(parts.slice(0, -1).map(t => t.trim().toLowerCase()));
+  const matches = all.filter(t => t.toLowerCase().startsWith(partial) && !existing.has(t.toLowerCase())).slice(0, 8);
+  if (!matches.length) { sug.style.display = 'none'; return; }
+  sug.innerHTML = matches.map(t => \`<div style="padding:6px 10px;cursor:pointer;font-size:13px;color:#e6edf3" onmousedown="pickTagSug('\${esc(t)}')" onmouseenter="this.style.background='#1f2937'" onmouseleave="this.style.background=''">🏷 \${esc(t)}</div>\`).join('');
+  sug.style.display = 'block';
+}
+function pickTagSug(tag) {
+  const inp = g('nm-tg');
+  const parts = inp.value.split(',');
+  parts[parts.length - 1] = ' ' + tag;
+  inp.value = parts.join(',') + ', ';
+  g('nm-tg-sug').style.display = 'none';
+  inp.focus();
+}
 refreshStats();
 loadBookmarks();
 api('/api/projects').then(ps => { const sel=g('mproj'); ps.forEach(p=>{const o=document.createElement('option');o.value=p.id;o.textContent=p.name;sel.appendChild(o);}); });
