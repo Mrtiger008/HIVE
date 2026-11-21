@@ -1,5 +1,17 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 83 Complete
+
+**Phase 83: Memory Share Card**
+
+`src/server.js`:
+- Added `#share-modal` with a monospace read-only textarea and Copy/Close buttons
+- Added `shareCard(id)`: fetches `/api/memories/:id`, formats a text snippet with title, type/trust/importance, tags, content, optional note, and HIVE attribution; opens modal
+- Added `shareCardCopy()`: clipboard write with "✓ Copied!" feedback
+- Added `📤 share` button to memory cards (between 🔗 copy and ✎ edit)
+
+`tests/test-phase83.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 82 Complete
 
 **Phase 82: Reading Time Filter**

@@ -1289,6 +1289,17 @@ input{width:360px}
   </div>
 </div>
 
+<div id="share-modal" class="modal" onclick="if(event.target===this)this.classList.remove('on')">
+  <div class="mbox" style="max-width:560px">
+    <h3>Share Memory</h3>
+    <textarea id="share-ta" rows="12" style="width:100%;background:#0d1117;color:#e6edf3;border:1px solid #30363d;border-radius:6px;padding:8px;font-size:12px;font-family:monospace;resize:vertical" readonly></textarea>
+    <div class="mbtns" style="margin-top:10px">
+      <button class="btn" id="share-copy-btn" onclick="shareCardCopy()">📋 Copy</button>
+      <button class="btn" onclick="g('share-modal').classList.remove('on')">Close</button>
+    </div>
+  </div>
+</div>
+
 <div id="add-modal" class="modal">
   <div class="mbox">
     <h3 id="nm-h">Add Memory</h3>
@@ -1376,7 +1387,7 @@ function card(m) {
   const labelSel = \`<select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:\${m.label?LCOL[m.label]:'#8b949e'};border:1px solid #30363d;border-radius:3px" title="Color label" onchange="setLabel('\${m.id}',this.value)"><option value="">🏷 label</option><option value="red"\${m.label==='red'?' selected':''}>🔴 red</option><option value="yellow"\${m.label==='yellow'?' selected':''}>🟡 yellow</option><option value="green"\${m.label==='green'?' selected':''}>🟢 green</option><option value="blue"\${m.label==='blue'?' selected':''}>🔵 blue</option></select>\`;
   const labelDot = m.label ? \`<span style="color:\${LCOL[m.label]};font-size:14px;margin-right:4px" title="Label: \${m.label}">●</span>\` : '';
   return \`<div class="card" data-id="\${m.id}" style="\${pinStyle}">
-    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" id="cl-\${m.id}" onclick="copyLink('\${m.id}')" title="Copy link to this memory">🔗 copy</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="duplicateMem('\${m.id}')" title="Duplicate">⧉ dupe</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button><select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:3px" title="Apply template" onchange="applyTemplate('\${m.id}',this.value);this.value=''"><option value="">⊞ tpl</option><option value="core">core</option><option value="skill">skill</option><option value="domain">domain</option><option value="project">project</option><option value="episodic">episodic</option><option value="semantic">semantic</option></select>\${labelSel}</div>
+    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" id="cl-\${m.id}" onclick="copyLink('\${m.id}')" title="Copy link to this memory">🔗 copy</button><button class="arch" onclick="shareCard('\${m.id}')" title="Share this memory as a text card">📤 share</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="duplicateMem('\${m.id}')" title="Duplicate">⧉ dupe</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button><select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:3px" title="Apply template" onchange="applyTemplate('\${m.id}',this.value);this.value=''"><option value="">⊞ tpl</option><option value="core">core</option><option value="skill">skill</option><option value="domain">domain</option><option value="project">project</option><option value="episodic">episodic</option><option value="semantic">semantic</option></select>\${labelSel}</div>
     <div class="cm">\${labelDot}\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span><span class="b" style="color:#8b949e" title="Created \${new Date(m.created_at).toLocaleDateString()}">\${ageStr}</span>\${tags}</div>
     <div class="cc" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(preview)}\${m.content.length>280?'…':''}</div>
     \${m.note ? \`<div style="margin-top:6px;padding:5px 8px;background:#1c2128;border-left:2px solid #d29922;border-radius:0 4px 4px 0;font-size:12px;color:#c9a227;cursor:pointer" title="Click to edit note" onclick="editNote('\${m.id}',this)">\${esc(m.note)}</div>\` : \`<div style="margin-top:4px"><button class="arch" style="font-size:11px;color:#484f58" onclick="editNote('\${m.id}',this.parentElement)" title="Add a sticky note">📝 add note</button></div>\`}
@@ -2432,6 +2443,34 @@ function copyLink(id) {
     const orig = btn.textContent;
     btn.textContent = '✓ copied';
     setTimeout(() => { btn.textContent = orig; }, 1500);
+  }).catch(() => {});
+}
+async function shareCard(id) {
+  const m = await api(\`/api/memories/\${id}\`);
+  const sep = '─'.repeat(48);
+  const tags = (m.tags||[]).map(t=>'#'+t).join(' ');
+  const lines = [
+    sep,
+    m.title,
+    \`Type: \${m.memory_type}  |  Trust: \${m.trust_level}  |  Importance: \${m.importance}\`,
+    tags ? \`Tags: \${tags}\` : null,
+    sep,
+    m.content || '',
+    m.note ? '' : null,
+    m.note ? \`Note: \${m.note}\` : null,
+    '',
+    \`(from HIVE · \${new Date(m.created_at).toLocaleDateString()})\`,
+    sep,
+  ].filter(l => l !== null).join('\\n');
+  g('share-ta').value = lines;
+  g('share-copy-btn').textContent = '📋 Copy';
+  g('share-modal').classList.add('on');
+}
+function shareCardCopy() {
+  navigator.clipboard.writeText(g('share-ta').value).then(() => {
+    const btn = g('share-copy-btn');
+    btn.textContent = '✓ Copied!';
+    setTimeout(() => { btn.textContent = '📋 Copy'; }, 1500);
   }).catch(() => {});
 }
 async function setLabel(id, label) {
