@@ -188,7 +188,8 @@ function handleSearch(req, res, q) {
       return;
     } catch { /* fall through to keyword */ }
   }
-  json(res, search(query, { limit, project_id: projectId }));
+  const notesOnly = q.notes_only === '1';
+  json(res, search(query, { limit, project_id: projectId, notes_only: notesOnly }));
 }
 
 const MEM_PAGE = 50; // memories per page
@@ -967,6 +968,7 @@ input{width:360px}
     <datalist id="q-history"></datalist>
     <div id="srch-sug"></div>
     <select id="smode" title="Search mode"><option value="keyword">Keyword</option><option value="hybrid">Hybrid</option><option value="semantic">Semantic</option></select>
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap;cursor:pointer" title="Only return memories where the query matches the note field"><input type="checkbox" id="snotes"> 🗒 notes only</label>
     <button class="btn" onclick="doSearch()">Search</button>
     <button class="btn" style="margin-left:4px" onclick="saveBookmark()" title="Save this search">★ Save</button>
     <button id="sr-csv-btn" class="btn" style="margin-left:4px;display:none" onclick="exportSearchCsv()" title="Export results as CSV">⬇ CSV</button>
@@ -1463,7 +1465,8 @@ async function doSearch() {
   const q = g('q').value.trim();
   if (!q) return;
   const mode = g('smode').value;
-  const d = await api('/api/search?q='+encodeURIComponent(q)+'&limit=20&mode='+mode);
+  const notesOnly = g('snotes').checked ? '&notes_only=1' : '';
+  const d = await api('/api/search?q='+encodeURIComponent(q)+'&limit=20&mode='+mode+notesOnly);
   _srResults = d;
   g('sr').innerHTML = d.length ? d.map(searchCard).join('') : '<p class="empty">No results.</p>';
   const csvBtn = g('sr-csv-btn'); if (csvBtn) csvBtn.style.display = d.length ? '' : 'none';

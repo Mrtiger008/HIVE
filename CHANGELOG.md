@@ -1,5 +1,19 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 86 Complete
+
+**Phase 86: Search in Notes Only**
+
+`src/search.js`:
+- Added `notes_only` option to `search()`: when true, skips FTS entirely and returns only memories whose note field matches the query (via `_noteFallback`)
+
+`src/server.js`:
+- `handleSearch`: reads `q.notes_only === '1'` and passes `notes_only` to `search()`
+- Search toolbar: added `<input type="checkbox" id="snotes">` "🗒 notes only" label next to mode select
+- `doSearch()`: appends `&notes_only=1` to query URL when checkbox is checked
+
+`tests/test-phase86.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 85 Complete
 
 **Phase 85: Memory Color Theme**

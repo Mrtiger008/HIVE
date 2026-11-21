@@ -4,8 +4,14 @@ const { touch } = require('./reinforce');
 
 // Full-text search over memories using SQLite FTS5 (BM25 ranking).
 // Falls back to LIKE search if the FTS query has syntax errors.
-function search(query, { domain, project_id, type, trust_level, status = 'active', limit = 10 } = {}) {
+function search(query, { domain, project_id, type, trust_level, status = 'active', limit = 10, notes_only = false } = {}) {
   if (!query?.trim()) return [];
+  if (notes_only) {
+    const db = getDb();
+    const results = _noteFallback(db, query, { domain, project_id, type, trust_level, status, limit }, new Set());
+    results.forEach(m => touch(m.id));
+    return results;
+  }
   const db = getDb();
 
   // Build FTS5 query: join each word with OR so natural-language queries

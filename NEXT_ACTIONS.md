@@ -165,9 +165,11 @@
 
 ## Phase 85 — Memory Color Theme — DONE ✅ (2026-11-21)
 
-## Phase 86 — Candidates
+## Phase 86 — Search in Notes Only — DONE ✅ (2026-11-21)
 
-- **Search in notes only**: toggle to restrict search results to the note field only
-- **Bulk archive by filter**: archive all memories matching current filter in one click
+## Phase 87 — Candidates
+
+- **Bulk archive by filter**: archive all memories matching the current filter in one click
 - **Tag usage heatmap**: show tag activity over time in the Tags tab
-- **Memory expiry date**: set an optional expiry date on a memory; show expired badge
+- **Memory expiry date**: optional expiry date on a memory with an expired badge
+- **Search result count badge**: show total match count in the search results header
