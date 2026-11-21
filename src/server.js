@@ -2515,13 +2515,13 @@ function filterTag(tag) {
 }
 function loadTagSelect() { api('/api/tags').then(ts => { const sel=g('mtag'); sel.innerHTML='<option value="">All tags</option>'; ts.forEach(({tag,count})=>{const o=document.createElement('option');o.value=tag;o.textContent=tag+' ('+count+')';sel.appendChild(o);}); }); }
 let _allTags = null;
-let _sugIdx = -1;
+let _tagSugIdx = -1;
 async function _loadAllTags() {
   if (!_allTags) _allTags = (await api('/api/tags')).map(t => t.tag);
   return _allTags;
 }
 async function tagSuggest(inp) {
-  _sugIdx = -1;
+  _tagSugIdx = -1;
   const parts = inp.value.split(',');
   const partial = parts[parts.length - 1].trim().toLowerCase();
   const sug = g('nm-tg-sug');
@@ -2534,7 +2534,7 @@ async function tagSuggest(inp) {
   sug.style.display = 'block';
 }
 function _sugHover(i) {
-  _sugIdx = i;
+  _tagSugIdx = i;
   const sug = g('nm-tg-sug');
   Array.from(sug.children).forEach((el, j) => { el.style.background = j === i ? '#1f2937' : ''; });
 }
@@ -2545,17 +2545,17 @@ function tagSuggestKey(e) {
   if (!rows.length) return;
   if (e.key === 'ArrowDown') {
     e.preventDefault();
-    _sugIdx = (_sugIdx + 1) % rows.length;
-    _sugHover(_sugIdx);
+    _tagSugIdx = (_tagSugIdx + 1) % rows.length;
+    _sugHover(_tagSugIdx);
   } else if (e.key === 'ArrowUp') {
     e.preventDefault();
-    _sugIdx = (_sugIdx - 1 + rows.length) % rows.length;
-    _sugHover(_sugIdx);
-  } else if (e.key === 'Enter' && _sugIdx >= 0) {
+    _tagSugIdx = (_tagSugIdx - 1 + rows.length) % rows.length;
+    _sugHover(_tagSugIdx);
+  } else if (e.key === 'Enter' && _tagSugIdx >= 0) {
     e.preventDefault();
-    pickTagSug(rows[_sugIdx].dataset.tag);
+    pickTagSug(rows[_tagSugIdx].dataset.tag);
   } else if (e.key === 'Escape') {
-    sug.style.display = 'none'; _sugIdx = -1;
+    sug.style.display = 'none'; _tagSugIdx = -1;
   }
 }
 function pickTagSug(tag) {
@@ -2564,7 +2564,7 @@ function pickTagSug(tag) {
   parts[parts.length - 1] = ' ' + tag;
   inp.value = parts.join(',') + ', ';
   g('nm-tg-sug').style.display = 'none';
-  _sugIdx = -1;
+  _tagSugIdx = -1;
   inp.focus();
 }
 refreshStats();
