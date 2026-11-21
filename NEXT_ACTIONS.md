@@ -161,9 +161,11 @@
 
 ## Phase 83 — Memory Share Card — DONE ✅ (2026-11-21)
 
-## Phase 84 — Candidates
+## Phase 84 — Tag Merge — DONE ✅ (2026-11-21)
 
-- **Tag merge**: merge two tags into one from the tag cloud
-- **Search in notes only**: toggle to restrict search to note field only
+## Phase 85 — Candidates
+
+- **Search in notes only**: toggle to restrict search results to the note field only
 - **Memory color theme**: per-memory highlight color extending labels
 - **Bulk archive by filter**: archive all memories matching current filter in one click
+- **Tag usage heatmap**: show tag activity over time in the Tags tab

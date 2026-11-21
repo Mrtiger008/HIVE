@@ -1,5 +1,17 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 84 Complete
+
+**Phase 84: Tag Merge**
+
+`src/server.js`:
+- Added `handleTagMerge`: `POST /api/tags/merge { from, into }` — removes the source tag from all active memories, adds the target tag if not already present; returns `{ merged, into, updated }`
+- Route `POST /api/tags/merge` registered
+- Added `⟳ merge into…` button to the active-tag bar in the Tags tab (green, next to rename)
+- Added `mergeTagGlobal()` client function: prompts for target tag, calls the API, refreshes cloud and stats
+
+`tests/test-phase84.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 83 Complete
 
 **Phase 83: Memory Share Card**
