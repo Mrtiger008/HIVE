@@ -167,9 +167,11 @@
 
 ## Phase 86 — Search in Notes Only — DONE ✅ (2026-11-21)
 
-## Phase 87 — Candidates
+## Phase 87 — Bulk Archive by Filter — DONE ✅ (2026-11-21)
 
-- **Bulk archive by filter**: archive all memories matching the current filter in one click
+## Phase 88 — Candidates
+
 - **Tag usage heatmap**: show tag activity over time in the Tags tab
 - **Memory expiry date**: optional expiry date on a memory with an expired badge
 - **Search result count badge**: show total match count in the search results header
+- **Memory favorite**: a ★ star button distinct from pinning (pin = top-of-list, star = personal highlight)

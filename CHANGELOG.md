@@ -1,5 +1,15 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 87 Complete
+
+**Phase 87: Bulk Archive by Filter**
+
+`src/server.js`:
+- Added `⚠ archive all` button (red-tinted, `id="arch-all-btn"`) to the memories toolbar
+- Added `archiveAllFiltered()`: fetches all memories matching the current filter (limit=100000), shows confirm dialog with count, calls `POST /api/memories/bulk` with `action:'archive'` for all ids, then reloads
+
+`tests/test-phase87.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 86 Complete
 
 **Phase 86: Search in Notes Only**

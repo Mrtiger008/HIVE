@@ -995,6 +995,7 @@ input{width:360px}
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only <span id="pinned-badge" style="display:none;background:#1f4b8e55;border:1px solid #58a6ff55;border-radius:10px;padding:0 6px;color:#58a6ff;font-size:11px;font-weight:600"></span></label>
     <select id="mlabel" onchange="loadMem()"><option value="">All labels</option><option value="red">🔴 Red</option><option value="yellow">🟡 Yellow</option><option value="green">🟢 Green</option><option value="blue">🔵 Blue</option><option value="purple">🟣 Purple</option><option value="orange">🟠 Orange</option><option value="teal">🩵 Teal</option><option value="pink">🩷 Pink</option></select>
     <button class="btn" onclick="exportFilteredCsv()" title="Export current filter as CSV" style="font-size:12px">⬇ CSV</button>
+    <button class="btn" id="arch-all-btn" onclick="archiveAllFiltered()" title="Archive ALL memories matching the current filter" style="font-size:12px;color:#f85149;border-color:#f8514966">⚠ archive all</button>
     <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
   </div>
   <div id="mem-chips" style="display:none;padding:4px 0 8px;display:none;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px"></div>
@@ -1726,6 +1727,16 @@ function exportFilteredCsv() {
   const a = document.createElement('a'); a.href = url;
   a.download = (tg||t||r||p||dom||imp||lbl2) ? 'hive-filtered.csv' : 'hive-export.csv';
   a.click();
+}
+async function archiveAllFiltered() {
+  const btn = g('arch-all-btn');
+  const all = await api(_memUrl(0).replace(/limit=\d+/, 'limit=100000').replace(/offset=\d+/, 'offset=0'));
+  if (!all.length) { alert('No memories match the current filter.'); return; }
+  if (!confirm(\`Archive \${all.length} memor\${all.length===1?'y':'ies'} matching the current filter? This cannot be undone easily.\`)) return;
+  btn.disabled = true; btn.textContent = 'archiving…';
+  await fetch('/api/memories/bulk',{method:'POST',headers:{'Content-Type':'application/json','X-Hive-Local':'1'},body:JSON.stringify({ids:all.map(m=>m.id),action:'archive'})});
+  btn.disabled = false; btn.textContent = '⚠ archive all';
+  loadMem(); refreshStats();
 }
 function exportSelectionCsv() {
   if (!_sel.size) return;
