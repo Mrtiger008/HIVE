@@ -914,6 +914,7 @@ input{width:360px}
     <select id="smode" title="Search mode"><option value="keyword">Keyword</option><option value="hybrid">Hybrid</option><option value="semantic">Semantic</option></select>
     <button class="btn" onclick="doSearch()">Search</button>
     <button class="btn" style="margin-left:4px" onclick="saveBookmark()" title="Save this search">★ Save</button>
+    <button id="sr-csv-btn" class="btn" style="margin-left:4px;display:none" onclick="exportSearchCsv()" title="Export results as CSV">⬇ CSV</button>
   </div>
   <div id="bk-bar" style="display:none;padding:6px 0 10px;border-bottom:1px solid #21262d;margin-bottom:10px;font-size:12px;color:#8b949e">
     <span style="margin-right:8px">Bookmarks:</span><span id="bk-chips"></span>
@@ -1376,8 +1377,15 @@ async function doSearch() {
   if (!q) return;
   const mode = g('smode').value;
   const d = await api('/api/search?q='+encodeURIComponent(q)+'&limit=20&mode='+mode);
+  _srResults = d;
   g('sr').innerHTML = d.length ? d.map(searchCard).join('') : '<p class="empty">No results.</p>';
+  const csvBtn = g('sr-csv-btn'); if (csvBtn) csvBtn.style.display = d.length ? '' : 'none';
   loadHistory();
+}
+function exportSearchCsv() {
+  if (!_srResults.length) return;
+  const url = '/api/export?format=csv&ids=' + _srResults.map(m => encodeURIComponent(m.id)).join(',');
+  const a = document.createElement('a'); a.href = url; a.download = 'hive-search.csv'; a.click();
 }
 
 var _sugTimer = null, _sugIdx = -1;
@@ -1431,6 +1439,7 @@ document.addEventListener('click', function(e) {
 });
 
 let _sel = new Set();
+let _srResults = [];
 function toggleSel(id, on) {
   on ? _sel.add(id) : _sel.delete(id);
   const bar = g('bulk-bar');

@@ -1,5 +1,18 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 68 Complete
+
+**Phase 68: Search Export**
+
+`src/server.js`:
+- Search tab: added `⬇ CSV` button (`#sr-csv-btn`), hidden until a search returns results
+- Added `let _srResults = []` to store last search result set
+- `doSearch()`: assigns `_srResults = d` after fetch; shows/hides CSV button based on result count
+- Added `exportSearchCsv()`: builds `/api/export?format=csv&ids=...` from `_srResults` IDs and triggers download as `hive-search.csv`
+- Reuses existing Phase 65 `ids` export endpoint — no backend changes needed
+
+`tests/test-phase68.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 67 Complete
 
 **Phase 67: Memory Color Labels**
