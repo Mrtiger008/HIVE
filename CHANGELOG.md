@@ -1,5 +1,16 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 74 Complete
+
+**Phase 74: Pinned Memories Count Badge**
+
+`src/server.js`:
+- `handleStats`: added `pinned` field — `COUNT(*) WHERE status='active' AND pinned=1`
+- `#mpinned` label in toolbar: added `#pinned-badge` span (hidden by default, blue pill style)
+- `refreshStats()`: now reads `d.pinned` and shows/hides the badge accordingly
+
+`tests/test-phase74.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 73 Complete
 
 **Phase 73: Tag Suggestions**

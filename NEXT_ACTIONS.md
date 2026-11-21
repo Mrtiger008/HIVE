@@ -141,9 +141,11 @@
 
 ## Phase 73 — Tag Suggestions — DONE ✅ (2026-11-21)
 
-## Phase 74 — Candidates
+## Phase 74 — Pinned Memories Count Badge — DONE ✅ (2026-11-21)
 
-- **Pinned memories count**: show a badge on the Memories toolbar with how many memories are currently pinned
+## Phase 75 — Candidates
+
 - **Memory note / sticky comment**: add a short freeform note field to any memory that appears below the content preview
 - **Keyboard navigation for tag suggestions**: arrow keys to navigate suggestion dropdown, Enter to select
 - **Tag rename across all memories**: rename a tag globally from the tag cloud / analytics view
+- **Memory copy link**: one-click button to copy a direct URL to a specific memory

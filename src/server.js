@@ -56,6 +56,7 @@ function handleStats(req, res) {
     memories: db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active'").get().n,
     entities: db.prepare("SELECT COUNT(*) as n FROM entities").get().n,
     projects: db.prepare("SELECT COUNT(*) as n FROM projects WHERE status='active'").get().n,
+    pinned:   db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active' AND pinned=1").get().n,
   });
 }
 
@@ -933,7 +934,7 @@ input{width:360px}
     <select id="mconf" onchange="loadMem()" title="Min confidence"><option value="">Any confidence</option><option value="0.8">≥ 0.8 (high)</option><option value="0.6">≥ 0.6 (medium+)</option><option value="0.0" data-max="0.4">≤ 0.4 (low)</option></select>
     <select id="mimportance" onchange="loadMem()" title="Min importance"><option value="">Any importance</option><option value="8">≥ 8 (high)</option><option value="6">≥ 6 (medium+)</option></select>
     <select id="msort" onchange="loadMem()" title="Sort order"><option value="updated">Sort: Updated</option><option value="created">Sort: Created</option><option value="importance">Sort: Importance</option><option value="confidence">Sort: Confidence</option><option value="label">Sort: Label</option></select>
-    <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only</label>
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only <span id="pinned-badge" style="display:none;background:#1f4b8e55;border:1px solid #58a6ff55;border-radius:10px;padding:0 6px;color:#58a6ff;font-size:11px;font-weight:600"></span></label>
     <select id="mlabel" onchange="loadMem()"><option value="">All labels</option><option value="red">🔴 Red</option><option value="yellow">🟡 Yellow</option><option value="green">🟢 Green</option><option value="blue">🔵 Blue</option></select>
     <button class="btn" onclick="exportFilteredCsv()" title="Export current filter as CSV" style="font-size:12px">⬇ CSV</button>
     <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
@@ -2270,7 +2271,7 @@ async function loadGraph() {
   gStop=()=>cancelAnimationFrame(raf);
 }
 
-function refreshStats() { api('/api/stats').then(d => g('stats').textContent = \`\${d.memories} memories · \${d.entities} entities · \${d.projects} projects\`); }
+function refreshStats() { api('/api/stats').then(d => { g('stats').textContent = \`\${d.memories} memories · \${d.entities} entities · \${d.projects} projects\`; const b=g('pinned-badge'); if(d.pinned>0){b.textContent=d.pinned;b.style.display='inline';}else{b.style.display='none';} }); }
 let _editId = null;
 let _tplCache = null;
 async function _loadTemplates() {
