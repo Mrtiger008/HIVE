@@ -31,6 +31,7 @@ function add(opts) {
     retrieval_keywords,
     label,
     note,
+    expires_at,
   } = opts;
 
   if (!title?.trim())   throw new Error('title is required');
@@ -52,9 +53,9 @@ function add(opts) {
       (id, title, content, memory_type, domain, project_id,
        created_at, updated_at, source, source_type, source_ref,
        confidence, trust_level, status, importance, tags,
-       valid_from, valid_until, supersedes, retrieval_keywords, label, note)
+       valid_from, valid_until, supersedes, retrieval_keywords, label, note, expires_at)
     VALUES
-      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `).run(
     id, title, content, memory_type,
     domain || null, project_id || null,
@@ -67,6 +68,7 @@ function add(opts) {
     retrieval_keywords || null,
     label || null,
     note || null,
+    expires_at || null,
   );
 
   if (supersedes) {
@@ -101,7 +103,7 @@ function update(id, updates) {
 
   const ALLOWED = ['title', 'content', 'memory_type', 'domain', 'project_id', 'confidence',
                    'trust_level', 'status', 'importance', 'tags', 'valid_until', 'superseded_by',
-                   'retrieval_keywords', 'user_confirmed', 'pinned', 'label', 'note'];
+                   'retrieval_keywords', 'user_confirmed', 'pinned', 'label', 'note', 'expires_at'];
   const setClauses = [], values = [];
   for (const [k, v] of Object.entries(updates)) {
     if (!ALLOWED.includes(k)) continue;

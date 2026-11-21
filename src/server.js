@@ -397,6 +397,7 @@ async function handleAddMemory(req, res) {
     project_id:  body.project_id  || undefined,
     label:       body.label       || undefined,
     note:        body.note        || undefined,
+    expires_at:  body.expires_at  || undefined,
   });
   webhooks.fire('memory.created', { id: m.id, title: m.title, memory_type: m.memory_type, trust_level: m.trust_level, importance: m.importance });
   json(res, m, 201);
@@ -423,6 +424,7 @@ async function handleUpdateMemory(req, res, id) {
   if (body.pinned      !== undefined) updates.pinned      = body.pinned ? 1 : 0;
   if (body.label       !== undefined) updates.label       = body.label || null;
   if (body.note        !== undefined) updates.note        = body.note  || null;
+  if (body.expires_at  !== undefined) updates.expires_at  = body.expires_at || null;
   if (!Object.keys(updates).length) { json(res, { error: 'no fields to update' }, 400); return; }
   if (updates.title !== undefined || updates.content !== undefined)
     versions.snapshot(id, m.title, m.content);
@@ -1352,6 +1354,7 @@ input{width:360px}
     <div class="f"><label>Confidence (0–1) <span style="font-weight:normal;color:#8b949e">how certain this is</span></label><input id="nm-cf" type="number" min="0" max="1" step="0.05" value="0.5" style="width:88px"></div>
     <div class="f"><label>Tags <span style="font-weight:normal;color:#8b949e">(comma-separated)</span></label><div style="position:relative"><input id="nm-tg" style="width:100%" placeholder="e.g. javascript, async, todo" oninput="tagSuggest(this)" onkeydown="tagSuggestKey(event)" onblur="setTimeout(()=>{const s=g('nm-tg-sug');if(s)s.style.display='none'},150)" autocomplete="off"><div id="nm-tg-sug" style="display:none;position:absolute;top:100%;left:0;right:0;background:#161b22;border:1px solid #30363d;border-radius:6px;z-index:200;max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.5)"></div></div></div>
     <div class="f"><label>Note <span style="font-weight:normal;color:#8b949e">(optional sticky comment)</span></label><textarea id="nm-nt" rows="2" placeholder="Short note or reminder about this memory…" style="width:100%"></textarea></div>
+    <div class="f"><label>Expiry date <span style="font-weight:normal;color:#8b949e">(optional — shows expired badge after this date)</span></label><input id="nm-ex" type="date" style="width:180px"></div>
     <p id="nm-err" class="merr"></p>
     <div id="nm-dup" style="display:none;margin:8px 0;padding:10px;background:#2d1f0a;border:1px solid #d2a8ff44;border-radius:6px;font-size:12px">
       <strong style="color:#d2a8ff">⚠ Similar memories found:</strong>
@@ -1426,9 +1429,10 @@ function card(m) {
   const ageStr = age(m.created_at);
   const labelSel = \`<select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:\${m.label?LCOL[m.label]:'#8b949e'};border:1px solid #30363d;border-radius:3px" title="Color label" onchange="setLabel('\${m.id}',this.value)"><option value="">🏷 label</option><option value="red"\${m.label==='red'?' selected':''}>🔴 red</option><option value="yellow"\${m.label==='yellow'?' selected':''}>🟡 yellow</option><option value="green"\${m.label==='green'?' selected':''}>🟢 green</option><option value="blue"\${m.label==='blue'?' selected':''}>🔵 blue</option><option value="purple"\${m.label==='purple'?' selected':''}>🟣 purple</option><option value="orange"\${m.label==='orange'?' selected':''}>🟠 orange</option><option value="teal"\${m.label==='teal'?' selected':''}>🩵 teal</option><option value="pink"\${m.label==='pink'?' selected':''}>🩷 pink</option></select>\`;
   const labelDot = m.label ? \`<span style="color:\${LCOL[m.label]};font-size:14px;margin-right:4px" title="Label: \${m.label}">●</span>\` : '';
+  const expiredBadge = m.expires_at && m.expires_at < Date.now() ? \`<span class="b" style="color:#f85149;border-color:#f85149" title="Expired \${new Date(m.expires_at).toLocaleDateString()}">⏰ expired</span>\` : (m.expires_at ? \`<span class="b" style="color:#d29922;border-color:#d29922" title="Expires \${new Date(m.expires_at).toLocaleDateString()}">⏳ exp \${new Date(m.expires_at).toLocaleDateString()}</span>\` : '');
   return \`<div class="card" data-id="\${m.id}" style="\${pinStyle}">
     <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" id="cl-\${m.id}" onclick="copyLink('\${m.id}')" title="Copy link to this memory">🔗 copy</button><button class="arch" onclick="shareCard('\${m.id}')" title="Share this memory as a text card">📤 share</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="duplicateMem('\${m.id}')" title="Duplicate">⧉ dupe</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button><select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:3px" title="Apply template" onchange="applyTemplate('\${m.id}',this.value);this.value=''"><option value="">⊞ tpl</option><option value="core">core</option><option value="skill">skill</option><option value="domain">domain</option><option value="project">project</option><option value="episodic">episodic</option><option value="semantic">semantic</option></select>\${labelSel}</div>
-    <div class="cm">\${labelDot}\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span><span class="b" style="color:#8b949e" title="Created \${new Date(m.created_at).toLocaleDateString()}">\${ageStr}</span>\${tags}</div>
+    <div class="cm">\${labelDot}\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span><span class="b" style="color:#8b949e" title="Created \${new Date(m.created_at).toLocaleDateString()}">\${ageStr}</span>\${expiredBadge}\${tags}</div>
     <div class="cc" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(preview)}\${m.content.length>280?'…':''}</div>
     \${m.note ? \`<div style="margin-top:6px;padding:5px 8px;background:#1c2128;border-left:2px solid #d29922;border-radius:0 4px 4px 0;font-size:12px;color:#c9a227;cursor:pointer" title="Click to edit note" onclick="editNote('\${m.id}',this)">\${esc(m.note)}</div>\` : \`<div style="margin-top:4px"><button class="arch" style="font-size:11px;color:#484f58" onclick="editNote('\${m.id}',this.parentElement)" title="Add a sticky note">📝 add note</button></div>\`}
     <div id="rel-\${m.id}" style="display:none;margin-top:8px;border-top:1px solid #21262d;padding-top:8px"></div>
@@ -2405,12 +2409,13 @@ async function applyTemplate(type) {
   if (tpl.tags.length && !g('nm-tg').value) g('nm-tg').value = tpl.tags.join(', ');
   renderTplChips(type);
 }
-function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-cf').value='0.5'; g('nm-tg').value=''; g('nm-nt').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); _loadTemplates().then(()=>renderTplChips('semantic')); }
-async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-cf').value=d.confidence!=null?d.confidence:0.5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-nt').value=d.note||''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
+function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-cf').value='0.5'; g('nm-tg').value=''; g('nm-nt').value=''; g('nm-ex').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); _loadTemplates().then(()=>renderTplChips('semantic')); }
+async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-cf').value=d.confidence!=null?d.confidence:0.5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-nt').value=d.note||''; g('nm-ex').value=d.expires_at?new Date(d.expires_at).toISOString().slice(0,10):''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
 function closeAdd() { g('add-modal').classList.remove('on'); g('nm-dup').style.display='none'; }
 function _buildPayload() {
   const rawTags = g('nm-tg').value.split(',').map(t=>t.trim()).filter(Boolean);
-  return { title: g('nm-t').value.trim(), content: g('nm-c').value.trim(), memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value, confidence: +g('nm-cf').value, tags: rawTags, note: g('nm-nt').value.trim() || undefined };
+  const exDate = g('nm-ex').value; const expires_at = exDate ? new Date(exDate).getTime() : undefined;
+  return { title: g('nm-t').value.trim(), content: g('nm-c').value.trim(), memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value, confidence: +g('nm-cf').value, tags: rawTags, note: g('nm-nt').value.trim() || undefined, expires_at };
 }
 async function _doSave(payload) {
   const r = _editId

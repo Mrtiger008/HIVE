@@ -254,6 +254,10 @@ function _initSchema(db) {
     try { db.exec('ALTER TABLE memories ADD COLUMN note TEXT'); } catch {}
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (12, ?)').run(Date.now());
   }
+  if (sv < 13) {
+    try { db.exec('ALTER TABLE memories ADD COLUMN expires_at INTEGER'); } catch {}
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (13, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {
