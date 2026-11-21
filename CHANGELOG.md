@@ -1,5 +1,15 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 78 Complete
+
+**Phase 78: Memory Copy Link**
+
+`src/server.js`:
+- `card()`: added `🔗 copy` button (`id="cl-{id}"`, `onclick="copyLink(id)"`) after the archive button
+- Added `copyLink(id)`: builds `location.origin + '/#' + id`, writes to `navigator.clipboard`; on success briefly changes button text to `✓ copied` for 1.5s then resets; `.catch(() => {})` silences clipboard permission errors
+
+`tests/test-phase78.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 77 Complete
 
 **Phase 77: Memory Word Count Filter**
