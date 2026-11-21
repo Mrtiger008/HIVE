@@ -1,5 +1,19 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 76 Complete
+
+**Phase 76: Keyboard Navigation for Tag Suggestions**
+
+`src/server.js`:
+- `#nm-tg` input: added `onkeydown="tagSuggestKey(event)"`
+- Added `let _sugIdx = -1` to track highlighted suggestion row
+- `tagSuggest()`: resets `_sugIdx`, adds `data-tag` and `data-sug-idx` to each row, uses `_sugHover` for mouse hover
+- Added `_sugHover(i)`: sets `_sugIdx` and updates row backgrounds
+- Added `tagSuggestKey(e)`: ArrowDown/Up moves highlight (wraps), Enter selects highlighted item, Escape closes dropdown
+- `pickTagSug()`: resets `_sugIdx = -1` after selection
+
+`tests/test-phase76.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 75 Complete
 
 **Phase 75: Memory Note / Sticky Comment**

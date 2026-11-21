@@ -145,9 +145,11 @@
 
 ## Phase 75 — Memory Note / Sticky Comment — DONE ✅ (2026-11-21)
 
-## Phase 76 — Candidates
+## Phase 76 — Keyboard Navigation for Tag Suggestions — DONE ✅ (2026-11-21)
 
-- **Keyboard navigation for tag suggestions**: arrow keys to navigate the tag suggestion dropdown, Enter to select
+## Phase 77 — Candidates
+
 - **Tag rename across all memories**: rename a tag globally from the tag cloud / analytics view
 - **Memory copy link**: one-click button to copy a direct URL to a specific memory
 - **Note search**: include memory notes in full-text search results
+- **Memory word count filter**: filter memories by minimum/maximum word count
