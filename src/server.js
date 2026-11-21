@@ -197,7 +197,7 @@ const MEM_PAGE = 50; // memories per page
 function handleMemories(req, res, q) {
   const pageSize = q.limit ? +(q.limit) : MEM_PAGE;
   const offset   = q.offset ? +(q.offset) : 0;
-  const needsPostFilter = q.tag || q.pinned || q.label || q.min_words || q.max_words || q.read_time;
+  const needsPostFilter = q.tag || q.pinned || q.label || q.min_words || q.max_words || q.read_time || q.expires;
   let results = memory.list({
     type:           q.type           || undefined,
     trust_level:    q.trust          || undefined,
@@ -220,6 +220,12 @@ function handleMemories(req, res, q) {
     if (q.read_time === 'quick')  results = results.filter(m => wc(m) <  100);
     if (q.read_time === 'medium') results = results.filter(m => { const w=wc(m); return w >= 100 && w <= 400; });
     if (q.read_time === 'long')   results = results.filter(m => wc(m) >  400);
+  }
+  if (q.expires) {
+    const now = Date.now();
+    if (q.expires === 'expired') results = results.filter(m => m.expires_at && m.expires_at < now);
+    if (q.expires === 'soon')    results = results.filter(m => m.expires_at && m.expires_at >= now && m.expires_at < now + 7 * 86400000);
+    if (q.expires === 'any')     results = results.filter(m => m.expires_at != null);
   }
   // For post-filter case apply client-side pagination
   if (needsPostFilter) results = results.slice(offset, offset + pageSize);
@@ -1007,6 +1013,7 @@ input{width:360px}
     <input id="mminw" type="number" min="1" placeholder="Min words" title="Minimum word count" style="width:80px;font-size:12px;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 4px" onchange="loadMem()">
     <input id="mmaxw" type="number" min="1" placeholder="Max words" title="Maximum word count" style="width:80px;font-size:12px;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 4px" onchange="loadMem()">
     <select id="mread" onchange="loadMem()" title="Reading time"><option value="">Any length</option><option value="quick">⚡ Quick (&lt;1 min)</option><option value="medium">📖 Medium (1-3 min)</option><option value="long">📚 Long (&gt;3 min)</option></select>
+    <select id="mexp" onchange="loadMem()" title="Expiry filter"><option value="">Any expiry</option><option value="expired">⏰ Expired</option><option value="soon">⏳ Expiring soon (7d)</option><option value="any">📅 Has expiry</option></select>
     <select id="msort" onchange="loadMem()" title="Sort order"><option value="updated">Sort: Updated</option><option value="created">Sort: Created</option><option value="importance">Sort: Importance</option><option value="confidence">Sort: Confidence</option><option value="label">Sort: Label</option></select>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only <span id="pinned-badge" style="display:none;background:#1f4b8e55;border:1px solid #58a6ff55;border-radius:10px;padding:0 6px;color:#58a6ff;font-size:11px;font-weight:600"></span></label>
     <select id="mlabel" onchange="loadMem()"><option value="">All labels</option><option value="red">🔴 Red</option><option value="yellow">🟡 Yellow</option><option value="green">🟢 Green</option><option value="blue">🔵 Blue</option><option value="purple">🟣 Purple</option><option value="orange">🟠 Orange</option><option value="teal">🩵 Teal</option><option value="pink">🩷 Pink</option></select>
@@ -1657,6 +1664,7 @@ function _memUrl(offset) {
   const minw=g('mminw').value, maxw=g('mmaxw').value;
   if (minw) u += '&min_words='+minw; if (maxw) u += '&max_words='+maxw;
   const rdt=g('mread').value; if (rdt) u += '&read_time='+rdt;
+  const exp=g('mexp').value; if (exp) u += '&expires='+exp;
   return u;
 }
 
@@ -1685,6 +1693,7 @@ async function loadMem() {
   const minwv=g('mminw').value, maxwv=g('mmaxw').value;
   if (minwv) chips.push(['words≥'+minwv,'mminw']); if (maxwv) chips.push(['words≤'+maxwv,'mmaxw']);
   const rdtv=g('mread').value; if (rdtv) chips.push(['read:'+rdtv,'mread']);
+  const expv=g('mexp').value; if (expv) chips.push(['exp:'+expv,'mexp']);
   const bar = g('mem-chips');
   if (chips.length) {
     bar.style.display='flex';
@@ -1728,7 +1737,7 @@ function clearMemFilter(selId) {
   loadMem();
 }
 function clearAllMemFilters() {
-  ['mtype','mtrust','mproj','mtag','mdomain','mconf','mimportance','mlabel','mminw','mmaxw','mread'].forEach(id => { const e=g(id); if(e) e.value=''; });
+  ['mtype','mtrust','mproj','mtag','mdomain','mconf','mimportance','mlabel','mminw','mmaxw','mread','mexp'].forEach(id => { const e=g(id); if(e) e.value=''; });
   g('msort').value='updated';
   const mp=g('mpinned'); if(mp) mp.checked=false;
   loadMem();
