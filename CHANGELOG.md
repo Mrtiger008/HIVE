@@ -1,5 +1,19 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 85 Complete
+
+**Phase 85: Memory Color Theme**
+
+`src/server.js`:
+- Expanded `LCOL` map with 4 new colors: `purple: #d2a8ff`, `orange: #ffa657`, `teal: #39c5cf`, `pink: #f778ba`
+- Added purple/orange/teal/pink options to the per-card label select (with `selected` state)
+- Added same 4 options to the memories filter `#mlabel` select
+- Added same 4 options to the bulk-label select
+
+No schema change — labels are stored as plain strings; the existing `label` column accepts any value.
+
+`tests/test-phase85.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 84 Complete
 
 **Phase 84: Tag Merge**
