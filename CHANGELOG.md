@@ -1,5 +1,18 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 77 Complete
+
+**Phase 77: Memory Word Count Filter**
+
+`src/server.js`:
+- `handleMemories`: added `min_words`/`max_words` to `needsPostFilter`; post-filters by `content.trim().split(/\s+/).filter(Boolean).length`
+- Toolbar: added `#mminw` (Min words) and `#mmaxw` (Max words) number inputs
+- `_memUrl()`: appends `&min_words=` / `&max_words=` when set
+- `loadMem()` chips: shows `words≥N` / `words≤N` filter chips
+- `clearAllMemFilters()`: clears `mminw` and `mmaxw`
+
+`tests/test-phase77.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 76 Complete
 
 **Phase 76: Keyboard Navigation for Tag Suggestions**

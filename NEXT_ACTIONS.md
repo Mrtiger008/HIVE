@@ -147,9 +147,11 @@
 
 ## Phase 76 — Keyboard Navigation for Tag Suggestions — DONE ✅ (2026-11-21)
 
-## Phase 77 — Candidates
+## Phase 77 — Memory Word Count Filter — DONE ✅ (2026-11-21)
+
+## Phase 78 — Candidates
 
 - **Tag rename across all memories**: rename a tag globally from the tag cloud / analytics view
 - **Memory copy link**: one-click button to copy a direct URL to a specific memory
 - **Note search**: include memory notes in full-text search results
-- **Memory word count filter**: filter memories by minimum/maximum word count
+- **Reading time filter**: filter memories by estimated reading time (quick / medium / long)

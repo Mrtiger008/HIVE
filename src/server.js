@@ -155,7 +155,7 @@ const MEM_PAGE = 50; // memories per page
 function handleMemories(req, res, q) {
   const pageSize = q.limit ? +(q.limit) : MEM_PAGE;
   const offset   = q.offset ? +(q.offset) : 0;
-  const needsPostFilter = q.tag || q.pinned || q.label;
+  const needsPostFilter = q.tag || q.pinned || q.label || q.min_words || q.max_words;
   let results = memory.list({
     type:           q.type           || undefined,
     trust_level:    q.trust          || undefined,
@@ -170,7 +170,9 @@ function handleMemories(req, res, q) {
   });
   if (q.tag)    results = results.filter(m => (m.tags || []).includes(q.tag));
   if (q.pinned) results = results.filter(m => m.pinned === 1 || m.pinned === true);
-  if (q.label)  results = results.filter(m => m.label === q.label);
+  if (q.label)     results = results.filter(m => m.label === q.label);
+  if (q.min_words) { const n=+q.min_words; results = results.filter(m => (m.content||'').trim().split(/\s+/).filter(Boolean).length >= n); }
+  if (q.max_words) { const n=+q.max_words; results = results.filter(m => (m.content||'').trim().split(/\s+/).filter(Boolean).length <= n); }
   // For post-filter case apply client-side pagination
   if (needsPostFilter) results = results.slice(offset, offset + pageSize);
   json(res, results);
@@ -935,6 +937,8 @@ input{width:360px}
     <select id="mdomain" onchange="loadMem()"><option value="">All domains</option></select>
     <select id="mconf" onchange="loadMem()" title="Min confidence"><option value="">Any confidence</option><option value="0.8">≥ 0.8 (high)</option><option value="0.6">≥ 0.6 (medium+)</option><option value="0.0" data-max="0.4">≤ 0.4 (low)</option></select>
     <select id="mimportance" onchange="loadMem()" title="Min importance"><option value="">Any importance</option><option value="8">≥ 8 (high)</option><option value="6">≥ 6 (medium+)</option></select>
+    <input id="mminw" type="number" min="1" placeholder="Min words" title="Minimum word count" style="width:80px;font-size:12px;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 4px" onchange="loadMem()">
+    <input id="mmaxw" type="number" min="1" placeholder="Max words" title="Maximum word count" style="width:80px;font-size:12px;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:2px 4px" onchange="loadMem()">
     <select id="msort" onchange="loadMem()" title="Sort order"><option value="updated">Sort: Updated</option><option value="created">Sort: Created</option><option value="importance">Sort: Importance</option><option value="confidence">Sort: Confidence</option><option value="label">Sort: Label</option></select>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only <span id="pinned-badge" style="display:none;background:#1f4b8e55;border:1px solid #58a6ff55;border-radius:10px;padding:0 6px;color:#58a6ff;font-size:11px;font-weight:600"></span></label>
     <select id="mlabel" onchange="loadMem()"><option value="">All labels</option><option value="red">🔴 Red</option><option value="yellow">🟡 Yellow</option><option value="green">🟢 Green</option><option value="blue">🔵 Blue</option></select>
@@ -1563,6 +1567,8 @@ function _memUrl(offset) {
   if (sort && sort !== 'updated') u += '&sort='+sort;
   if (g('mpinned').checked) u += '&pinned=1';
   const lbl = g('mlabel').value; if (lbl) u += '&label='+encodeURIComponent(lbl);
+  const minw=g('mminw').value, maxw=g('mmaxw').value;
+  if (minw) u += '&min_words='+minw; if (maxw) u += '&max_words='+maxw;
   return u;
 }
 
@@ -1588,6 +1594,8 @@ async function loadMem() {
   if (sort && sort !== 'updated') chips.push(['sort:'+sort,'msort']);
   if (g('mpinned').checked) chips.push(['pinned','mpinned']);
   const lbl = g('mlabel').value; if (lbl) chips.push(['label:'+lbl,'mlabel']);
+  const minwv=g('mminw').value, maxwv=g('mmaxw').value;
+  if (minwv) chips.push(['words≥'+minwv,'mminw']); if (maxwv) chips.push(['words≤'+maxwv,'mmaxw']);
   const bar = g('mem-chips');
   if (chips.length) {
     bar.style.display='flex';
@@ -1631,7 +1639,7 @@ function clearMemFilter(selId) {
   loadMem();
 }
 function clearAllMemFilters() {
-  ['mtype','mtrust','mproj','mtag','mdomain','mconf','mimportance','mlabel'].forEach(id => { const e=g(id); if(e) e.value=''; });
+  ['mtype','mtrust','mproj','mtag','mdomain','mconf','mimportance','mlabel','mminw','mmaxw'].forEach(id => { const e=g(id); if(e) e.value=''; });
   g('msort').value='updated';
   const mp=g('mpinned'); if(mp) mp.checked=false;
   loadMem();
