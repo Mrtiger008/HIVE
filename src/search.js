@@ -42,17 +42,38 @@ function search(query, { domain, project_id, type, trust_level, status = 'active
   try {
     const results = db.prepare(sql).all(...params).map(m => ({ ...m, tags: JSON.parse(m.tags || '[]') }));
     results.forEach(m => touch(m.id));
-    return results;
+
+    // Supplement: pick up memories matched only by their note (not indexed in FTS5)
+    const seenIds = new Set(results.map(m => m.id));
+    const noteResults = _noteFallback(db, query, { domain, project_id, type, trust_level, status, limit }, seenIds);
+    noteResults.forEach(m => touch(m.id));
+
+    return [...results, ...noteResults].slice(0, limit);
   } catch {
     // FTS5 syntax error (e.g., bare special chars) — fall back to LIKE
     return _likeFallback(db, query, { domain, project_id, type, trust_level, status, limit });
   }
 }
 
+function _noteFallback(db, query, { domain, project_id, type, trust_level, status, limit }, excludeIds) {
+  const like = `%${query}%`;
+  let sql = 'SELECT * FROM memories WHERE note LIKE ? AND status = ?';
+  const params = [like, status];
+  if (domain)      { sql += ' AND domain = ?';       params.push(domain); }
+  if (project_id)  { sql += ' AND project_id = ?';   params.push(project_id); }
+  if (type)        { sql += ' AND memory_type = ?';  params.push(type); }
+  if (trust_level) { sql += ' AND trust_level = ?';  params.push(trust_level); }
+  sql += ' ORDER BY importance DESC LIMIT ?';
+  params.push(limit);
+  return db.prepare(sql).all(...params)
+    .filter(m => !excludeIds.has(m.id))
+    .map(m => ({ ...m, tags: JSON.parse(m.tags || '[]') }));
+}
+
 function _likeFallback(db, query, { domain, project_id, type, trust_level, status, limit }) {
   const like = `%${query}%`;
-  let sql = 'SELECT * FROM memories WHERE (title LIKE ? OR content LIKE ?) AND status = ?';
-  const params = [like, like, status];
+  let sql = 'SELECT * FROM memories WHERE (title LIKE ? OR content LIKE ? OR note LIKE ?) AND status = ?';
+  const params = [like, like, like, status];
   if (domain)      { sql += ' AND domain = ?';       params.push(domain); }
   if (project_id)  { sql += ' AND project_id = ?';   params.push(project_id); }
   if (type)        { sql += ' AND memory_type = ?';  params.push(type); }

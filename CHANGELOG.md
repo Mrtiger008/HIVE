@@ -1,5 +1,18 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 81 Complete
+
+**Phase 81: Note Search**
+
+`src/search.js`:
+- Added `_noteFallback()`: runs `note LIKE ?` query with the same filters, excluding ids already in FTS results
+- FTS path now appends note-matched memories (deduplicated by id) up to the limit
+- LIKE fallback extended to `title LIKE ? OR content LIKE ? OR note LIKE ?`
+
+Notes are now returned by `/api/search` even when the query term only appears in the note field.
+
+`tests/test-phase81.js`: 10/10 tests passing
+
 ## 2026-11-21 — Phase 80 Complete
 
 **Phase 80: Memory Highlight on Load**
