@@ -171,9 +171,28 @@
 
 ## Phase 88 — Tag Usage Heatmap — DONE ✅ (2026-11-21)
 
-## Phase 89 — Candidates
+## Phase 89 — Memory Expiry Date — DONE ✅ (2026-11-21)
 
-- **Memory expiry date**: optional expiry date on a memory with an expired badge when due
-- **Search result count badge**: show total match count in the search results header
+## Phase 90 — Search Result Count Badge — DONE ✅ (2026-11-21)
+
+## Phase 91 — Expired Memories Filter — DONE ✅ (2026-11-21)
+
+## Phase 92 — Memory Favorite (Star) — DONE ✅ (2026-11-21)
+
+## Phase 93 — Tag Descriptions — DONE ✅ (2026-11-21)
+
+## Phase 94 — Sort by Starred — DONE ✅ (2026-11-23)
+
+## Phase 95 — Memory Word Frequency — DONE ✅ (2026-11-23)
+
+## Phase 96 — Memory Read Status — DONE ✅ (2026-11-23)
+
+## Phase 97 — Next
+
+- **Memory word frequency**: show top words used across all active memories as a mini word cloud in the stats tab
+- **Duplicate tag detection**: warn when renaming a tag that would create a near-duplicate (e.g. js → javascript already exists)
+- **Memory read status**: mark a memory as "read", filter by unread
+- **Stats timeline chart**: sparkline of memories created per day over the last 30 days
 - **Memory favorite**: a ★ star button distinct from pinning (pin = top-of-list, star = personal highlight)
 - **Tag description**: add a short description to any tag, shown as tooltip in the tag cloud
+- **Expired memories filter**: filter view to show only expired or expiring-soon memories

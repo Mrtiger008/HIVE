@@ -1,5 +1,29 @@
 # CHANGELOG.md
 
+## 2026-11-21 — Phase 89 Complete
+
+**Phase 89: Memory Expiry Date**
+
+`src/db.js`:
+- Schema v13: `ALTER TABLE memories ADD COLUMN expires_at INTEGER`
+
+`src/memory.js`:
+- `add()`: accepts and stores `expires_at`
+- `update()` ALLOWED list: added `expires_at`
+
+`src/server.js`:
+- `handleAddMemory`: passes `expires_at` from request body
+- `handleUpdateMemory`: accepts `expires_at` (set or null to clear)
+- `card()`: shows ⏳ yellow badge when memory expires in future; ⏰ red "expired" badge when past
+- Add/edit modal: `<input type="date" id="nm-ex">` for expiry date
+- `showAdd()`: clears `nm-ex` on open
+- `showEdit()`: populates `nm-ex` from stored `expires_at` timestamp
+- `_buildPayload()`: converts date string to epoch ms and includes in payload
+
+`tests/test-phase89.js`: 10/10 passing
+
+---
+
 ## 2026-11-21 — Phase 88 Complete
 
 **Phase 88: Tag Usage Heatmap**

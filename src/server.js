@@ -683,6 +683,18 @@ function handleImpDist(req, res) {
   json(res, result);
 }
 
+function handleLabelDist(req, res) {
+  const db = getDb();
+  const LABELS = ['red','yellow','green','blue','purple','orange','teal','pink'];
+  const result = LABELS.map(lbl => ({
+    label: lbl,
+    count: db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active' AND label=?").get(lbl).n,
+  })).filter(r => r.count > 0);
+  const unlabelled = db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active' AND (label IS NULL OR label='')").get().n;
+  if (unlabelled > 0) result.push({ label: 'none', count: unlabelled });
+  json(res, result);
+}
+
 function handleDomainBreakdown(req, res) {
   const rows = getDb().prepare(`
     SELECT domain,
@@ -840,6 +852,7 @@ const ROUTES = {
   'GET /api/stats/confidence-dist':  (req, res) => handleConfDist(req, res),
   'GET /api/stats/importance-dist':    (req, res) => handleImpDist(req, res),
   'GET /api/stats/domain-breakdown':  (req, res) => handleDomainBreakdown(req, res),
+  'GET /api/stats/label-dist':        (req, res) => handleLabelDist(req, res),
   'GET /api/stats/wordfreq': (req, res) => { const u = new URL(req.url,'http://l'); handleWordFreq(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/digest':         (req, res) => {
     const u = new URL(req.url, 'http://localhost');
@@ -3320,7 +3333,7 @@ async function loadDigest(period) {
   g('dg-body').innerHTML = html;
 }
 async function loadKStats() {
-  const [d, wf, cd, id2, db2] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown')]);
+  const [d, wf, cd, id2, db2, ld] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown'), api('/api/stats/label-dist')]);
   const bar = (count, max, col) => {
     const w = max ? Math.round((count/max)*180) : 0;
     return \`<span style="display:inline-block;height:12px;width:\${w}px;background:\${col};border-radius:2px;vertical-align:middle;margin-right:6px"></span>\`;
@@ -3412,6 +3425,18 @@ async function loadKStats() {
           <td style="color:#3fb950;text-align:right;padding:3px 0">\${r.avg_importance != null ? r.avg_importance : '—'}</td>
         </tr>\`).join('')}</tbody>
       </table>
+    </div>\` : ''}
+    \${ld.length ? \`<div id="ks-label-dist" style="margin-top:20px">
+      <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Label distribution</h4>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">\${ld.map(r => {
+        const COLS = {red:'#f85149',yellow:'#d29922',green:'#3fb950',blue:'#58a6ff',purple:'#d2a8ff',orange:'#ffa657',teal:'#39c5cf',pink:'#ff7eb6',none:'#8b949e'};
+        const col = COLS[r.label] || '#8b949e';
+        return \`<div style="display:flex;align-items:center;gap:5px;font-size:12px">
+          <span style="width:10px;height:10px;border-radius:50%;background:\${col};display:inline-block;flex-shrink:0"></span>
+          <span style="color:#c9d1d9">\${esc(r.label)}</span>
+          <span style="color:#8b949e">\${r.count}</span>
+        </div>\`;
+      }).join('')}</div>
     </div>\` : ''}\`;
   g('ks-body').innerHTML = html;
   // Draw sparkline
