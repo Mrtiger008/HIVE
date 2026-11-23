@@ -612,6 +612,22 @@ function handleWordFreq(req, res, q) {
   json(res, sorted.map(([word, count]) => ({ word, count })));
 }
 
+function handleConfDist(req, res) {
+  const db = getDb();
+  const buckets = [
+    { label: '0–20%',  min: 0,   max: 0.2 },
+    { label: '20–40%', min: 0.2, max: 0.4 },
+    { label: '40–60%', min: 0.4, max: 0.6 },
+    { label: '60–80%', min: 0.6, max: 0.8 },
+    { label: '80–100%',min: 0.8, max: 1.01 },
+  ];
+  const result = buckets.map(b => ({
+    label: b.label,
+    count: db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active' AND confidence >= ? AND confidence < ?").get(b.min, b.max).n,
+  }));
+  json(res, result);
+}
+
 function handleTagCooccurrence(req, res, q) {
   const limit = Math.min(+(q.limit) || 20, 100);
   const rows = getDb().prepare("SELECT tags FROM memories WHERE status='active' AND tags != '[]'").all();
@@ -751,6 +767,7 @@ const ROUTES = {
   'POST /api/apikeys':       handleCreateKey,
   'GET /api/templates':      (req, res) => json(res, templates.list()),
   'GET /api/stats/full':     (req, res) => json(res, kstats.full()),
+  'GET /api/stats/confidence-dist': (req, res) => handleConfDist(req, res),
   'GET /api/stats/wordfreq': (req, res) => { const u = new URL(req.url,'http://l'); handleWordFreq(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/digest':         (req, res) => {
     const u = new URL(req.url, 'http://localhost');
@@ -3154,7 +3171,7 @@ async function loadDigest(period) {
   g('dg-body').innerHTML = html;
 }
 async function loadKStats() {
-  const [d, wf] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60')]);
+  const [d, wf, cd] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist')]);
   const bar = (count, max, col) => {
     const w = max ? Math.round((count/max)*180) : 0;
     return \`<span style="display:inline-block;height:12px;width:\${w}px;background:\${col};border-radius:2px;vertical-align:middle;margin-right:6px"></span>\`;
@@ -3199,6 +3216,20 @@ async function loadKStats() {
       <div>\${section('By type',d.byType,'#58a6ff')}</div>
       <div>\${section('By trust',d.byTrust,'#3fb950')}</div>
       <div>\${section('By domain',d.byDomain,'#d2a8ff')}</div>
+    </div>
+    <div id="ks-conf-dist" style="margin-top:20px">
+      <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Confidence distribution</h4>
+      \${(() => {
+        const maxC = Math.max(...cd.map(b => b.count), 1);
+        return cd.map(b => {
+          const w = Math.round((b.count / maxC) * 180);
+          return \`<div style="margin:4px 0;font-size:13px;display:flex;align-items:center;gap:8px">
+            <span style="color:#8b949e;min-width:52px;font-size:11px">\${esc(b.label)}</span>
+            <span style="display:inline-block;height:12px;width:\${w}px;background:#ffa657;border-radius:2px"></span>
+            <span style="color:#8b949e">\${b.count}</span>
+          </div>\`;
+        }).join('');
+      })()}
     </div>\`;
   g('ks-body').innerHTML = html;
   // Draw sparkline
