@@ -634,6 +634,22 @@ function handleConfDist(req, res) {
   json(res, result);
 }
 
+function handleImpDist(req, res) {
+  const db = getDb();
+  const buckets = [
+    { label: '1–2',  min: 1, max: 3  },
+    { label: '3–4',  min: 3, max: 5  },
+    { label: '5–6',  min: 5, max: 7  },
+    { label: '7–8',  min: 7, max: 9  },
+    { label: '9–10', min: 9, max: 11 },
+  ];
+  const result = buckets.map(b => ({
+    label: b.label,
+    count: db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active' AND importance >= ? AND importance < ?").get(b.min, b.max).n,
+  }));
+  json(res, result);
+}
+
 function handleTagCooccurrence(req, res, q) {
   const limit = Math.min(+(q.limit) || 20, 100);
   const rows = getDb().prepare("SELECT tags FROM memories WHERE status='active' AND tags != '[]'").all();
@@ -774,7 +790,8 @@ const ROUTES = {
   'POST /api/apikeys':       handleCreateKey,
   'GET /api/templates':      (req, res) => json(res, templates.list()),
   'GET /api/stats/full':     (req, res) => json(res, kstats.full()),
-  'GET /api/stats/confidence-dist': (req, res) => handleConfDist(req, res),
+  'GET /api/stats/confidence-dist':  (req, res) => handleConfDist(req, res),
+  'GET /api/stats/importance-dist':  (req, res) => handleImpDist(req, res),
   'GET /api/stats/wordfreq': (req, res) => { const u = new URL(req.url,'http://l'); handleWordFreq(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/digest':         (req, res) => {
     const u = new URL(req.url, 'http://localhost');
@@ -3215,7 +3232,7 @@ async function loadDigest(period) {
   g('dg-body').innerHTML = html;
 }
 async function loadKStats() {
-  const [d, wf, cd] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist')]);
+  const [d, wf, cd, id2] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist')]);
   const bar = (count, max, col) => {
     const w = max ? Math.round((count/max)*180) : 0;
     return \`<span style="display:inline-block;height:12px;width:\${w}px;background:\${col};border-radius:2px;vertical-align:middle;margin-right:6px"></span>\`;
@@ -3261,19 +3278,35 @@ async function loadKStats() {
       <div>\${section('By trust',d.byTrust,'#3fb950')}</div>
       <div>\${section('By domain',d.byDomain,'#d2a8ff')}</div>
     </div>
-    <div id="ks-conf-dist" style="margin-top:20px">
-      <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Confidence distribution</h4>
-      \${(() => {
-        const maxC = Math.max(...cd.map(b => b.count), 1);
-        return cd.map(b => {
-          const w = Math.round((b.count / maxC) * 180);
-          return \`<div style="margin:4px 0;font-size:13px;display:flex;align-items:center;gap:8px">
-            <span style="color:#8b949e;min-width:52px;font-size:11px">\${esc(b.label)}</span>
-            <span style="display:inline-block;height:12px;width:\${w}px;background:#ffa657;border-radius:2px"></span>
-            <span style="color:#8b949e">\${b.count}</span>
-          </div>\`;
-        }).join('');
-      })()}
+    <div style="display:flex;gap:40px;flex-wrap:wrap;margin-top:20px">
+      <div id="ks-conf-dist">
+        <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Confidence distribution</h4>
+        \${(() => {
+          const maxC = Math.max(...cd.map(b => b.count), 1);
+          return cd.map(b => {
+            const w = Math.round((b.count / maxC) * 160);
+            return \`<div style="margin:4px 0;font-size:13px;display:flex;align-items:center;gap:8px">
+              <span style="color:#8b949e;min-width:52px;font-size:11px">\${esc(b.label)}</span>
+              <span style="display:inline-block;height:12px;width:\${w}px;background:#ffa657;border-radius:2px"></span>
+              <span style="color:#8b949e">\${b.count}</span>
+            </div>\`;
+          }).join('');
+        })()}
+      </div>
+      <div id="ks-imp-dist">
+        <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Importance distribution</h4>
+        \${(() => {
+          const maxI = Math.max(...id2.map(b => b.count), 1);
+          return id2.map(b => {
+            const w = Math.round((b.count / maxI) * 160);
+            return \`<div style="margin:4px 0;font-size:13px;display:flex;align-items:center;gap:8px">
+              <span style="color:#8b949e;min-width:36px;font-size:11px">\${esc(b.label)}</span>
+              <span style="display:inline-block;height:12px;width:\${w}px;background:#3fb950;border-radius:2px"></span>
+              <span style="color:#8b949e">\${b.count}</span>
+            </div>\`;
+          }).join('');
+        })()}
+      </div>
     </div>\`;
   g('ks-body').innerHTML = html;
   // Draw sparkline
