@@ -216,6 +216,7 @@ function handleMemories(req, res, q) {
     project_id:     q.project        || undefined,
     domain:         q.domain         || undefined,
     sort:           q.sort           || undefined,
+    status:         q.status         || 'active',
     limit:          needsPostFilter ? 100000 : pageSize,
     offset:         needsPostFilter ? 0       : offset,
     min_conf:       q.min_conf       != null ? +q.min_conf       : undefined,
@@ -507,6 +508,7 @@ async function handleBulk(req, res) {
       else if (action === 'mark-read')   { memory.update(id, { read_at: Date.now() }); count++; }
       else if (action === 'mark-unread') { memory.update(id, { read_at: null }); count++; }
       else if (action === 'delete')      { memory.update(id, { status: 'archived' }); count++; }
+      else if (action === 'restore')     { memory.update(id, { status: 'active'   }); count++; }
     } catch {}
   }
   json(res, { count });
@@ -1020,6 +1022,10 @@ function createServer() {
       if (readm && req.method === 'POST') {
         handler = (req, res) => handleMarkRead(req, res, readm[1], readm[2] === 'mark-read');
       }
+      const rst = pathname.match(/^\/api\/memories\/([^/]+)\/restore$/);
+      if (rst && req.method === 'POST') {
+        handler = (req, res) => { const m = memory.get(rst[1]); if (!m) { json(res, { error: 'not found' }, 404); return; } json(res, memory.update(rst[1], { status: 'active' })); };
+      }
       const lk = pathname.match(/^\/api\/memories\/([^/]+)\/links$/);
       if (lk) {
         if (req.method === 'GET')  handler = (req, res) => handleListLinks(req, res, lk[1]);
@@ -1203,6 +1209,7 @@ input{width:360px}
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#d29922;white-space:nowrap"><input type="checkbox" id="mstarred" onchange="loadMem()"> ★ Starred only</label>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="munread" onchange="loadMem()"> Unread only</label>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mnotag" onchange="loadMem()"> No tags</label>
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#f85149;white-space:nowrap"><input type="checkbox" id="marchived" onchange="loadMem()"> Archived</label>
     <select id="mlabel" onchange="loadMem()"><option value="">All labels</option><option value="red">🔴 Red</option><option value="yellow">🟡 Yellow</option><option value="green">🟢 Green</option><option value="blue">🔵 Blue</option><option value="purple">🟣 Purple</option><option value="orange">🟠 Orange</option><option value="teal">🩵 Teal</option><option value="pink">🩷 Pink</option></select>
     <button class="btn" onclick="exportFilteredCsv()" title="Export current filter as CSV" style="font-size:12px">⬇ CSV</button>
     <button class="btn" id="arch-all-btn" onclick="archiveAllFiltered()" title="Archive ALL memories matching the current filter" style="font-size:12px;color:#f85149;border-color:#f8514966">⚠ archive all</button>
@@ -1910,6 +1917,7 @@ function _memUrl(offset) {
   const exp=g('mexp').value; if (exp) u += '&expires='+exp;
   const agev=g('mage').value; if (agev) u += '&age='+agev;
   const stalev=g('mstale').value; if (stalev) u += '&stale='+stalev;
+  if (g('marchived') && g('marchived').checked) u += '&status=archived';
   return u;
 }
 
@@ -1944,6 +1952,7 @@ async function loadMem() {
   const expv=g('mexp').value; if (expv) chips.push(['exp:'+expv,'mexp']);
   const agec=g('mage').value; if (agec) chips.push(['age:'+agec,'mage']);
   const stalec=g('mstale').value; if (stalec) chips.push(['stale>'+stalec,'mstale']);
+  if (g('marchived') && g('marchived').checked) chips.push(['archived','marchived']);
   const bar = g('mem-chips');
   if (chips.length) {
     bar.style.display='flex';
@@ -1993,6 +2002,7 @@ function clearAllMemFilters() {
   const ms=g('mstarred'); if(ms) ms.checked=false;
   const mu=g('munread'); if(mu) mu.checked=false;
   const mn=g('mnotag');  if(mn) mn.checked=false;
+  const ma=g('marchived'); if(ma) ma.checked=false;
   loadMem();
 }
 function exportFilteredCsv() {
@@ -2770,6 +2780,12 @@ async function archiveMem(id, btn) {
   const r = await fetch(\`/api/memories/\${id}\`, { method:'DELETE' });
   if (r.ok) { btn.closest('.card').remove(); refreshStats(); }
   else btn.textContent = '× archive';
+}
+async function restoreMemory(id, btn) {
+  if (btn) btn.textContent = '…';
+  const r = await fetch(\`/api/memories/\${id}/restore\`, {method:'POST',headers:{'X-Hive-Local':'1'}});
+  if (r.ok) { if (btn) btn.closest('.card').remove(); loadMem(); }
+  else { if (btn) btn.textContent = '↩ restore'; }
 }
 async function duplicateMem(id) {
   const r = await fetch(\`/api/memories/\${id}/duplicate\`, {method:'POST',headers:{'X-Hive-Local':'1'}});
