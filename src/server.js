@@ -505,6 +505,12 @@ async function handleBulk(req, res) {
   json(res, { count });
 }
 
+function handleRandom(req, res) {
+  const row = getDb().prepare("SELECT id FROM memories WHERE status='active' ORDER BY RANDOM() LIMIT 1").get();
+  if (!row) { json(res, { error: 'no memories' }, 404); return; }
+  json(res, memory.get(row.id));
+}
+
 function handleSimilar(req, res, q) {
   const { findSimilar } = require('./dedupe');
   const title     = q.title   || '';
@@ -751,6 +757,7 @@ const ROUTES = {
   'GET /api/tags':           handleTags,
   'GET /api/activity':       handleActivity,
   'GET /api/memories':         handleMemories,
+  'GET /api/memories/random':  handleRandom,
   'GET /api/memories/similar': handleSimilar,
   'POST /api/capture':         handleCapture,
   'POST /api/memories':        handleAddMemory,
@@ -1158,6 +1165,7 @@ input{width:360px}
     <select id="mlabel" onchange="loadMem()"><option value="">All labels</option><option value="red">🔴 Red</option><option value="yellow">🟡 Yellow</option><option value="green">🟢 Green</option><option value="blue">🔵 Blue</option><option value="purple">🟣 Purple</option><option value="orange">🟠 Orange</option><option value="teal">🩵 Teal</option><option value="pink">🩷 Pink</option></select>
     <button class="btn" onclick="exportFilteredCsv()" title="Export current filter as CSV" style="font-size:12px">⬇ CSV</button>
     <button class="btn" id="arch-all-btn" onclick="archiveAllFiltered()" title="Archive ALL memories matching the current filter" style="font-size:12px;color:#f85149;border-color:#f8514966">⚠ archive all</button>
+    <button class="btn" onclick="showRandom()" title="Open a random memory" style="font-size:12px">🎲 Surprise me</button>
     <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
   </div>
   <div id="mem-qstats" style="padding:6px 0 2px;font-size:12px;color:#8b949e;display:flex;gap:14px;flex-wrap:wrap"></div>
@@ -1502,6 +1510,19 @@ input{width:360px}
       <button class="btn" id="share-copy-btn" onclick="shareCardCopy()">📋 Copy</button>
       <button class="btn" onclick="g('share-modal').classList.remove('on')">Close</button>
     </div>
+  </div>
+</div>
+
+<div id="random-modal" class="modal" onclick="if(event.target===this)this.classList.remove('on')">
+  <div class="mbox" style="max-width:600px">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+      <span style="font-size:16px;font-weight:600;color:#e6edf3">🎲 Random Memory</span>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="showRandom()" style="font-size:12px">🎲 Another</button>
+        <button class="btn" onclick="g('random-modal').classList.remove('on')">Close</button>
+      </div>
+    </div>
+    <div id="random-body"><p class="empty">Loading…</p></div>
   </div>
 </div>
 
@@ -2638,6 +2659,29 @@ async function applyTemplate(type) {
   if (tpl.tags.length && !g('nm-tg').value) g('nm-tg').value = tpl.tags.join(', ');
   renderTplChips(type);
 }
+async function showRandom() {
+  g('random-modal').classList.add('on');
+  g('random-body').innerHTML = '<p class="empty">Loading…</p>';
+  const m = await api('/api/memories/random');
+  if (m.error) { g('random-body').innerHTML = \`<p class="empty">\${esc(m.error)}</p>\`; return; }
+  const tags = (m.tags||[]).map(t=>\`<span style="background:#1f4b8e55;border:1px solid #58a6ff55;border-radius:12px;padding:2px 8px;font-size:11px;color:#79c0ff">#\${esc(t)}</span>\`).join(' ');
+  g('random-body').innerHTML = \`
+    <div style="margin-bottom:8px">
+      <span style="font-size:16px;font-weight:600;color:#e6edf3">\${esc(m.title)}</span>
+      \${m.memory_type ? \`<span style="margin-left:8px;font-size:11px;color:#8b949e;background:#21262d;border:1px solid #30363d;border-radius:4px;padding:1px 6px">\${esc(m.memory_type)}</span>\` : ''}
+    </div>
+    \${tags ? \`<div style="margin-bottom:10px;display:flex;gap:4px;flex-wrap:wrap">\${tags}</div>\` : ''}
+    <div style="font-size:13px;color:#c9d1d9;white-space:pre-wrap;line-height:1.6;max-height:300px;overflow-y:auto;border:1px solid #21262d;border-radius:6px;padding:10px;background:#0d1117">\${esc(m.content)}</div>
+    <div style="margin-top:10px;display:flex;gap:12px;font-size:11px;color:#8b949e">
+      \${m.confidence!=null?\`<span>Confidence: \${Math.round(m.confidence*100)}%</span>\`:''}
+      \${m.importance!=null?\`<span>Importance: \${m.importance}/10</span>\`:''}
+      \${m.domain?\`<span>Domain: \${esc(m.domain)}</span>\`:''}
+      <span>Created: \${new Date(m.created_at).toLocaleDateString()}</span>
+    </div>
+    <div style="margin-top:12px"><button class="btn" onclick="g('random-modal').classList.remove('on');editMemory('\${esc(m.id)}')" style="font-size:12px">✎ Edit</button></div>
+  \`;
+}
+
 function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-cf').value='0.5'; g('nm-tg').value=''; g('nm-nt').value=''; g('nm-ex').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); _loadTemplates().then(()=>renderTplChips('semantic')); }
 async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-cf').value=d.confidence!=null?d.confidence:0.5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-nt').value=d.note||''; g('nm-ex').value=d.expires_at?new Date(d.expires_at).toISOString().slice(0,10):''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
 function closeAdd() { g('add-modal').classList.remove('on'); g('nm-dup').style.display='none'; }
