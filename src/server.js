@@ -610,6 +610,26 @@ function handleWordFreq(req, res, q) {
   json(res, sorted.map(([word, count]) => ({ word, count })));
 }
 
+function handleTagCooccurrence(req, res, q) {
+  const limit = Math.min(+(q.limit) || 20, 100);
+  const rows = getDb().prepare("SELECT tags FROM memories WHERE status='active' AND tags != '[]'").all();
+  const pairs = {};
+  for (const { tags } of rows) {
+    const t = JSON.parse(tags || '[]');
+    for (let i = 0; i < t.length; i++) {
+      for (let j = i + 1; j < t.length; j++) {
+        const key = [t[i], t[j]].sort().join('\x00');
+        pairs[key] = (pairs[key] || 0) + 1;
+      }
+    }
+  }
+  const sorted = Object.entries(pairs)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([key, count]) => { const [a, b] = key.split('\x00'); return { tags: [a, b], count }; });
+  json(res, sorted);
+}
+
 function handleGetTagDescriptions(req, res) {
   const rows = getDb().prepare('SELECT tag, description FROM tag_descriptions').all();
   const map = {};
@@ -832,6 +852,7 @@ const ROUTES = {
   'POST /api/bookmarks':     handleAddBookmark,
   'GET /api/tags/stats':     (req, res) => { const u = new URL(req.url,'http://l'); handleTagStats(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/tags/heatmap':        (req, res) => { const u = new URL(req.url,'http://l'); handleTagHeatmap(req, res, Object.fromEntries(u.searchParams)); },
+  'GET /api/tags/cooccurrence':   (req, res) => { const u = new URL(req.url,'http://l'); handleTagCooccurrence(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/tags/descriptions':   handleGetTagDescriptions,
   'PUT /api/tags/descriptions':   handleSetTagDescription,
   'POST /api/tags/rename':        handleTagRename,
@@ -1349,6 +1370,7 @@ input{width:360px}
     <h4 style="margin:0 0 8px;font-size:13px;color:#8b949e">Co-occurring tags</h4>
     <div id="tc-co-list"></div>
   </div>
+  <div id="tc-pairs" style="margin-top:20px"></div>
   <div id="tc-results" style="margin-top:20px;display:none">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
       <h4 id="tc-results-title" style="margin:0;font-size:13px;color:#8b949e"></h4>
@@ -3127,10 +3149,11 @@ async function loadKStats() {
 let _tcTimer = null;
 let _tcSelectedTag = null;
 async function loadTagCloud() {
-  const [d, descs] = await Promise.all([api('/api/tags/stats?limit=80'), api('/api/tags/descriptions')]);
+  const [d, descs, pairs] = await Promise.all([api('/api/tags/stats?limit=80'), api('/api/tags/descriptions'), api('/api/tags/cooccurrence?limit=15')]);
   const cloud = g('tc-cloud');
   const top = g('tc-top');
-  if (!d.top.length) { cloud.innerHTML='<p class="empty">No tags yet — add tags when creating memories.</p>'; top.innerHTML=''; return; }
+  const pairsEl = g('tc-pairs');
+  if (!d.top.length) { cloud.innerHTML='<p class="empty">No tags yet — add tags when creating memories.</p>'; top.innerHTML=''; if(pairsEl)pairsEl.innerHTML=''; return; }
   const max = d.top[0].count;
   const minPx = 12, maxPx = 32;
   const colors = ['#79c0ff','#3fb950','#d2a8ff','#ffa657','#f85149','#58a6ff'];
@@ -3145,6 +3168,12 @@ async function loadTagCloud() {
     return \`<span id="tc-tag-\${esc(t.tag.replace(/[^a-z0-9]/gi,'_'))}" style="\${style}" onclick="selectTag('\${esc(t.tag)}')" title="\${esc(tooltip)}">#\${esc(t.tag)} <sup style="font-size:10px;opacity:.7">\${t.count}</sup>\${editBtn}</span>\`;
   }).join('');
   top.innerHTML = \`<table style="font-size:12px;border-collapse:collapse;width:100%;max-width:500px">\${d.top.slice(0,15).map((t,i)=>{const desc=descs[t.tag]||'';return\`<tr><td style="padding:3px 8px;color:#8b949e">\${i+1}</td><td style="padding:3px 8px"><span style="cursor:pointer;color:#79c0ff" onclick="selectTag('\${esc(t.tag)}')">#\${esc(t.tag)}</span></td><td style="padding:3px 8px;color:#8b949e">\${t.count}</td><td style="padding:3px 8px;color:#8b949e;font-style:italic">\${esc(desc)}</td></tr>\`;}).join('')}</table>\`;
+  if (pairsEl) {
+    if (!pairs.length) { pairsEl.innerHTML=''; }
+    else {
+      pairsEl.innerHTML = \`<h4 style="margin:0 0 8px;font-size:13px;color:#8b949e">Top tag pairs</h4><table style="font-size:12px;border-collapse:collapse;width:100%;max-width:400px">\${pairs.map((p,i)=>\`<tr><td style="padding:3px 8px;color:#8b949e">\${i+1}</td><td style="padding:3px 8px"><span style="color:#79c0ff">#\${esc(p.tags[0])}</span> <span style="color:#484f58">+</span> <span style="color:#3fb950">#\${esc(p.tags[1])}</span></td><td style="padding:3px 8px;color:#8b949e">\${p.count}</td></tr>\`).join('')}</table>\`;
+    }
+  }
 }
 async function setTagDesc(tag) {
   const cur = (await api('/api/tags/descriptions'))[tag] || '';
