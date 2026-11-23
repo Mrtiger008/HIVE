@@ -506,6 +506,7 @@ async function handleBulk(req, res) {
       }
       else if (action === 'mark-read')   { memory.update(id, { read_at: Date.now() }); count++; }
       else if (action === 'mark-unread') { memory.update(id, { read_at: null }); count++; }
+      else if (action === 'delete')      { memory.update(id, { status: 'archived' }); count++; }
     } catch {}
   }
   json(res, { count });
@@ -1229,6 +1230,7 @@ input{width:360px}
     <button class="btn" onclick="bulkMarkUnread()" title="Mark selected as unread">○ unread</button>
     <button class="btn" id="bulk-merge-btn" onclick="showMerge()" style="display:none" title="Merge two selected memories">⟳ Merge</button>
     <button class="btn" onclick="exportSelectionCsv()" title="Export selected as CSV">⬇ CSV</button>
+    <button class="btn" onclick="bulkDelete()" title="Delete selected memories" style="color:#f85149;border-color:#f8514966">🗑 Delete</button>
     <button class="arch" onclick="clearSelection()" style="margin-left:auto">✕ clear</button>
   </div>
   <div id="ml"></div>
@@ -1842,6 +1844,12 @@ async function bulkMarkRead() {
 async function bulkMarkUnread() {
   if (!_sel.size) return;
   await fetch('/api/memories/bulk',{method:'POST',headers:{'Content-Type':'application/json','X-Hive-Local':'1'},body:JSON.stringify({ids:[..._sel],action:'mark-unread'})});
+  _sel.clear(); loadMem(); g('bulk-bar').style.display='none';
+}
+async function bulkDelete() {
+  if (!_sel.size) return;
+  if (!confirm(\`Delete \${_sel.size} memor\${_sel.size===1?'y':'ies'}? This archives them.\`)) return;
+  await fetch('/api/memories/bulk',{method:'POST',headers:{'Content-Type':'application/json','X-Hive-Local':'1'},body:JSON.stringify({ids:[..._sel],action:'delete'})});
   _sel.clear(); loadMem(); g('bulk-bar').style.display='none';
 }
 async function bulkRetype() {
