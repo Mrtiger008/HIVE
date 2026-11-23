@@ -103,7 +103,7 @@ function update(id, updates) {
 
   const ALLOWED = ['title', 'content', 'memory_type', 'domain', 'project_id', 'confidence',
                    'trust_level', 'status', 'importance', 'tags', 'valid_until', 'superseded_by',
-                   'retrieval_keywords', 'user_confirmed', 'pinned', 'label', 'note', 'expires_at', 'starred', 'read_at'];
+                   'retrieval_keywords', 'user_confirmed', 'pinned', 'label', 'note', 'expires_at', 'starred', 'read_at', 'needs_review'];
   const setClauses = [], values = [];
   for (const [k, v] of Object.entries(updates)) {
     if (!ALLOWED.includes(k)) continue;
@@ -139,7 +139,7 @@ const SORT_MAP = {
   starred:    'starred DESC, pinned DESC, updated_at DESC',
 };
 
-function list({ type, domain, project_id, trust_level, status = 'active', limit = 20, offset = 0, min_conf, max_conf, min_importance, created_after, created_before, sort } = {}) {
+function list({ type, domain, project_id, trust_level, status = 'active', limit = 20, offset = 0, min_conf, max_conf, min_importance, created_after, created_before, sort, flagged } = {}) {
   let sql = 'SELECT * FROM memories WHERE 1=1';
   const params = [];
   if (type)           { sql += ' AND memory_type = ?';   params.push(type); }
@@ -152,6 +152,7 @@ function list({ type, domain, project_id, trust_level, status = 'active', limit 
   if (min_importance != null)  { sql += ' AND importance >= ?';  params.push(min_importance); }
   if (created_after != null)   { sql += ' AND created_at >= ?';  params.push(created_after); }
   if (created_before != null)  { sql += ' AND created_at < ?';   params.push(created_before); }
+  if (flagged)                 { sql += ' AND needs_review = 1'; }
   const order = SORT_MAP[sort] || SORT_MAP.updated;
   sql += ` ORDER BY ${order} LIMIT ? OFFSET ?`;
   params.push(limit, offset);

@@ -275,6 +275,11 @@ function _initSchema(db) {
     try { db.exec('ALTER TABLE memories ADD COLUMN read_at INTEGER'); } catch {}
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (16, ?)').run(Date.now());
   }
+  // v17: needs_review — 0 = normal, 1 = flagged for review
+  if (sv < 17) {
+    try { db.exec('ALTER TABLE memories ADD COLUMN needs_review INTEGER NOT NULL DEFAULT 0'); } catch {}
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (17, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {

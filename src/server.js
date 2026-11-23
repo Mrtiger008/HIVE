@@ -209,7 +209,7 @@ function _ageToMs(age) {
 function handleMemories(req, res, q) {
   const pageSize = q.limit ? +(q.limit) : MEM_PAGE;
   const offset   = q.offset ? +(q.offset) : 0;
-  const needsPostFilter = q.tag || q.pinned || q.starred || q.label || q.min_words || q.max_words || q.read_time || q.expires || q.unread || q.notag || q.stale;
+  const needsPostFilter = q.tag || q.pinned || q.starred || q.label || q.min_words || q.max_words || q.read_time || q.expires || q.unread || q.notag || q.stale || q.flagged;
   let results = memory.list({
     type:           q.type           || undefined,
     trust_level:    q.trust          || undefined,
@@ -224,6 +224,7 @@ function handleMemories(req, res, q) {
     min_importance: q.min_importance != null ? +q.min_importance : undefined,
     created_after:  q.age ? _ageToMs(q.age).after  : undefined,
     created_before: q.age ? _ageToMs(q.age).before : undefined,
+    flagged:        q.flagged ? true : undefined,
   });
   if (q.tag)    results = results.filter(m => (m.tags || []).includes(q.tag));
   if (q.pinned)  results = results.filter(m => m.pinned  === 1 || m.pinned  === true);
@@ -1114,6 +1115,14 @@ function createServer() {
       if (mdex && req.method === 'GET') {
         handler = (req, res) => handleMarkdownExport(req, res, mdex[1]);
       }
+      const flg = pathname.match(/^\/api\/memories\/([^/]+)\/flag$/);
+      if (flg && req.method === 'POST') {
+        handler = (req, res) => {
+          const m = memory.get(flg[1]);
+          if (!m) { json(res, { error: 'not found' }, 404); return; }
+          json(res, memory.update(flg[1], { needs_review: m.needs_review ? 0 : 1 }));
+        };
+      }
       const lk = pathname.match(/^\/api\/memories\/([^/]+)\/links$/);
       if (lk) {
         if (req.method === 'GET')  handler = (req, res) => handleListLinks(req, res, lk[1]);
@@ -1298,6 +1307,7 @@ input{width:360px}
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="munread" onchange="loadMem()"> Unread only</label>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mnotag" onchange="loadMem()"> No tags</label>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#f85149;white-space:nowrap"><input type="checkbox" id="marchived" onchange="loadMem()"> Archived</label>
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#f85149;white-space:nowrap"><input type="checkbox" id="mflagged" onchange="loadMem()"> 🚩 Flagged</label>
     <select id="mlabel" onchange="loadMem()"><option value="">All labels</option><option value="red">🔴 Red</option><option value="yellow">🟡 Yellow</option><option value="green">🟢 Green</option><option value="blue">🔵 Blue</option><option value="purple">🟣 Purple</option><option value="orange">🟠 Orange</option><option value="teal">🩵 Teal</option><option value="pink">🩷 Pink</option></select>
     <button class="btn" onclick="exportFilteredCsv()" title="Export current filter as CSV" style="font-size:12px">⬇ CSV</button>
     <button class="btn" id="arch-all-btn" onclick="archiveAllFiltered()" title="Archive ALL memories matching the current filter" style="font-size:12px;color:#f85149;border-color:#f8514966">⚠ archive all</button>
@@ -1751,6 +1761,9 @@ function card(m) {
   const readBtn = m.read_at
     ? \`<button class="arch" style="color:#3fb950" onclick="toggleRead('\${m.id}',0)" title="Mark as unread">✓ read</button>\`
     : \`<button class="arch" onclick="toggleRead('\${m.id}',1)" title="Mark as read">○ read</button>\`;
+  const flagBtn = m.needs_review
+    ? \`<button class="arch" style="color:#f85149" onclick="flagMem('\${m.id}',this)" title="Remove review flag">🚩 flagged</button>\`
+    : \`<button class="arch" onclick="flagMem('\${m.id}',this)" title="Flag for review">🚩 flag</button>\`;
   const words = (m.content||'').trim().split(/\s+/).filter(Boolean).length;
   const rt = Math.max(1, Math.ceil(words / 200));
   const ageStr = age(m.created_at);
@@ -1758,7 +1771,7 @@ function card(m) {
   const labelDot = m.label ? \`<span style="color:\${LCOL[m.label]};font-size:14px;margin-right:4px" title="Label: \${m.label}">●</span>\` : '';
   const expiredBadge = m.expires_at && m.expires_at < Date.now() ? \`<span class="b" style="color:#f85149;border-color:#f85149" title="Expired \${new Date(m.expires_at).toLocaleDateString()}">⏰ expired</span>\` : (m.expires_at ? \`<span class="b" style="color:#d29922;border-color:#d29922" title="Expires \${new Date(m.expires_at).toLocaleDateString()}">⏳ exp \${new Date(m.expires_at).toLocaleDateString()}</span>\` : '');
   return \`<div class="card" data-id="\${m.id}" style="\${pinStyle}">
-    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" id="cl-\${m.id}" onclick="copyLink('\${m.id}')" title="Copy link to this memory">🔗 copy</button><button class="arch" onclick="copyAsMarkdown('\${m.id}',this)" title="Copy as Markdown">📋 MD</button><button class="arch" onclick="shareCard('\${m.id}')" title="Share this memory as a text card">📤 share</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="duplicateMem('\${m.id}')" title="Duplicate">⧉ dupe</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}\${starBtn}\${readBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button><select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:3px" title="Apply template" onchange="applyTemplate('\${m.id}',this.value);this.value=''"><option value="">⊞ tpl</option><option value="core">core</option><option value="skill">skill</option><option value="domain">domain</option><option value="project">project</option><option value="episodic">episodic</option><option value="semantic">semantic</option></select>\${labelSel}</div>
+    <div class="ct"><input type="checkbox" style="margin-right:8px;cursor:pointer" onchange="toggleSel('\${m.id}',this.checked)"><span class="ct-title" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(m.title)}</span><button class="arch" onclick="archiveMem('\${m.id}',this)" title="Archive">× archive</button><button class="arch" id="cl-\${m.id}" onclick="copyLink('\${m.id}')" title="Copy link to this memory">🔗 copy</button><button class="arch" onclick="copyAsMarkdown('\${m.id}',this)" title="Copy as Markdown">📋 MD</button><button class="arch" onclick="shareCard('\${m.id}')" title="Share this memory as a text card">📤 share</button><button class="arch" onclick="showEdit('\${m.id}')" title="Edit">✎ edit</button><button class="arch" onclick="duplicateMem('\${m.id}')" title="Duplicate">⧉ dupe</button><button class="arch" onclick="showHistory('\${m.id}')" title="History">⏱ history</button><button class="arch" onclick="showLinks('\${m.id}')" title="Links">⇄ links</button>\${pinBtn}\${starBtn}\${readBtn}\${flagBtn}<button class="arch" onclick="toggleRelated('\${m.id}')" title="Show related memories">~ related</button><select class="arch" style="font-size:11px;padding:0 2px;cursor:pointer;background:#21262d;color:#8b949e;border:1px solid #30363d;border-radius:3px" title="Apply template" onchange="applyTemplate('\${m.id}',this.value);this.value=''"><option value="">⊞ tpl</option><option value="core">core</option><option value="skill">skill</option><option value="domain">domain</option><option value="project">project</option><option value="episodic">episodic</option><option value="semantic">semantic</option></select>\${labelSel}</div>
     <div class="cm">\${labelDot}\${confBar(m.confidence)}<span class="b bt">\${m.memory_type}</span><span class="b br">\${m.trust_level}</span><span class="b bi">i=\${m.importance}</span><span class="b" style="color:#8b949e" title="\${words} words">\${words}w \${rt}m</span><span class="b" style="color:#8b949e" title="Created \${new Date(m.created_at).toLocaleDateString()}">\${ageStr}</span>\${expiredBadge}\${tags}</div>
     <div class="cc" ondblclick="inlineEdit('\${m.id}')" title="Double-click to edit inline" style="cursor:text">\${esc(preview)}\${m.content.length>280?'…':''}</div>
     \${m.note ? \`<div style="margin-top:6px;padding:5px 8px;background:#1c2128;border-left:2px solid #d29922;border-radius:0 4px 4px 0;font-size:12px;color:#c9a227;cursor:pointer" title="Click to edit note" onclick="editNote('\${m.id}',this)">\${esc(m.note)}</div>\` : \`<div style="margin-top:4px"><button class="arch" style="font-size:11px;color:#484f58" onclick="editNote('\${m.id}',this.parentElement)" title="Add a sticky note">📝 add note</button></div>\`}
@@ -2006,6 +2019,7 @@ function _memUrl(offset) {
   const agev=g('mage').value; if (agev) u += '&age='+agev;
   const stalev=g('mstale').value; if (stalev) u += '&stale='+stalev;
   if (g('marchived') && g('marchived').checked) u += '&status=archived';
+  if (g('mflagged') && g('mflagged').checked)   u += '&flagged=1';
   return u;
 }
 
@@ -2041,6 +2055,7 @@ async function loadMem() {
   const agec=g('mage').value; if (agec) chips.push(['age:'+agec,'mage']);
   const stalec=g('mstale').value; if (stalec) chips.push(['stale>'+stalec,'mstale']);
   if (g('marchived') && g('marchived').checked) chips.push(['archived','marchived']);
+  if (g('mflagged') && g('mflagged').checked)   chips.push(['🚩 flagged','mflagged']);
   const bar = g('mem-chips');
   if (chips.length) {
     bar.style.display='flex';
@@ -2091,6 +2106,7 @@ function clearAllMemFilters() {
   const mu=g('munread'); if(mu) mu.checked=false;
   const mn=g('mnotag');  if(mn) mn.checked=false;
   const ma=g('marchived'); if(ma) ma.checked=false;
+  const mf=g('mflagged');  if(mf) mf.checked=false;
   loadMem();
 }
 function exportFilteredCsv() {
@@ -2876,6 +2892,10 @@ async function copyAsMarkdown(id, btn) {
   const md = await r.text();
   try { await navigator.clipboard.writeText(md); if (btn) btn.textContent = '✓ copied'; }
   catch { if (btn) btn.textContent = '✗ failed'; }
+}
+async function flagMem(id, btn) {
+  const r = await fetch(\`/api/memories/\${id}/flag\`,{method:'POST',headers:{'X-Hive-Local':'1'}});
+  if (r.ok) { const m = await r.json(); btn.textContent = m.needs_review ? '🚩 flagged' : '🚩 flag'; btn.style.color = m.needs_review ? '#f85149' : ''; }
 }
 async function restoreMemory(id, btn) {
   if (btn) btn.textContent = '…';
