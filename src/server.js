@@ -57,6 +57,8 @@ function handleStats(req, res) {
     entities: db.prepare("SELECT COUNT(*) as n FROM entities").get().n,
     projects: db.prepare("SELECT COUNT(*) as n FROM projects WHERE status='active'").get().n,
     pinned:   db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active' AND pinned=1").get().n,
+    starred:  db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active' AND starred=1").get().n,
+    unread:   db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active' AND read_at IS NULL").get().n,
   });
 }
 
@@ -1119,6 +1121,7 @@ input{width:360px}
     <button class="btn" id="arch-all-btn" onclick="archiveAllFiltered()" title="Archive ALL memories matching the current filter" style="font-size:12px;color:#f85149;border-color:#f8514966">⚠ archive all</button>
     <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
   </div>
+  <div id="mem-qstats" style="padding:6px 0 2px;font-size:12px;color:#8b949e;display:flex;gap:14px;flex-wrap:wrap"></div>
   <div id="mem-chips" style="display:none;padding:4px 0 8px;display:none;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px"></div>
   <div id="bulk-bar" style="display:none;padding:8px 0;display:none;gap:10px;align-items:center;border-bottom:1px solid #30363d;margin-bottom:8px">
     <span id="bulk-count" style="color:#8b949e;font-size:13px"></span>
@@ -2517,7 +2520,7 @@ async function loadGraph() {
   gStop=()=>cancelAnimationFrame(raf);
 }
 
-function refreshStats() { api('/api/stats').then(d => { g('stats').textContent = \`\${d.memories} memories · \${d.entities} entities · \${d.projects} projects\`; const b=g('pinned-badge'); if(d.pinned>0){b.textContent=d.pinned;b.style.display='inline';}else{b.style.display='none';} }); }
+function refreshStats() { api('/api/stats').then(d => { g('stats').textContent = \`\${d.memories} memories · \${d.entities} entities · \${d.projects} projects\`; const b=g('pinned-badge'); if(d.pinned>0){b.textContent=d.pinned;b.style.display='inline';}else{b.style.display='none';} const qs=g('mem-qstats'); if(qs){ const chip=(icon,val,label,onclick)=>\`<span style="cursor:\${onclick?'pointer':'default'}" \${onclick?'onclick="'+onclick+'"':''} title="\${label}">\${icon} \${val}</span>\`; qs.innerHTML=[chip('📚',d.memories,'Total active memories',''),chip('📌',d.pinned,'Pinned — click to filter','g(\\'mpinned\\').checked=true;loadMem()'),chip('★',d.starred,'Starred — click to filter','g(\\'mstarred\\').checked=true;loadMem()'),chip('○',d.unread,'Unread — click to filter','g(\\'munread\\').checked=true;loadMem()')].join(''); } }); }
 let _editId = null;
 let _tplCache = null;
 async function _loadTemplates() {
