@@ -496,6 +496,8 @@ async function handleBulk(req, res) {
         const m = memory.get(id);
         if (m) { const rm = new Set(updates.tags); memory.update(id, { tags: (m.tags || []).filter(t => !rm.has(t)) }); count++; }
       }
+      else if (action === 'mark-read')   { memory.update(id, { read_at: Date.now() }); count++; }
+      else if (action === 'mark-unread') { memory.update(id, { read_at: null }); count++; }
     } catch {}
   }
   json(res, { count });
@@ -1111,6 +1113,9 @@ input{width:360px}
     <span style="color:#30363d;margin:0 4px">|</span>
     <select id="bulk-label" style="background:#161b22;color:#c9d1d9;border:1px solid #30363d;border-radius:6px;padding:4px 8px"><option value="">Label…</option><option value="red">🔴 Red</option><option value="yellow">🟡 Yellow</option><option value="green">🟢 Green</option><option value="blue">🔵 Blue</option><option value="purple">🟣 Purple</option><option value="orange">🟠 Orange</option><option value="teal">🩵 Teal</option><option value="pink">🩷 Pink</option><option value="__clear__">— Remove label</option></select>
     <button class="btn" onclick="bulkLabel()" title="Apply label to selected">Apply label</button>
+    <span style="color:#30363d;margin:0 4px">|</span>
+    <button class="btn" onclick="bulkMarkRead()" title="Mark selected as read">✓ read</button>
+    <button class="btn" onclick="bulkMarkUnread()" title="Mark selected as unread">○ unread</button>
     <button class="btn" id="bulk-merge-btn" onclick="showMerge()" style="display:none" title="Merge two selected memories">⟳ Merge</button>
     <button class="btn" onclick="exportSelectionCsv()" title="Export selected as CSV">⬇ CSV</button>
     <button class="arch" onclick="clearSelection()" style="margin-left:auto">✕ clear</button>
@@ -1692,6 +1697,16 @@ async function bulkArchive() {
   const d = await r.json();
   _sel.clear(); loadMem(); refreshStats();
   g('bulk-bar').style.display='none';
+}
+async function bulkMarkRead() {
+  if (!_sel.size) return;
+  await fetch('/api/memories/bulk',{method:'POST',headers:{'Content-Type':'application/json','X-Hive-Local':'1'},body:JSON.stringify({ids:[..._sel],action:'mark-read'})});
+  _sel.clear(); loadMem(); g('bulk-bar').style.display='none';
+}
+async function bulkMarkUnread() {
+  if (!_sel.size) return;
+  await fetch('/api/memories/bulk',{method:'POST',headers:{'Content-Type':'application/json','X-Hive-Local':'1'},body:JSON.stringify({ids:[..._sel],action:'mark-unread'})});
+  _sel.clear(); loadMem(); g('bulk-bar').style.display='none';
 }
 async function bulkRetype() {
   const ty = g('bulk-type').value;
