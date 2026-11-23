@@ -270,6 +270,11 @@ function _initSchema(db) {
     )`);
     db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (15, ?)').run(Date.now());
   }
+  // v16: read_at — null = unread, timestamp = when marked read
+  if (sv < 16) {
+    try { db.exec('ALTER TABLE memories ADD COLUMN read_at INTEGER'); } catch {}
+    db.prepare('INSERT INTO schema_version (version, applied_at) VALUES (16, ?)').run(Date.now());
+  }
 }
 
 function closeDb() {
