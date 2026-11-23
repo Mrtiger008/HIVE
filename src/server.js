@@ -651,6 +651,20 @@ function handleImpDist(req, res) {
   json(res, result);
 }
 
+function handleDomainBreakdown(req, res) {
+  const rows = getDb().prepare(`
+    SELECT domain,
+           COUNT(*) as count,
+           ROUND(AVG(confidence), 3)  as avg_conf,
+           ROUND(AVG(importance), 2)  as avg_importance
+    FROM memories
+    WHERE status='active' AND domain IS NOT NULL AND domain != ''
+    GROUP BY domain
+    ORDER BY count DESC
+  `).all();
+  json(res, rows);
+}
+
 function handleTagCooccurrence(req, res, q) {
   const limit = Math.min(+(q.limit) || 20, 100);
   const rows = getDb().prepare("SELECT tags FROM memories WHERE status='active' AND tags != '[]'").all();
@@ -792,7 +806,8 @@ const ROUTES = {
   'GET /api/templates':      (req, res) => json(res, templates.list()),
   'GET /api/stats/full':     (req, res) => json(res, kstats.full()),
   'GET /api/stats/confidence-dist':  (req, res) => handleConfDist(req, res),
-  'GET /api/stats/importance-dist':  (req, res) => handleImpDist(req, res),
+  'GET /api/stats/importance-dist':    (req, res) => handleImpDist(req, res),
+  'GET /api/stats/domain-breakdown':  (req, res) => handleDomainBreakdown(req, res),
   'GET /api/stats/wordfreq': (req, res) => { const u = new URL(req.url,'http://l'); handleWordFreq(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/digest':         (req, res) => {
     const u = new URL(req.url, 'http://localhost');
@@ -3237,7 +3252,7 @@ async function loadDigest(period) {
   g('dg-body').innerHTML = html;
 }
 async function loadKStats() {
-  const [d, wf, cd, id2] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist')]);
+  const [d, wf, cd, id2, db2] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown')]);
   const bar = (count, max, col) => {
     const w = max ? Math.round((count/max)*180) : 0;
     return \`<span style="display:inline-block;height:12px;width:\${w}px;background:\${col};border-radius:2px;vertical-align:middle;margin-right:6px"></span>\`;
@@ -3312,7 +3327,24 @@ async function loadKStats() {
           }).join('');
         })()}
       </div>
-    </div>\`;
+    </div>
+    \${db2.length ? \`<div id="ks-domain-breakdown" style="margin-top:20px">
+      <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Domain breakdown</h4>
+      <table style="border-collapse:collapse;font-size:12px;width:100%;max-width:480px">
+        <thead><tr>
+          <th style="text-align:left;color:#8b949e;padding:3px 10px 3px 0;border-bottom:1px solid #21262d">Domain</th>
+          <th style="text-align:right;color:#8b949e;padding:3px 10px;border-bottom:1px solid #21262d">Memories</th>
+          <th style="text-align:right;color:#8b949e;padding:3px 10px;border-bottom:1px solid #21262d">Avg conf</th>
+          <th style="text-align:right;color:#8b949e;padding:3px 0;border-bottom:1px solid #21262d">Avg imp</th>
+        </tr></thead>
+        <tbody>\${db2.map(r => \`<tr>
+          <td style="color:#c9d1d9;padding:3px 10px 3px 0">\${esc(r.domain)}</td>
+          <td style="color:#79c0ff;text-align:right;padding:3px 10px">\${r.count}</td>
+          <td style="color:#ffa657;text-align:right;padding:3px 10px">\${r.avg_conf != null ? Math.round(r.avg_conf*100)+'%' : '—'}</td>
+          <td style="color:#3fb950;text-align:right;padding:3px 0">\${r.avg_importance != null ? r.avg_importance : '—'}</td>
+        </tr>\`).join('')}</tbody>
+      </table>
+    </div>\` : ''}\`;
   g('ks-body').innerHTML = html;
   // Draw sparkline
   const cv = document.getElementById(sparkId);
