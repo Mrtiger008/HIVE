@@ -683,6 +683,17 @@ function handleImpDist(req, res) {
   json(res, result);
 }
 
+function handleHourDist(req, res) {
+  const rows = getDb().prepare(`
+    SELECT CAST(strftime('%H', datetime(created_at/1000,'unixepoch','localtime')) AS INTEGER) as hour,
+           COUNT(*) as count
+    FROM memories WHERE status='active'
+    GROUP BY hour ORDER BY hour
+  `).all();
+  const map = Object.fromEntries(rows.map(r => [r.hour, r.count]));
+  json(res, Array.from({length:24}, (_, i) => ({ hour: i, count: map[i] || 0 })));
+}
+
 function handleWeekdayDist(req, res) {
   const rows = getDb().prepare(`
     SELECT CAST(strftime('%w', datetime(created_at/1000,'unixepoch')) AS INTEGER) as dow,
@@ -866,6 +877,7 @@ const ROUTES = {
   'GET /api/stats/domain-breakdown':  (req, res) => handleDomainBreakdown(req, res),
   'GET /api/stats/label-dist':        (req, res) => handleLabelDist(req, res),
   'GET /api/stats/weekday-dist':      (req, res) => handleWeekdayDist(req, res),
+  'GET /api/stats/hour-dist':         (req, res) => handleHourDist(req, res),
   'GET /api/stats/wordfreq': (req, res) => { const u = new URL(req.url,'http://l'); handleWordFreq(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/digest':         (req, res) => {
     const u = new URL(req.url, 'http://localhost');
@@ -3346,7 +3358,7 @@ async function loadDigest(period) {
   g('dg-body').innerHTML = html;
 }
 async function loadKStats() {
-  const [d, wf, cd, id2, db2, ld, wd] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown'), api('/api/stats/label-dist'), api('/api/stats/weekday-dist')]);
+  const [d, wf, cd, id2, db2, ld, wd, hd] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown'), api('/api/stats/label-dist'), api('/api/stats/weekday-dist'), api('/api/stats/hour-dist')]);
   const bar = (count, max, col) => {
     const w = max ? Math.round((count/max)*180) : 0;
     return \`<span style="display:inline-block;height:12px;width:\${w}px;background:\${col};border-radius:2px;vertical-align:middle;margin-right:6px"></span>\`;
@@ -3461,6 +3473,20 @@ async function loadKStats() {
             <span style="font-size:10px;color:#8b949e">\${r.count||''}</span>
             <span style="width:26px;height:\${h}px;background:#58a6ff;border-radius:3px 3px 0 0;opacity:\${r.count?'.85':'.2'};display:block" title="\${esc(r.label)}: \${r.count}"></span>
             <span style="font-size:10px;color:#8b949e">\${esc(r.label)}</span>
+          </div>\`;
+        }).join('');
+      })()}</div>
+    </div>\` : ''}
+    \${hd && hd.length ? \`<div id="ks-hour-dist" style="margin-top:20px">
+      <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Activity by hour</h4>
+      <div style="display:flex;gap:2px;align-items:flex-end">\${(() => {
+        const maxH = Math.max(...hd.map(r => r.count), 1);
+        return hd.map(r => {
+          const op = r.count ? (0.2 + 0.8 * (r.count / maxH)).toFixed(2) : '0.08';
+          const label = r.hour.toString().padStart(2,'0') + ':00';
+          return \`<div style="display:flex;flex-direction:column;align-items:center" title="\${label}: \${r.count}">
+            <span style="width:14px;height:28px;background:#3fb950;border-radius:2px;opacity:\${op}"></span>
+            \${r.hour % 6 === 0 ? \`<span style="font-size:9px;color:#8b949e;margin-top:2px">\${r.hour}h</span>\` : '<span style="font-size:9px;margin-top:2px"> </span>'}
           </div>\`;
         }).join('');
       })()}</div>
