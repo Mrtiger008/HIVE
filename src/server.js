@@ -575,6 +575,20 @@ function handleTagHeatmap(req, res, q) {
   json(res, rows);
 }
 
+function handleWordFreq(req, res, q) {
+  const limit = Math.min(+(q.limit) || 60, 200);
+  const rows = getDb().prepare("SELECT content FROM memories WHERE status='active'").all();
+  const STOP = new Set(['the','a','an','and','or','but','in','on','at','to','for','of','with','is','was','are','it','this','that','be','as','by','from','not','have','has','had','i','you','we','they','he','she','its','my','your','our','their','been','will','can','do','did','so','if','its','are','than','then','into','about','which','when','where','how','what','who','also','just','more','some','all','no','up','out','one','two','get','use','used','using','new']);
+  const freq = {};
+  for (const { content } of rows) {
+    for (const w of (content || '').toLowerCase().match(/[a-z]{3,}/g) || []) {
+      if (!STOP.has(w)) freq[w] = (freq[w] || 0) + 1;
+    }
+  }
+  const sorted = Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, limit);
+  json(res, sorted.map(([word, count]) => ({ word, count })));
+}
+
 function handleGetTagDescriptions(req, res) {
   const rows = getDb().prepare('SELECT tag, description FROM tag_descriptions').all();
   const map = {};
@@ -694,6 +708,7 @@ const ROUTES = {
   'POST /api/apikeys':       handleCreateKey,
   'GET /api/templates':      (req, res) => json(res, templates.list()),
   'GET /api/stats/full':     (req, res) => json(res, kstats.full()),
+  'GET /api/stats/wordfreq': (req, res) => { const u = new URL(req.url,'http://l'); handleWordFreq(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/digest':         (req, res) => {
     const u = new URL(req.url, 'http://localhost');
     const period = u.searchParams.get('period') || 'daily';
@@ -2990,7 +3005,7 @@ async function loadDigest(period) {
   g('dg-body').innerHTML = html;
 }
 async function loadKStats() {
-  const d = await api('/api/stats/full');
+  const [d, wf] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60')]);
   const bar = (count, max, col) => {
     const w = max ? Math.round((count/max)*180) : 0;
     return \`<span style="display:inline-block;height:12px;width:\${w}px;background:\${col};border-radius:2px;vertical-align:middle;margin-right:6px"></span>\`;
@@ -3016,6 +3031,20 @@ async function loadKStats() {
     <div style="margin-bottom:20px">
       <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Growth — last 30 days</h4>
       <canvas id="\${sparkId}" width="600" height="60" style="max-width:100%;border:1px solid #21262d;border-radius:6px;background:#0d1117"></canvas>
+    </div>
+    <div style="margin-bottom:20px">
+      <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Top words</h4>
+      <div style="line-height:2.2">\${(() => {
+        if (!wf.length) return '<span style="color:#8b949e;font-size:12px">No content yet.</span>';
+        const maxW = wf[0].count;
+        const minPx = 11, maxPx = 28;
+        const cols = ['#79c0ff','#3fb950','#d2a8ff','#ffa657','#58a6ff','#39c5cf'];
+        return wf.map((w,i) => {
+          const sz = minPx + Math.round((w.count/maxW)*(maxPx-minPx));
+          const col = cols[i % cols.length];
+          return \`<span title="\${w.count} occurrence\${w.count===1?'':'s'}" style="display:inline-block;font-size:\${sz}px;color:\${col};margin:0 6px;opacity:.85;cursor:default">\${esc(w.word)}</span>\`;
+        }).join('');
+      })()}</div>
     </div>
     <div style="display:flex;gap:32px;flex-wrap:wrap">
       <div>\${section('By type',d.byType,'#58a6ff')}</div>
