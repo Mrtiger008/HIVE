@@ -683,6 +683,18 @@ function handleImpDist(req, res) {
   json(res, result);
 }
 
+function handleWeekdayDist(req, res) {
+  const rows = getDb().prepare(`
+    SELECT CAST(strftime('%w', datetime(created_at/1000,'unixepoch')) AS INTEGER) as dow,
+           COUNT(*) as count
+    FROM memories WHERE status='active'
+    GROUP BY dow ORDER BY dow
+  `).all();
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const map = Object.fromEntries(rows.map(r => [r.dow, r.count]));
+  json(res, DAYS.map((label, i) => ({ label, count: map[i] || 0 })));
+}
+
 function handleLabelDist(req, res) {
   const db = getDb();
   const LABELS = ['red','yellow','green','blue','purple','orange','teal','pink'];
@@ -853,6 +865,7 @@ const ROUTES = {
   'GET /api/stats/importance-dist':    (req, res) => handleImpDist(req, res),
   'GET /api/stats/domain-breakdown':  (req, res) => handleDomainBreakdown(req, res),
   'GET /api/stats/label-dist':        (req, res) => handleLabelDist(req, res),
+  'GET /api/stats/weekday-dist':      (req, res) => handleWeekdayDist(req, res),
   'GET /api/stats/wordfreq': (req, res) => { const u = new URL(req.url,'http://l'); handleWordFreq(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/digest':         (req, res) => {
     const u = new URL(req.url, 'http://localhost');
@@ -3333,7 +3346,7 @@ async function loadDigest(period) {
   g('dg-body').innerHTML = html;
 }
 async function loadKStats() {
-  const [d, wf, cd, id2, db2, ld] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown'), api('/api/stats/label-dist')]);
+  const [d, wf, cd, id2, db2, ld, wd] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown'), api('/api/stats/label-dist'), api('/api/stats/weekday-dist')]);
   const bar = (count, max, col) => {
     const w = max ? Math.round((count/max)*180) : 0;
     return \`<span style="display:inline-block;height:12px;width:\${w}px;background:\${col};border-radius:2px;vertical-align:middle;margin-right:6px"></span>\`;
@@ -3437,6 +3450,20 @@ async function loadKStats() {
           <span style="color:#8b949e">\${r.count}</span>
         </div>\`;
       }).join('')}</div>
+    </div>\` : ''}
+    \${wd && wd.length ? \`<div id="ks-weekday-dist" style="margin-top:20px">
+      <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Activity by weekday</h4>
+      <div style="display:flex;align-items:flex-end;gap:6px;height:52px">\${(() => {
+        const maxWd = Math.max(...wd.map(r => r.count), 1);
+        return wd.map(r => {
+          const h = Math.max(4, Math.round((r.count / maxWd) * 44));
+          return \`<div style="display:flex;flex-direction:column;align-items:center;gap:3px">
+            <span style="font-size:10px;color:#8b949e">\${r.count||''}</span>
+            <span style="width:26px;height:\${h}px;background:#58a6ff;border-radius:3px 3px 0 0;opacity:\${r.count?'.85':'.2'};display:block" title="\${esc(r.label)}: \${r.count}"></span>
+            <span style="font-size:10px;color:#8b949e">\${esc(r.label)}</span>
+          </div>\`;
+        }).join('');
+      })()}</div>
     </div>\` : ''}\`;
   g('ks-body').innerHTML = html;
   // Draw sparkline
