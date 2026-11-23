@@ -209,7 +209,7 @@ function _ageToMs(age) {
 function handleMemories(req, res, q) {
   const pageSize = q.limit ? +(q.limit) : MEM_PAGE;
   const offset   = q.offset ? +(q.offset) : 0;
-  const needsPostFilter = q.tag || q.pinned || q.starred || q.label || q.min_words || q.max_words || q.read_time || q.expires || q.unread || q.notag;
+  const needsPostFilter = q.tag || q.pinned || q.starred || q.label || q.min_words || q.max_words || q.read_time || q.expires || q.unread || q.notag || q.stale;
   let results = memory.list({
     type:           q.type           || undefined,
     trust_level:    q.trust          || undefined,
@@ -244,6 +244,11 @@ function handleMemories(req, res, q) {
   }
   if (q.unread) results = results.filter(m => !m.read_at);
   if (q.notag)  results = results.filter(m => !(m.tags && m.tags.length));
+  if (q.stale) {
+    const DAY = 86400000;
+    const staleDays = { '7d': 7, '30d': 30, '60d': 60, '90d': 90 }[q.stale];
+    if (staleDays) { const cutoff = Date.now() - staleDays * DAY; results = results.filter(m => m.updated_at < cutoff); }
+  }
   // For post-filter case apply client-side pagination
   if (needsPostFilter) results = results.slice(offset, offset + pageSize);
   json(res, results);
@@ -1191,6 +1196,7 @@ input{width:360px}
     <select id="mread" onchange="loadMem()" title="Reading time"><option value="">Any length</option><option value="quick">⚡ Quick (&lt;1 min)</option><option value="medium">📖 Medium (1-3 min)</option><option value="long">📚 Long (&gt;3 min)</option></select>
     <select id="mexp" onchange="loadMem()" title="Expiry filter"><option value="">Any expiry</option><option value="expired">⏰ Expired</option><option value="soon">⏳ Expiring soon (7d)</option><option value="any">📅 Has expiry</option></select>
     <select id="mage" onchange="loadMem()" title="Created age filter"><option value="">Any age</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="90d">Last 90 days</option><option value="old">Older than 90d</option></select>
+    <select id="mstale" onchange="loadMem()" title="Not updated in…"><option value="">Any freshness</option><option value="7d">Stale &gt;7d</option><option value="30d">Stale &gt;30d</option><option value="60d">Stale &gt;60d</option><option value="90d">Stale &gt;90d</option></select>
     <select id="msort" onchange="loadMem()" title="Sort order"><option value="updated">Sort: Updated</option><option value="created">Sort: Created</option><option value="importance">Sort: Importance</option><option value="confidence">Sort: Confidence</option><option value="label">Sort: Label</option><option value="starred">Sort: Starred</option></select>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only <span id="pinned-badge" style="display:none;background:#1f4b8e55;border:1px solid #58a6ff55;border-radius:10px;padding:0 6px;color:#58a6ff;font-size:11px;font-weight:600"></span></label>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#d29922;white-space:nowrap"><input type="checkbox" id="mstarred" onchange="loadMem()"> ★ Starred only</label>
@@ -1895,6 +1901,7 @@ function _memUrl(offset) {
   const rdt=g('mread').value; if (rdt) u += '&read_time='+rdt;
   const exp=g('mexp').value; if (exp) u += '&expires='+exp;
   const agev=g('mage').value; if (agev) u += '&age='+agev;
+  const stalev=g('mstale').value; if (stalev) u += '&stale='+stalev;
   return u;
 }
 
@@ -1928,6 +1935,7 @@ async function loadMem() {
   const rdtv=g('mread').value; if (rdtv) chips.push(['read:'+rdtv,'mread']);
   const expv=g('mexp').value; if (expv) chips.push(['exp:'+expv,'mexp']);
   const agec=g('mage').value; if (agec) chips.push(['age:'+agec,'mage']);
+  const stalec=g('mstale').value; if (stalec) chips.push(['stale>'+stalec,'mstale']);
   const bar = g('mem-chips');
   if (chips.length) {
     bar.style.display='flex';
@@ -1971,7 +1979,7 @@ function clearMemFilter(selId) {
   loadMem();
 }
 function clearAllMemFilters() {
-  ['mtype','mtrust','mproj','mtag','mdomain','mconf','mimportance','mlabel','mminw','mmaxw','mread','mexp','mage'].forEach(id => { const e=g(id); if(e) e.value=''; });
+  ['mtype','mtrust','mproj','mtag','mdomain','mconf','mimportance','mlabel','mminw','mmaxw','mread','mexp','mage','mstale'].forEach(id => { const e=g(id); if(e) e.value=''; });
   g('msort').value='updated';
   const mp=g('mpinned'); if(mp) mp.checked=false;
   const ms=g('mstarred'); if(ms) ms.checked=false;
