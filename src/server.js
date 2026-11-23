@@ -683,6 +683,27 @@ function handleImpDist(req, res) {
   json(res, result);
 }
 
+function handleMonthDist(req, res) {
+  const rows = getDb().prepare(`
+    SELECT strftime('%Y-%m', datetime(created_at/1000,'unixepoch','localtime')) as month,
+           COUNT(*) as count
+    FROM memories WHERE status='active'
+      AND created_at >= (strftime('%s', date('now','-11 months','start of month')) * 1000)
+    GROUP BY month ORDER BY month
+  `).all();
+  // Build a full 12-month array ending this month
+  const result = [];
+  for (let i = 11; i >= 0; i--) {
+    const d = new Date();
+    d.setDate(1);
+    d.setMonth(d.getMonth() - i);
+    const key = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    const found = rows.find(r => r.month === key);
+    result.push({ month: key, label: d.toLocaleString('default', { month: 'short' }), count: found ? found.count : 0 });
+  }
+  json(res, result);
+}
+
 function handleHourDist(req, res) {
   const rows = getDb().prepare(`
     SELECT CAST(strftime('%H', datetime(created_at/1000,'unixepoch','localtime')) AS INTEGER) as hour,
@@ -878,6 +899,7 @@ const ROUTES = {
   'GET /api/stats/label-dist':        (req, res) => handleLabelDist(req, res),
   'GET /api/stats/weekday-dist':      (req, res) => handleWeekdayDist(req, res),
   'GET /api/stats/hour-dist':         (req, res) => handleHourDist(req, res),
+  'GET /api/stats/month-dist':        (req, res) => handleMonthDist(req, res),
   'GET /api/stats/wordfreq': (req, res) => { const u = new URL(req.url,'http://l'); handleWordFreq(req, res, Object.fromEntries(u.searchParams)); },
   'GET /api/digest':         (req, res) => {
     const u = new URL(req.url, 'http://localhost');
@@ -3358,7 +3380,7 @@ async function loadDigest(period) {
   g('dg-body').innerHTML = html;
 }
 async function loadKStats() {
-  const [d, wf, cd, id2, db2, ld, wd, hd] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown'), api('/api/stats/label-dist'), api('/api/stats/weekday-dist'), api('/api/stats/hour-dist')]);
+  const [d, wf, cd, id2, db2, ld, wd, hd, md] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown'), api('/api/stats/label-dist'), api('/api/stats/weekday-dist'), api('/api/stats/hour-dist'), api('/api/stats/month-dist')]);
   const bar = (count, max, col) => {
     const w = max ? Math.round((count/max)*180) : 0;
     return \`<span style="display:inline-block;height:12px;width:\${w}px;background:\${col};border-radius:2px;vertical-align:middle;margin-right:6px"></span>\`;
@@ -3487,6 +3509,20 @@ async function loadKStats() {
           return \`<div style="display:flex;flex-direction:column;align-items:center" title="\${label}: \${r.count}">
             <span style="width:14px;height:28px;background:#3fb950;border-radius:2px;opacity:\${op}"></span>
             \${r.hour % 6 === 0 ? \`<span style="font-size:9px;color:#8b949e;margin-top:2px">\${r.hour}h</span>\` : '<span style="font-size:9px;margin-top:2px"> </span>'}
+          </div>\`;
+        }).join('');
+      })()}</div>
+    </div>\` : ''}
+    \${md && md.length ? \`<div id="ks-month-dist" style="margin-top:20px">
+      <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Activity — last 12 months</h4>
+      <div style="display:flex;align-items:flex-end;gap:4px;height:60px">\${(() => {
+        const maxM = Math.max(...md.map(r => r.count), 1);
+        return md.map(r => {
+          const h = Math.max(3, Math.round((r.count / maxM) * 50));
+          return \`<div style="display:flex;flex-direction:column;align-items:center;gap:2px" title="\${esc(r.month)}: \${r.count}">
+            <span style="font-size:9px;color:#8b949e">\${r.count || ''}</span>
+            <span style="width:22px;height:\${h}px;background:#d2a8ff;border-radius:2px 2px 0 0;opacity:\${r.count ? '.85' : '.15'};display:block"></span>
+            <span style="font-size:9px;color:#8b949e">\${esc(r.label)}</span>
           </div>\`;
         }).join('');
       })()}</div>
