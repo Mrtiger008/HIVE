@@ -136,6 +136,7 @@ const SORT_MAP = {
   importance: 'pinned DESC, importance DESC, updated_at DESC',
   confidence: 'pinned DESC, confidence DESC, updated_at DESC',
   label:      "pinned DESC, CASE label WHEN 'red' THEN 0 WHEN 'yellow' THEN 1 WHEN 'green' THEN 2 WHEN 'blue' THEN 3 ELSE 4 END, updated_at DESC",
+  starred:    'starred DESC, pinned DESC, updated_at DESC',
 };
 
 function list({ type, domain, project_id, trust_level, status = 'active', limit = 20, offset = 0, min_conf, max_conf, min_importance, sort } = {}) {
