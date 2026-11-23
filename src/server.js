@@ -776,6 +776,28 @@ const ROUTES = {
     try { json(res, importer.importDir(dirPath, { auto: !!body.auto, limit: body.limit || 500 })); }
     catch (e) { json(res, { error: e.message }, 400); }
   },
+  'POST /api/import/json': async (req, res) => {
+    const body = await readBody(req).catch(() => ({}));
+    const items = body.memories;
+    if (!Array.isArray(items) || !items.length) { json(res, { error: 'memories array required' }, 400); return; }
+    const imported = [], errors = [];
+    for (const [i, item] of items.entries()) {
+      try {
+        const m = memory.add({
+          title:        String(item.title  || '').trim(),
+          content:      String(item.content || '').trim(),
+          memory_type:  item.memory_type  || 'semantic',
+          tags:         Array.isArray(item.tags) ? item.tags : [],
+          domain:       item.domain       || undefined,
+          importance:   item.importance   != null ? +item.importance   : 5,
+          confidence:   item.confidence   != null ? +item.confidence   : 0.5,
+          trust_level:  item.trust_level  || 'OBSERVED',
+        });
+        imported.push(m.id);
+      } catch (e) { errors.push({ index: i, error: e.message }); }
+    }
+    json(res, { imported: imported.length, errors });
+  },
   'POST /api/calibrate/apply': async (req, res) => {
     const body = await readBody(req).catch(() => ({}));
     json(res, calibrate.apply({ limit: body.limit || 500 }));
@@ -1354,6 +1376,17 @@ input{width:360px}
   </div>
   <div id="imp-status" style="font-size:12px;color:#8b949e;margin-bottom:8px"></div>
   <div id="imp-list"></div>
+
+  <hr style="border-color:#21262d;margin:24px 0">
+  <h3 style="margin:0 0 12px;font-size:14px;color:#e6edf3">JSON Import</h3>
+  <p style="font-size:12px;color:#8b949e;margin-bottom:12px">Paste a JSON array of memory objects. Required fields: <code>title</code>, <code>content</code>. Optional: <code>memory_type</code>, <code>tags</code>, <code>domain</code>, <code>importance</code>, <code>confidence</code>, <code>trust_level</code>.</p>
+  <textarea id="jimp-input" rows="8" placeholder='[{"title":"…","content":"…","tags":["a","b"]}]' style="width:100%;font-family:monospace;font-size:12px;background:#0d1117;border:1px solid #30363d;border-radius:6px;color:#e6edf3;padding:8px;box-sizing:border-box;resize:vertical"></textarea>
+  <div class="row" style="gap:8px;margin-top:8px">
+    <button class="btn" onclick="jsonImportPreview()">🔍 Preview</button>
+    <button class="btn" id="jimp-go-btn" style="display:none;background:#238636;border-color:#238636" onclick="jsonImportAll()">⬆ Import All</button>
+  </div>
+  <div id="jimp-status" style="font-size:12px;color:#8b949e;margin:8px 0"></div>
+  <div id="jimp-list"></div>
 </div>
 
 <div id="tagcloud" class="tab">
@@ -2266,6 +2299,45 @@ async function importAll() {
   g('imp-status').textContent = \`✓ Imported \${n} memory/memories. \${(d.skipped||[]).length} skipped.\`;
   g('imp-list').innerHTML = \`<p style="color:#3fb950;font-size:13px">Done — \${n} new memories added.</p>\`;
   refreshStats();
+}
+
+// ── JSON Import ───────────────────────────────────────────────────────────
+let _jimpItems = [];
+function jsonImportPreview() {
+  const raw = g('jimp-input').value.trim();
+  g('jimp-status').textContent = '';
+  g('jimp-list').innerHTML = '';
+  g('jimp-go-btn').style.display = 'none';
+  if (!raw) { g('jimp-status').textContent = 'Paste JSON first.'; return; }
+  try { _jimpItems = JSON.parse(raw); } catch (e) { g('jimp-status').textContent = '⚠ Invalid JSON: ' + e.message; return; }
+  if (!Array.isArray(_jimpItems)) { g('jimp-status').textContent = '⚠ JSON must be an array.'; return; }
+  const valid = _jimpItems.filter(x => x && typeof x === 'object' && x.title && x.content);
+  const bad = _jimpItems.length - valid.length;
+  g('jimp-status').textContent = \`\${valid.length} valid · \${bad} missing title/content (will be skipped)\`;
+  if (!valid.length) return;
+  g('jimp-go-btn').style.display = '';
+  g('jimp-list').innerHTML = valid.slice(0,20).map(p =>
+    \`<div class="card" style="font-size:12px">
+      <div style="font-weight:600;color:#e6edf3">\${esc(p.title)}</div>
+      <div style="color:#484f58;margin-top:3px">\${esc((p.content||'').slice(0,100))}\${(p.content||'').length>100?'…':''}</div>
+      <div style="margin-top:4px"><span class="b bt">\${esc(p.memory_type||'semantic')}</span>\${(p.tags||[]).map(t=>\`<span class="b" style="color:#79c0ff">#\${esc(t)}</span>\`).join('')}</div>
+    </div>\`
+  ).join('') + (valid.length > 20 ? \`<p style="color:#8b949e;font-size:12px">… and \${valid.length-20} more</p>\` : '');
+}
+async function jsonImportAll() {
+  const btn = g('jimp-go-btn');
+  btn.disabled = true; btn.textContent = 'Importing…';
+  const r = await fetch('/api/import/json', {
+    method: 'POST', headers: {'Content-Type':'application/json','X-Hive-Local':'1'},
+    body: JSON.stringify({ memories: _jimpItems })
+  });
+  const d = await r.json();
+  btn.style.display = 'none';
+  if (d.error) { g('jimp-status').textContent = '⚠ ' + d.error; btn.disabled=false; return; }
+  g('jimp-status').textContent = \`✓ Imported \${d.imported} memor\${d.imported===1?'y':'ies'}.\${d.errors.length?' '+d.errors.length+' skipped.':''}\`;
+  g('jimp-list').innerHTML = \`<p style="color:#3fb950;font-size:13px">Done — \${d.imported} new memories added.</p>\`;
+  g('jimp-input').value = ''; _jimpItems = [];
+  refreshStats(); loadMem();
 }
 
 // ── Memory Compare ────────────────────────────────────────────────────────
