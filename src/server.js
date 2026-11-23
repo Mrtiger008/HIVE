@@ -209,7 +209,7 @@ function _ageToMs(age) {
 function handleMemories(req, res, q) {
   const pageSize = q.limit ? +(q.limit) : MEM_PAGE;
   const offset   = q.offset ? +(q.offset) : 0;
-  const needsPostFilter = q.tag || q.pinned || q.starred || q.label || q.min_words || q.max_words || q.read_time || q.expires || q.unread;
+  const needsPostFilter = q.tag || q.pinned || q.starred || q.label || q.min_words || q.max_words || q.read_time || q.expires || q.unread || q.notag;
   let results = memory.list({
     type:           q.type           || undefined,
     trust_level:    q.trust          || undefined,
@@ -243,6 +243,7 @@ function handleMemories(req, res, q) {
     if (q.expires === 'any')     results = results.filter(m => m.expires_at != null);
   }
   if (q.unread) results = results.filter(m => !m.read_at);
+  if (q.notag)  results = results.filter(m => !(m.tags && m.tags.length));
   // For post-filter case apply client-side pagination
   if (needsPostFilter) results = results.slice(offset, offset + pageSize);
   json(res, results);
@@ -1179,6 +1180,7 @@ input{width:360px}
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only <span id="pinned-badge" style="display:none;background:#1f4b8e55;border:1px solid #58a6ff55;border-radius:10px;padding:0 6px;color:#58a6ff;font-size:11px;font-weight:600"></span></label>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#d29922;white-space:nowrap"><input type="checkbox" id="mstarred" onchange="loadMem()"> ★ Starred only</label>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="munread" onchange="loadMem()"> Unread only</label>
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mnotag" onchange="loadMem()"> No tags</label>
     <select id="mlabel" onchange="loadMem()"><option value="">All labels</option><option value="red">🔴 Red</option><option value="yellow">🟡 Yellow</option><option value="green">🟢 Green</option><option value="blue">🔵 Blue</option><option value="purple">🟣 Purple</option><option value="orange">🟠 Orange</option><option value="teal">🩵 Teal</option><option value="pink">🩷 Pink</option></select>
     <button class="btn" onclick="exportFilteredCsv()" title="Export current filter as CSV" style="font-size:12px">⬇ CSV</button>
     <button class="btn" id="arch-all-btn" onclick="archiveAllFiltered()" title="Archive ALL memories matching the current filter" style="font-size:12px;color:#f85149;border-color:#f8514966">⚠ archive all</button>
@@ -1871,6 +1873,7 @@ function _memUrl(offset) {
   if (g('mpinned').checked)  u += '&pinned=1';
   if (g('mstarred').checked) u += '&starred=1';
   if (g('munread').checked)  u += '&unread=1';
+  if (g('mnotag').checked)   u += '&notag=1';
   const lbl = g('mlabel').value; if (lbl) u += '&label='+encodeURIComponent(lbl);
   const minw=g('mminw').value, maxw=g('mmaxw').value;
   if (minw) u += '&min_words='+minw; if (maxw) u += '&max_words='+maxw;
@@ -1903,6 +1906,7 @@ async function loadMem() {
   if (g('mpinned').checked)  chips.push(['pinned','mpinned']);
   if (g('mstarred').checked) chips.push(['★ starred','mstarred']);
   if (g('munread').checked)  chips.push(['unread','munread']);
+  if (g('mnotag').checked)   chips.push(['no tags','mnotag']);
   const lbl = g('mlabel').value; if (lbl) chips.push(['label:'+lbl,'mlabel']);
   const minwv=g('mminw').value, maxwv=g('mmaxw').value;
   if (minwv) chips.push(['words≥'+minwv,'mminw']); if (maxwv) chips.push(['words≤'+maxwv,'mmaxw']);
@@ -1957,6 +1961,7 @@ function clearAllMemFilters() {
   const mp=g('mpinned'); if(mp) mp.checked=false;
   const ms=g('mstarred'); if(ms) ms.checked=false;
   const mu=g('munread'); if(mu) mu.checked=false;
+  const mn=g('mnotag');  if(mn) mn.checked=false;
   loadMem();
 }
 function exportFilteredCsv() {
