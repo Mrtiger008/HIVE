@@ -1208,6 +1208,7 @@ input{width:360px}
 .card{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:16px;margin-bottom:10px}
 #ml.compact .card{padding:6px 12px;margin-bottom:4px}
 #ml.compact .cc,#ml.compact [id^="rel-"],#ml.compact .card>div:last-child:not(.ct):not(.cm){display:none!important}
+.card.kb-focus{outline:2px solid #58a6ff;outline-offset:2px}
 .ct{font-size:15px;font-weight:600;color:#e6edf3;margin-bottom:4px}
 .cm{font-size:12px;color:#8b949e;margin-bottom:8px}
 .cc{font-size:13px;white-space:pre-wrap;max-height:160px;overflow:hidden}
@@ -2010,6 +2011,7 @@ async function bulkLabel() {
 
 let _domainsLoaded = false;
 let _memOffset = 0;
+let _kbFocusIdx = -1;
 const _MEM_PAGE = 50;
 
 function _memUrl(offset) {
@@ -2043,6 +2045,7 @@ function _memUrl(offset) {
 
 async function loadMem() {
   _memOffset = 0;
+  _kbFocusIdx = -1;
   _sel.clear(); g('bulk-bar').style.display='none';
   // restore compact preference once
   if (localStorage.getItem('hive-compact')) { const ml=g('ml'); if(ml&&!ml.classList.contains('compact')){ml.classList.add('compact');const b=g('compact-toggle');if(b)b.textContent='⊞ Cards';} }
@@ -2932,6 +2935,18 @@ function toggleSortDir() {
   else localStorage.setItem('hive-sort-dir', next);
   const btn = g('msort-dir'); if (btn) btn.textContent = next === 'asc' ? '↑' : '↓';
   loadMem();
+}
+function kbFocus(dir) {
+  const cards = Array.from(document.querySelectorAll('#ml .card'));
+  if (!cards.length) return;
+  cards.forEach(c => c.classList.remove('kb-focus'));
+  if (_kbFocusIdx === -1) {
+    _kbFocusIdx = dir > 0 ? 0 : cards.length - 1;
+  } else {
+    _kbFocusIdx = (_kbFocusIdx + dir + cards.length) % cards.length;
+  }
+  cards[_kbFocusIdx].classList.add('kb-focus');
+  cards[_kbFocusIdx].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 async function bumpImportance(id, delta) {
   const badge = g('imp-' + id);
@@ -3936,6 +3951,14 @@ async function quickCaptureSave() {
       if (document.activeElement) document.activeElement.blur();
     } else if (e.key === '?' && !inInput) {
       toggleHelp();
+    } else if (e.key === 'j' && !inInput) {
+      kbFocus(1);
+    } else if (e.key === 'k' && !inInput) {
+      kbFocus(-1);
+    } else if (e.key === 'Enter' && !inInput && _kbFocusIdx >= 0) {
+      const cards = Array.from(document.querySelectorAll('#ml .card'));
+      const focused = cards[_kbFocusIdx];
+      if (focused && focused.dataset.id) { e.preventDefault(); showEdit(focused.dataset.id); }
     }
   });
   overlay.addEventListener('click', e => { if (e.target===overlay) overlay.style.display='none'; });

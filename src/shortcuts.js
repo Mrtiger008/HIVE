@@ -10,6 +10,9 @@ const SHORTCUTS = [
   { key: 'Escape', guard: 'always',   action: 'closeAll',     description: 'Close modal / clear focus' },
   { key: 'q',      guard: 'notInput', action: 'quickCapture', description: 'Quick capture a thought' },
   { key: '?',      guard: 'notInput', action: 'toggleHelp',   description: 'Show / hide shortcuts' },
+  { key: 'j',      guard: 'notInput', action: 'focusNextCard', description: 'Focus next memory card' },
+  { key: 'k',      guard: 'notInput', action: 'focusPrevCard', description: 'Focus previous memory card' },
+  { key: 'Enter',  guard: 'cardFocus',action: 'openCard',      description: 'Open focused card for editing' },
 ];
 
 module.exports = { SHORTCUTS };
