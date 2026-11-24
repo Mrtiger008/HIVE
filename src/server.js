@@ -752,6 +752,15 @@ function handleLabelDist(req, res) {
   json(res, result);
 }
 
+function handleTypeDist(req, res) {
+  const rows = getDb().prepare(`
+    SELECT memory_type as type, COUNT(*) as count
+    FROM memories WHERE status='active'
+    GROUP BY memory_type ORDER BY count DESC
+  `).all();
+  json(res, rows);
+}
+
 function handleDomainBreakdown(req, res) {
   const rows = getDb().prepare(`
     SELECT domain,
@@ -910,6 +919,7 @@ const ROUTES = {
   'GET /api/stats/importance-dist':    (req, res) => handleImpDist(req, res),
   'GET /api/stats/domain-breakdown':  (req, res) => handleDomainBreakdown(req, res),
   'GET /api/stats/label-dist':        (req, res) => handleLabelDist(req, res),
+  'GET /api/stats/type-dist':         (req, res) => handleTypeDist(req, res),
   'GET /api/stats/health-summary':    (req, res) => handleHealthSummary(req, res),
   'GET /api/stats/weekday-dist':      (req, res) => handleWeekdayDist(req, res),
   'GET /api/stats/hour-dist':         (req, res) => handleHourDist(req, res),
@@ -2969,6 +2979,27 @@ function applyHealthFilter(qs) {
   if (p.get('expires'))  { const e=g('mexp');       if(e) e.value=p.get('expires'); }
   loadMem();
 }
+async function applyStatsFilter(params) {
+  const btn = document.querySelector('nav button[onclick*="memories"]');
+  if (btn) btn.click();
+  clearAllMemFilters();
+  if (params.type)  { const e=g('mtype');  if(e) e.value=params.type; }
+  if (params.label) { const e=g('mlabel'); if(e) e.value=params.label; }
+  if (params.domain) {
+    const sel = g('mdomain');
+    if (sel) {
+      if (!_domainsLoaded) {
+        _domainsLoaded = true;
+        try { const doms = await api('/api/domains'); sel.innerHTML = '<option value="">All domains</option>' + doms.map(d=>\`<option>\${esc(d)}</option>\`).join(''); } catch {}
+      }
+      if (![...sel.options].some(o => o.value === params.domain)) {
+        const o = document.createElement('option'); o.value=params.domain; o.textContent=params.domain; sel.appendChild(o);
+      }
+      sel.value = params.domain;
+    }
+  }
+  loadMem();
+}
 async function flagMem(id, btn) {
   const r = await fetch(\`/api/memories/\${id}/flag\`,{method:'POST',headers:{'X-Hive-Local':'1'}});
   if (r.ok) { const m = await r.json(); btn.textContent = m.needs_review ? '🚩 flagged' : '🚩 flag'; btn.style.color = m.needs_review ? '#f85149' : ''; }
@@ -3476,7 +3507,7 @@ async function loadDigest(period) {
   g('dg-body').innerHTML = html;
 }
 async function loadKStats() {
-  const [d, wf, cd, id2, db2, ld, wd, hd, md, hs] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown'), api('/api/stats/label-dist'), api('/api/stats/weekday-dist'), api('/api/stats/hour-dist'), api('/api/stats/month-dist'), api('/api/stats/health-summary')]);
+  const [d, wf, cd, id2, db2, ld, wd, hd, md, hs, td] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown'), api('/api/stats/label-dist'), api('/api/stats/weekday-dist'), api('/api/stats/hour-dist'), api('/api/stats/month-dist'), api('/api/stats/health-summary'), api('/api/stats/type-dist')]);
   const bar = (count, max, col) => {
     const w = max ? Math.round((count/max)*180) : 0;
     return \`<span style="display:inline-block;height:12px;width:\${w}px;background:\${col};border-radius:2px;vertical-align:middle;margin-right:6px"></span>\`;
@@ -3570,20 +3601,36 @@ async function loadKStats() {
           <th style="text-align:right;color:#8b949e;padding:3px 10px;border-bottom:1px solid #21262d">Avg conf</th>
           <th style="text-align:right;color:#8b949e;padding:3px 0;border-bottom:1px solid #21262d">Avg imp</th>
         </tr></thead>
-        <tbody>\${db2.map(r => \`<tr>
-          <td style="color:#c9d1d9;padding:3px 10px 3px 0">\${esc(r.domain)}</td>
+        <tbody>\${db2.map(r => \`<tr style="cursor:pointer" onclick="applyStatsFilter({domain:'\${esc(r.domain)}'})" title="Filter memories by domain: \${esc(r.domain)}" onmouseover="this.style.background='#1f2937'" onmouseout="this.style.background=''">
+          <td style="color:#58a6ff;padding:3px 10px 3px 0">\${esc(r.domain)}</td>
           <td style="color:#79c0ff;text-align:right;padding:3px 10px">\${r.count}</td>
           <td style="color:#ffa657;text-align:right;padding:3px 10px">\${r.avg_conf != null ? Math.round(r.avg_conf*100)+'%' : '—'}</td>
           <td style="color:#3fb950;text-align:right;padding:3px 0">\${r.avg_importance != null ? r.avg_importance : '—'}</td>
         </tr>\`).join('')}</tbody>
       </table>
     </div>\` : ''}
+    \${td && td.length ? \`<div id="ks-type-dist" style="margin-top:20px">
+      <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Memory types <span style="font-weight:400;text-transform:none;letter-spacing:0;color:#484f58">(click to filter)</span></h4>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">\${(() => {
+        const maxT = Math.max(...td.map(r=>r.count), 1);
+        const TYPE_COL = {core:'#58a6ff',domain:'#3fb950',project:'#ffa657',episodic:'#d2a8ff',semantic:'#79c0ff',skill:'#ff7eb6'};
+        return td.map(r => {
+          const col = TYPE_COL[r.type] || '#8b949e';
+          const w = Math.max(18, Math.round((r.count/maxT)*80));
+          return \`<div style="display:flex;align-items:center;gap:6px;font-size:12px;cursor:pointer;padding:3px 8px;border-radius:4px;border:1px solid #21262d" onclick="applyStatsFilter({type:'\${esc(r.type)}'})" title="Filter by type: \${esc(r.type)}" onmouseover="this.style.borderColor='\${col}'" onmouseout="this.style.borderColor='#21262d'">
+            <span style="display:inline-block;height:8px;width:\${w}px;background:\${col};border-radius:2px;opacity:.8"></span>
+            <span style="color:#c9d1d9">\${esc(r.type)}</span>
+            <span style="color:#8b949e">\${r.count}</span>
+          </div>\`;
+        }).join('');
+      })()}</div>
+    </div>\` : ''}
     \${ld.length ? \`<div id="ks-label-dist" style="margin-top:20px">
       <h4 style="margin:0 0 8px;font-size:12px;color:#8b949e;text-transform:uppercase;letter-spacing:.05em">Label distribution</h4>
       <div style="display:flex;flex-wrap:wrap;gap:8px">\${ld.map(r => {
         const COLS = {red:'#f85149',yellow:'#d29922',green:'#3fb950',blue:'#58a6ff',purple:'#d2a8ff',orange:'#ffa657',teal:'#39c5cf',pink:'#ff7eb6',none:'#8b949e'};
         const col = COLS[r.label] || '#8b949e';
-        return \`<div style="display:flex;align-items:center;gap:5px;font-size:12px">
+        return \`<div style="display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer;padding:3px 6px;border-radius:4px" onclick="applyStatsFilter({label:'\${esc(r.label)}'})" title="Filter memories by label: \${esc(r.label)}" onmouseover="this.style.background='#1f2937'" onmouseout="this.style.background=''">
           <span style="width:10px;height:10px;border-radius:50%;background:\${col};display:inline-block;flex-shrink:0"></span>
           <span style="color:#c9d1d9">\${esc(r.label)}</span>
           <span style="color:#8b949e">\${r.count}</span>
