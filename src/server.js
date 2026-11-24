@@ -216,6 +216,7 @@ function handleMemories(req, res, q) {
     project_id:     q.project        || undefined,
     domain:         q.domain         || undefined,
     sort:           q.sort           || undefined,
+    sort_dir:       q.sort_dir       || 'desc',
     status:         q.status         || 'active',
     limit:          needsPostFilter ? 100000 : pageSize,
     offset:         needsPostFilter ? 0       : offset,
@@ -1316,6 +1317,7 @@ input{width:360px}
     <select id="mage" onchange="loadMem()" title="Created age filter"><option value="">Any age</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="90d">Last 90 days</option><option value="old">Older than 90d</option></select>
     <select id="mstale" onchange="loadMem()" title="Not updated in…"><option value="">Any freshness</option><option value="7d">Stale &gt;7d</option><option value="30d">Stale &gt;30d</option><option value="60d">Stale &gt;60d</option><option value="90d">Stale &gt;90d</option></select>
     <select id="msort" onchange="loadMem()" title="Sort order"><option value="updated">Sort: Updated</option><option value="created">Sort: Created</option><option value="importance">Sort: Importance</option><option value="confidence">Sort: Confidence</option><option value="label">Sort: Label</option><option value="starred">Sort: Starred</option></select>
+    <button id="msort-dir" class="btn" onclick="toggleSortDir()" title="Toggle sort direction: newest/highest first ↔ oldest/lowest first" style="font-size:12px;min-width:28px;padding:3px 7px">↓</button>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only <span id="pinned-badge" style="display:none;background:#1f4b8e55;border:1px solid #58a6ff55;border-radius:10px;padding:0 6px;color:#58a6ff;font-size:11px;font-weight:600"></span></label>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#d29922;white-space:nowrap"><input type="checkbox" id="mstarred" onchange="loadMem()"> ★ Starred only</label>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="munread" onchange="loadMem()"> Unread only</label>
@@ -2022,6 +2024,7 @@ function _memUrl(offset) {
   if (minC !== '') u += '&min_conf='+minC; if (maxC !== '') u += '&max_conf='+maxC;
   if (imp) u += '&min_importance='+imp;
   if (sort && sort !== 'updated') u += '&sort='+sort;
+  if ((localStorage.getItem('hive-sort-dir') || 'desc') === 'asc') u += '&sort_dir=asc';
   if (g('mpinned').checked)  u += '&pinned=1';
   if (g('mstarred').checked) u += '&starred=1';
   if (g('munread').checked)  u += '&unread=1';
@@ -2043,6 +2046,9 @@ async function loadMem() {
   _sel.clear(); g('bulk-bar').style.display='none';
   // restore compact preference once
   if (localStorage.getItem('hive-compact')) { const ml=g('ml'); if(ml&&!ml.classList.contains('compact')){ml.classList.add('compact');const b=g('compact-toggle');if(b)b.textContent='⊞ Cards';} }
+  // restore sort direction button state
+  const _sd = localStorage.getItem('hive-sort-dir') || 'desc';
+  const _sdb = g('msort-dir'); if (_sdb) _sdb.textContent = _sd === 'asc' ? '↑' : '↓';
   if (!_domainsLoaded) {
     _domainsLoaded = true;
     try {
@@ -2060,6 +2066,7 @@ async function loadMem() {
   if (dom) chips.push(['domain:'+dom,'mdomain']);
   if (imp) chips.push(['importance≥'+imp,'mimportance']);
   if (sort && sort !== 'updated') chips.push(['sort:'+sort,'msort']);
+  if (_sd === 'asc') chips.push(['↑ asc','msort-dir']);
   if (g('mpinned').checked)  chips.push(['pinned','mpinned']);
   if (g('mstarred').checked) chips.push(['★ starred','mstarred']);
   if (g('munread').checked)  chips.push(['unread','munread']);
@@ -2111,13 +2118,15 @@ function _updateMoreBtn(pageCount) {
 function clearMemFilter(selId) {
   const el = g(selId);
   if (!el) return;
-  if (el.type === 'checkbox') el.checked = false;
+  if (selId === 'msort-dir') { localStorage.removeItem('hive-sort-dir'); el.textContent = '↓'; }
+  else if (el.type === 'checkbox') el.checked = false;
   else el.value = '';
   loadMem();
 }
 function clearAllMemFilters() {
   ['mtype','mtrust','mproj','mtag','mdomain','mconf','mimportance','mlabel','mminw','mmaxw','mread','mexp','mage','mstale'].forEach(id => { const e=g(id); if(e) e.value=''; });
   g('msort').value='updated';
+  localStorage.removeItem('hive-sort-dir'); const sdd=g('msort-dir'); if(sdd) sdd.textContent='↓';
   const mp=g('mpinned'); if(mp) mp.checked=false;
   const ms=g('mstarred'); if(ms) ms.checked=false;
   const mu=g('munread'); if(mu) mu.checked=false;
@@ -2915,6 +2924,14 @@ function toggleCompactView() {
   const compact = ml.classList.toggle('compact');
   localStorage.setItem('hive-compact', compact ? '1' : '');
   if (btn) btn.textContent = compact ? '⊞ Cards' : '⊟ Compact';
+}
+function toggleSortDir() {
+  const cur = localStorage.getItem('hive-sort-dir') || 'desc';
+  const next = cur === 'asc' ? 'desc' : 'asc';
+  if (next === 'desc') localStorage.removeItem('hive-sort-dir');
+  else localStorage.setItem('hive-sort-dir', next);
+  const btn = g('msort-dir'); if (btn) btn.textContent = next === 'asc' ? '↑' : '↓';
+  loadMem();
 }
 function applyHealthFilter(qs) {
   // navigate to memories tab

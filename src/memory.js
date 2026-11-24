@@ -139,7 +139,7 @@ const SORT_MAP = {
   starred:    'starred DESC, pinned DESC, updated_at DESC',
 };
 
-function list({ type, domain, project_id, trust_level, status = 'active', limit = 20, offset = 0, min_conf, max_conf, min_importance, created_after, created_before, sort, flagged } = {}) {
+function list({ type, domain, project_id, trust_level, status = 'active', limit = 20, offset = 0, min_conf, max_conf, min_importance, created_after, created_before, sort, flagged, sort_dir = 'desc' } = {}) {
   let sql = 'SELECT * FROM memories WHERE 1=1';
   const params = [];
   if (type)           { sql += ' AND memory_type = ?';   params.push(type); }
@@ -153,7 +153,10 @@ function list({ type, domain, project_id, trust_level, status = 'active', limit 
   if (created_after != null)   { sql += ' AND created_at >= ?';  params.push(created_after); }
   if (created_before != null)  { sql += ' AND created_at < ?';   params.push(created_before); }
   if (flagged)                 { sql += ' AND needs_review = 1'; }
-  const order = SORT_MAP[sort] || SORT_MAP.updated;
+  const rawOrder = SORT_MAP[sort] || SORT_MAP.updated;
+  const order = sort_dir === 'asc'
+    ? rawOrder.replace(/\b(updated_at|created_at|importance|confidence|END) DESC/g, '$1 ASC')
+    : rawOrder;
   sql += ` ORDER BY ${order} LIMIT ? OFFSET ?`;
   params.push(limit, offset);
   return getDb().prepare(sql).all(...params).map(_parse);
