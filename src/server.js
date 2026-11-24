@@ -217,6 +217,7 @@ function handleMemories(req, res, q) {
     domain:         q.domain         || undefined,
     sort:           q.sort           || undefined,
     sort_dir:       q.sort_dir       || 'desc',
+    text_search:    q.search         || undefined,
     status:         q.status         || 'active',
     limit:          needsPostFilter ? 100000 : pageSize,
     offset:         needsPostFilter ? 0       : offset,
@@ -1327,6 +1328,7 @@ input{width:360px}
     <select id="mexp" onchange="loadMem()" title="Expiry filter"><option value="">Any expiry</option><option value="expired">⏰ Expired</option><option value="soon">⏳ Expiring soon (7d)</option><option value="any">📅 Has expiry</option></select>
     <select id="mage" onchange="loadMem()" title="Created age filter"><option value="">Any age</option><option value="7d">Last 7 days</option><option value="30d">Last 30 days</option><option value="90d">Last 90 days</option><option value="old">Older than 90d</option></select>
     <select id="mstale" onchange="loadMem()" title="Not updated in…"><option value="">Any freshness</option><option value="7d">Stale &gt;7d</option><option value="30d">Stale &gt;30d</option><option value="60d">Stale &gt;60d</option><option value="90d">Stale &gt;90d</option></select>
+    <input id="msearch" type="search" placeholder="🔍 title/content…" oninput="loadMem()" style="width:150px;font-size:12px;background:#21262d;border:1px solid #30363d;color:#e6edf3;border-radius:4px;padding:3px 7px" title="Filter memories by title or content text">
     <select id="msort" onchange="loadMem()" title="Sort order"><option value="updated">Sort: Updated</option><option value="created">Sort: Created</option><option value="importance">Sort: Importance</option><option value="confidence">Sort: Confidence</option><option value="label">Sort: Label</option><option value="starred">Sort: Starred</option></select>
     <button id="msort-dir" class="btn" onclick="toggleSortDir()" title="Toggle sort direction: newest/highest first ↔ oldest/lowest first" style="font-size:12px;min-width:28px;padding:3px 7px">↓</button>
     <label style="display:flex;align-items:center;gap:4px;font-size:12px;color:#8b949e;white-space:nowrap"><input type="checkbox" id="mpinned" onchange="loadMem()"> Pinned only <span id="pinned-badge" style="display:none;background:#1f4b8e55;border:1px solid #58a6ff55;border-radius:10px;padding:0 6px;color:#58a6ff;font-size:11px;font-weight:600"></span></label>
@@ -2035,6 +2037,8 @@ function _memUrl(offset) {
   if (dom) u += '&domain='+encodeURIComponent(dom);
   if (minC !== '') u += '&min_conf='+minC; if (maxC !== '') u += '&max_conf='+maxC;
   if (imp) u += '&min_importance='+imp;
+  const msrch = g('msearch') ? g('msearch').value.trim() : '';
+  if (msrch) u += '&search='+encodeURIComponent(msrch);
   if (sort && sort !== 'updated') u += '&sort='+sort;
   if ((localStorage.getItem('hive-sort-dir') || 'desc') === 'asc') u += '&sort_dir=asc';
   if (g('mpinned').checked)  u += '&pinned=1';
@@ -2078,6 +2082,8 @@ async function loadMem() {
   if (tg) chips.push(['tag:'+tg,'mtag']);
   if (dom) chips.push(['domain:'+dom,'mdomain']);
   if (imp) chips.push(['importance≥'+imp,'mimportance']);
+  const msrchv = g('msearch') ? g('msearch').value.trim() : '';
+  if (msrchv) chips.push(['🔍 '+msrchv, 'msearch']);
   if (sort && sort !== 'updated') chips.push(['sort:'+sort,'msort']);
   if (_sd === 'asc') chips.push(['↑ asc','msort-dir']);
   if (g('mpinned').checked)  chips.push(['pinned','mpinned']);
@@ -2137,7 +2143,7 @@ function clearMemFilter(selId) {
   loadMem();
 }
 function clearAllMemFilters() {
-  ['mtype','mtrust','mproj','mtag','mdomain','mconf','mimportance','mlabel','mminw','mmaxw','mread','mexp','mage','mstale'].forEach(id => { const e=g(id); if(e) e.value=''; });
+  ['mtype','mtrust','mproj','mtag','mdomain','mconf','mimportance','mlabel','mminw','mmaxw','mread','mexp','mage','mstale','msearch'].forEach(id => { const e=g(id); if(e) e.value=''; });
   g('msort').value='updated';
   localStorage.removeItem('hive-sort-dir'); const sdd=g('msort-dir'); if(sdd) sdd.textContent='↓';
   const mp=g('mpinned'); if(mp) mp.checked=false;
