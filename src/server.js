@@ -258,6 +258,23 @@ function handleMemories(req, res, q) {
   json(res, results);
 }
 
+function handleMemCount(req, res, q) {
+  json(res, { count: memory.count({
+    type:           q.type           || undefined,
+    trust_level:    q.trust          || undefined,
+    project_id:     q.project        || undefined,
+    domain:         q.domain         || undefined,
+    text_search:    q.search         || undefined,
+    status:         q.status         || 'active',
+    min_conf:       q.min_conf       != null ? +q.min_conf       : undefined,
+    max_conf:       q.max_conf       != null ? +q.max_conf       : undefined,
+    min_importance: q.min_importance != null ? +q.min_importance : undefined,
+    created_after:  q.age ? _ageToMs(q.age).after  : undefined,
+    created_before: q.age ? _ageToMs(q.age).before : undefined,
+    flagged:        q.flagged ? true : undefined,
+  }) });
+}
+
 function handlePatterns(req, res, q) {
   json(res, topKeywords({ days: +(q.days) || 30, limit: +(q.limit) || 20 }));
 }
@@ -899,6 +916,7 @@ const ROUTES = {
   'GET /api/tags':           handleTags,
   'GET /api/activity':       handleActivity,
   'GET /api/memories':         handleMemories,
+  'GET /api/memories/count':   handleMemCount,
   'GET /api/memories/random':  handleRandom,
   'GET /api/memories/similar': handleSimilar,
   'POST /api/capture':         handleCapture,
@@ -2108,9 +2126,13 @@ async function loadMem() {
   } else {
     bar.style.display='none'; bar.innerHTML='';
   }
-  const d = await api(_memUrl(0));
+  const _baseUrl = _memUrl(0);
+  const _countUrl = _baseUrl.replace(/^\/api\/memories(\?|$)/, '/api/memories/count\$1');
+  const [d, cnt] = await Promise.all([api(_baseUrl), api(_countUrl)]);
   g('ml').innerHTML = d.length ? d.map(card).join('') : '<p class="empty">No memories.</p>';
   _updateMoreBtn(d.length);
+  const qs = g('mem-qstats');
+  if (qs) qs.innerHTML = \`<span>\${cnt.count} memor\${cnt.count === 1 ? 'y' : 'ies'}</span>\`;
 }
 
 async function loadMoreMem() {

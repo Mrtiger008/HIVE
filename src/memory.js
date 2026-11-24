@@ -163,4 +163,22 @@ function list({ type, domain, project_id, trust_level, status = 'active', limit 
   return getDb().prepare(sql).all(...params).map(_parse);
 }
 
-module.exports = { add, get, update, remove, list };
+function count({ type, domain, project_id, trust_level, status = 'active', min_conf, max_conf, min_importance, created_after, created_before, flagged, text_search } = {}) {
+  let sql = 'SELECT COUNT(*) as n FROM memories WHERE 1=1';
+  const params = [];
+  if (type)           { sql += ' AND memory_type = ?';   params.push(type); }
+  if (domain)         { sql += ' AND domain = ?';         params.push(domain); }
+  if (project_id)     { sql += ' AND project_id = ?';     params.push(project_id); }
+  if (trust_level)    { sql += ' AND trust_level = ?';    params.push(trust_level); }
+  if (status)         { sql += ' AND status = ?';         params.push(status); }
+  if (min_conf != null)       { sql += ' AND confidence >= ?'; params.push(min_conf); }
+  if (max_conf != null)       { sql += ' AND confidence <= ?'; params.push(max_conf); }
+  if (min_importance != null) { sql += ' AND importance >= ?'; params.push(min_importance); }
+  if (created_after != null)  { sql += ' AND created_at >= ?'; params.push(created_after); }
+  if (created_before != null) { sql += ' AND created_at < ?';  params.push(created_before); }
+  if (flagged)                { sql += ' AND needs_review = 1'; }
+  if (text_search)            { const pat = `%${text_search.toLowerCase()}%`; sql += ' AND (LOWER(title) LIKE ? OR LOWER(content) LIKE ?)'; params.push(pat, pat); }
+  return getDb().prepare(sql).get(...params).n;
+}
+
+module.exports = { add, get, update, remove, list, count };
