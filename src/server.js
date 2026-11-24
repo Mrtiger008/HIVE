@@ -1205,6 +1205,8 @@ input{width:360px}
 .btn{background:#21262d;border:1px solid #30363d;color:#c9d1d9;padding:8px 16px;border-radius:6px;cursor:pointer;font-size:14px}
 .btn:hover{background:#30363d}
 .card{background:#161b22;border:1px solid #21262d;border-radius:8px;padding:16px;margin-bottom:10px}
+#ml.compact .card{padding:6px 12px;margin-bottom:4px}
+#ml.compact .cc,#ml.compact [id^="rel-"],#ml.compact .card>div:last-child:not(.ct):not(.cm){display:none!important}
 .ct{font-size:15px;font-weight:600;color:#e6edf3;margin-bottom:4px}
 .cm{font-size:12px;color:#8b949e;margin-bottom:8px}
 .cc{font-size:13px;white-space:pre-wrap;max-height:160px;overflow:hidden}
@@ -1324,6 +1326,7 @@ input{width:360px}
     <button class="btn" onclick="exportFilteredCsv()" title="Export current filter as CSV" style="font-size:12px">⬇ CSV</button>
     <button class="btn" id="arch-all-btn" onclick="archiveAllFiltered()" title="Archive ALL memories matching the current filter" style="font-size:12px;color:#f85149;border-color:#f8514966">⚠ archive all</button>
     <button class="btn" onclick="showRandom()" title="Open a random memory" style="font-size:12px">🎲 Surprise me</button>
+    <button class="btn" id="compact-toggle" onclick="toggleCompactView()" style="font-size:12px" title="Toggle compact/card view">⊟ Compact</button>
     <button class="btn" onclick="showAdd()" style="margin-left:auto">+ Add Memory</button>
   </div>
   <div id="mem-qstats" style="padding:6px 0 2px;font-size:12px;color:#8b949e;display:flex;gap:14px;flex-wrap:wrap"></div>
@@ -2038,6 +2041,8 @@ function _memUrl(offset) {
 async function loadMem() {
   _memOffset = 0;
   _sel.clear(); g('bulk-bar').style.display='none';
+  // restore compact preference once
+  if (localStorage.getItem('hive-compact')) { const ml=g('ml'); if(ml&&!ml.classList.contains('compact')){ml.classList.add('compact');const b=g('compact-toggle');if(b)b.textContent='⊞ Cards';} }
   if (!_domainsLoaded) {
     _domainsLoaded = true;
     try {
@@ -2904,6 +2909,12 @@ async function copyAsMarkdown(id, btn) {
   const md = await r.text();
   try { await navigator.clipboard.writeText(md); if (btn) btn.textContent = '✓ copied'; }
   catch { if (btn) btn.textContent = '✗ failed'; }
+}
+function toggleCompactView() {
+  const ml = g('ml'), btn = g('compact-toggle');
+  const compact = ml.classList.toggle('compact');
+  localStorage.setItem('hive-compact', compact ? '1' : '');
+  if (btn) btn.textContent = compact ? '⊞ Cards' : '⊟ Compact';
 }
 function applyHealthFilter(qs) {
   // navigate to memories tab
