@@ -10,9 +10,15 @@ credentials.*
 *_secret*
 *.cookie
 
-# Database (binary — keep backups separately)
+# Database (binary — keep backups separately; never commit personal data)
+database/*.db
 database/*.db-shm
 database/*.db-wal
+database/embeddings/
+database/models/
+
+# Memory files (personal notes — never commit)
+memory/
 
 # Logs
 logs/*.log
