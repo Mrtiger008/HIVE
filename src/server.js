@@ -470,6 +470,7 @@ async function handleUpdateMemory(req, res, id) {
   if (body.importance  !== undefined) updates.importance  = +body.importance;
   if (body.confidence  !== undefined) updates.confidence  = Math.min(1, Math.max(0, +body.confidence));
   if (body.tags        !== undefined) updates.tags        = body.tags;
+  if (body.domain      !== undefined) updates.domain      = body.domain || null;
   if (body.pinned      !== undefined) updates.pinned      = body.pinned ? 1 : 0;
   if (body.label       !== undefined) updates.label       = body.label || null;
   if (body.note        !== undefined) updates.note        = body.note  || null;
@@ -1731,6 +1732,7 @@ input{width:360px}
     <div class="f"><label>Trust</label><select id="nm-tr"><option>OBSERVED</option><option>USER_CONFIRMED</option><option>SOURCE_VERIFIED</option><option>INFERRED</option></select></div>
     <div class="f"><label>Importance (1–10)</label><input id="nm-i" type="number" min="1" max="10" value="5"></div>
     <div class="f"><label>Confidence (0–1) <span style="font-weight:normal;color:#8b949e">how certain this is</span></label><input id="nm-cf" type="number" min="0" max="1" step="0.05" value="0.5" style="width:88px"></div>
+    <div class="f"><label>Domain <span style="font-weight:normal;color:#8b949e">(optional — group related memories)</span></label><input id="nm-do" list="nm-domains-dl" style="width:100%" placeholder="e.g. physics, work, cooking" autocomplete="off"><datalist id="nm-domains-dl"></datalist></div>
     <div class="f"><label>Tags <span style="font-weight:normal;color:#8b949e">(comma-separated)</span></label><div style="position:relative"><input id="nm-tg" style="width:100%" placeholder="e.g. javascript, async, todo" oninput="tagSuggest(this)" onkeydown="tagSuggestKey(event)" onblur="setTimeout(()=>{const s=g('nm-tg-sug');if(s)s.style.display='none'},150)" autocomplete="off"><div id="nm-tg-sug" style="display:none;position:absolute;top:100%;left:0;right:0;background:#161b22;border:1px solid #30363d;border-radius:6px;z-index:200;max-height:180px;overflow-y:auto;box-shadow:0 4px 12px rgba(0,0,0,.5)"></div></div></div>
     <div class="f"><label>Note <span style="font-weight:normal;color:#8b949e">(optional sticky comment)</span></label><textarea id="nm-nt" rows="2" placeholder="Short note or reminder about this memory…" style="width:100%"></textarea></div>
     <div class="f"><label>Expiry date <span style="font-weight:normal;color:#8b949e">(optional — shows expired badge after this date)</span></label><input id="nm-ex" type="date" style="width:180px"></div>
@@ -2916,13 +2918,15 @@ async function showRandom() {
   \`;
 }
 
-function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-cf').value='0.5'; g('nm-tg').value=''; g('nm-nt').value=''; g('nm-ex').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); _loadTemplates().then(()=>renderTplChips('semantic')); }
-async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-cf').value=d.confidence!=null?d.confidence:0.5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-nt').value=d.note||''; g('nm-ex').value=d.expires_at?new Date(d.expires_at).toISOString().slice(0,10):''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); }
+function loadDomainsDl() { api('/api/domains').then(doms => { const dl=g('nm-domains-dl'); if(dl){ dl.innerHTML=doms.map(d=>\`<option value="\${esc(d)}">\`).join(''); } }); }
+function showAdd() { _editId=null; g('nm-h').textContent='Add Memory'; g('nm-t').value=''; g('nm-c').value=''; g('nm-ty').value='semantic'; g('nm-tr').value='OBSERVED'; g('nm-i').value='5'; g('nm-cf').value='0.5'; g('nm-tg').value=''; g('nm-do').value=''; g('nm-nt').value=''; g('nm-ex').value=''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); loadDomainsDl(); _loadTemplates().then(()=>renderTplChips('semantic')); }
+async function showEdit(id) { const d=await api('/api/memories/'+id); _editId=id; g('nm-h').textContent='Edit Memory'; g('nm-t').value=d.title||''; g('nm-c').value=d.content||''; g('nm-ty').value=d.memory_type||'semantic'; g('nm-tr').value=d.trust_level||'OBSERVED'; g('nm-i').value=d.importance||5; g('nm-cf').value=d.confidence!=null?d.confidence:0.5; g('nm-tg').value=(d.tags||[]).join(', '); g('nm-do').value=d.domain||''; g('nm-nt').value=d.note||''; g('nm-ex').value=d.expires_at?new Date(d.expires_at).toISOString().slice(0,10):''; g('nm-err').textContent=''; g('add-modal').classList.add('on'); loadDomainsDl(); }
 function closeAdd() { g('add-modal').classList.remove('on'); g('nm-dup').style.display='none'; }
 function _buildPayload() {
   const rawTags = g('nm-tg').value.split(',').map(t=>t.trim()).filter(Boolean);
   const exDate = g('nm-ex').value; const expires_at = exDate ? new Date(exDate).getTime() : undefined;
-  return { title: g('nm-t').value.trim(), content: g('nm-c').value.trim(), memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value, confidence: +g('nm-cf').value, tags: rawTags, note: g('nm-nt').value.trim() || undefined, expires_at };
+  const domain = g('nm-do').value.trim() || undefined;
+  return { title: g('nm-t').value.trim(), content: g('nm-c').value.trim(), memory_type: g('nm-ty').value, trust_level: g('nm-tr').value, importance: +g('nm-i').value, confidence: +g('nm-cf').value, tags: rawTags, domain, note: g('nm-nt').value.trim() || undefined, expires_at };
 }
 async function _doSave(payload) {
   const r = _editId
