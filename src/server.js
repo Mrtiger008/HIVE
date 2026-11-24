@@ -728,6 +728,17 @@ function handleWeekdayDist(req, res) {
   json(res, DAYS.map((label, i) => ({ label, count: map[i] || 0 })));
 }
 
+function handleHealthSummary(req, res) {
+  const db = getDb();
+  const now = Date.now();
+  const stale90 = now - 90 * 86400000;
+  const flagged  = db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active' AND needs_review=1").get().n;
+  const stale    = db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active' AND updated_at < ?").get(stale90).n;
+  const untagged = db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active' AND (tags IS NULL OR tags='[]' OR tags='')").get().n;
+  const expired  = db.prepare("SELECT COUNT(*) as n FROM memories WHERE status='active' AND expires_at IS NOT NULL AND expires_at < ?").get(now).n;
+  json(res, { flagged, stale, untagged, expired });
+}
+
 function handleLabelDist(req, res) {
   const db = getDb();
   const LABELS = ['red','yellow','green','blue','purple','orange','teal','pink'];
@@ -898,6 +909,7 @@ const ROUTES = {
   'GET /api/stats/importance-dist':    (req, res) => handleImpDist(req, res),
   'GET /api/stats/domain-breakdown':  (req, res) => handleDomainBreakdown(req, res),
   'GET /api/stats/label-dist':        (req, res) => handleLabelDist(req, res),
+  'GET /api/stats/health-summary':    (req, res) => handleHealthSummary(req, res),
   'GET /api/stats/weekday-dist':      (req, res) => handleWeekdayDist(req, res),
   'GET /api/stats/hour-dist':         (req, res) => handleHourDist(req, res),
   'GET /api/stats/month-dist':        (req, res) => handleMonthDist(req, res),
@@ -2893,6 +2905,19 @@ async function copyAsMarkdown(id, btn) {
   try { await navigator.clipboard.writeText(md); if (btn) btn.textContent = '✓ copied'; }
   catch { if (btn) btn.textContent = '✗ failed'; }
 }
+function applyHealthFilter(qs) {
+  // navigate to memories tab
+  const btn = document.querySelector('nav button[onclick*="memories"]');
+  if (btn) btn.click();
+  // parse and apply filters
+  const p = new URLSearchParams(qs.replace(/^\?/,''));
+  clearAllMemFilters();
+  if (p.get('flagged'))  { const e=g('mflagged');  if(e) e.checked=true; }
+  if (p.get('notag'))    { const e=g('mnotag');     if(e) e.checked=true; }
+  if (p.get('stale'))    { const e=g('mstale');     if(e) e.value=p.get('stale'); }
+  if (p.get('expires'))  { const e=g('mexp');       if(e) e.value=p.get('expires'); }
+  loadMem();
+}
 async function flagMem(id, btn) {
   const r = await fetch(\`/api/memories/\${id}/flag\`,{method:'POST',headers:{'X-Hive-Local':'1'}});
   if (r.ok) { const m = await r.json(); btn.textContent = m.needs_review ? '🚩 flagged' : '🚩 flag'; btn.style.color = m.needs_review ? '#f85149' : ''; }
@@ -3400,7 +3425,7 @@ async function loadDigest(period) {
   g('dg-body').innerHTML = html;
 }
 async function loadKStats() {
-  const [d, wf, cd, id2, db2, ld, wd, hd, md] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown'), api('/api/stats/label-dist'), api('/api/stats/weekday-dist'), api('/api/stats/hour-dist'), api('/api/stats/month-dist')]);
+  const [d, wf, cd, id2, db2, ld, wd, hd, md, hs] = await Promise.all([api('/api/stats/full'), api('/api/stats/wordfreq?limit=60'), api('/api/stats/confidence-dist'), api('/api/stats/importance-dist'), api('/api/stats/domain-breakdown'), api('/api/stats/label-dist'), api('/api/stats/weekday-dist'), api('/api/stats/hour-dist'), api('/api/stats/month-dist'), api('/api/stats/health-summary')]);
   const bar = (count, max, col) => {
     const w = max ? Math.round((count/max)*180) : 0;
     return \`<span style="display:inline-block;height:12px;width:\${w}px;background:\${col};border-radius:2px;vertical-align:middle;margin-right:6px"></span>\`;
@@ -3416,6 +3441,15 @@ async function loadKStats() {
   const sparkId = 'ks-spark-'+Date.now();
   const maxG = Math.max(...d.growth.map(g=>g.count), 1);
   const html = \`
+    \${hs ? \`<div id="ks-health-summary" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px">\${[
+      {label:'Flagged',count:hs.flagged,col:'#f85149',filter:'?flagged=1',tip:'Needs review'},
+      {label:'Stale 90d+',count:hs.stale,col:'#d29922',filter:'?stale=90d',tip:'Not updated in 90 days'},
+      {label:'Untagged',count:hs.untagged,col:'#8b949e',filter:'?notag=1',tip:'No tags'},
+      {label:'Expired',count:hs.expired,col:'#f0883e',filter:'?expires=expired',tip:'Past expiry date'},
+    ].map(item => item.count === 0 ? '' : \`<button onclick="applyHealthFilter('\${item.filter}')" style="background:#21262d;border:1px solid \${item.col}44;border-radius:6px;padding:6px 12px;cursor:pointer;text-align:left;min-width:90px" title="\${item.tip}">
+      <div style="font-size:20px;font-weight:700;color:\${item.col}">\${item.count}</div>
+      <div style="font-size:11px;color:#8b949e;margin-top:1px">\${item.label}</div>
+    </button>\`).join('')}\${[hs.flagged,hs.stale,hs.untagged,hs.expired].every(n=>n===0)?'<span style="font-size:12px;color:#3fb950">✓ All clear</span>':''}</div>\` : ''}
     <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:20px">
       \${[['Memories',d.total,'#58a6ff'],['Archived',d.archived,'#8b949e'],['Entities',d.entities,'#d2a8ff'],['Projects',d.projects,'#3fb950']].map(([l,v,c])=>\`
         <div style="text-align:center;min-width:80px"><div style="font-size:28px;font-weight:700;color:\${c}">\${v}</div><div style="font-size:11px;color:#8b949e;margin-top:2px">\${l}</div></div>
